@@ -23,11 +23,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatCurrency, cn } from "@/lib/utils";
+import { customerToSearchResult } from "@/lib/customer-search";
 import { readApiResponse } from "@/lib/api-error";
 import { InvoiceWizardShell } from "./invoice-wizard-shell";
 import { InvoiceWizardNav } from "./invoice-wizard-nav";
 import { InvoiceSummaryPanel, InvoiceSummaryMobileBar } from "./invoice-summary-panel";
 import { InvoiceItemRow } from "./invoice-item-row";
+import { InvoiceCustomerStep, validateCustomerStep } from "@/components/invoices/invoice-customer-step";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -44,9 +46,9 @@ function StepCard({
   headerAction?: React.ReactNode;
 }) {
   return (
-    <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-card/85 shadow-[0_4px_24px_rgba(0,112,192,0.14),0_1px_3px_rgba(15,23,42,0.06)] backdrop-blur-md dark:border-primary/25 dark:shadow-[0_8px_40px_rgba(0,112,192,0.2)]">
-      <div className="h-0.5 bg-gradient-to-r from-[#0070C0] via-[#38bdf8] to-[#0070C0]/40" />
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-primary/10 px-4 py-3 sm:px-5">
+    <div className="relative overflow-visible rounded-xl border bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-md border-[#E2E8F0] dark:border-primary/25 dark:bg-card/85 dark:shadow-[0_8px_40px_rgba(0,112,192,0.2)]">
+      <div className="h-0.5 bg-gradient-to-r from-[#0EA5E9] via-[#38bdf8] to-[#0284C7]/60" />
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E2E8F0] px-4 py-3 sm:px-5 dark:border-primary/10">
         <div>
           <h3 className="text-lg font-bold tracking-tight text-foreground">{title}</h3>
           {description && (
@@ -67,8 +69,11 @@ export default function InvoiceWizard() {
   const [loading, setLoading] = useState(false);
 
   const {
+    customerId,
     customerName,
     customerMobile,
+    customerAddress,
+    customerGst,
     invoiceDate,
     gstEnabled,
     cgstRate,
@@ -79,6 +84,7 @@ export default function InvoiceWizard() {
     items,
     setCustomerName,
     setCustomerMobile,
+    setSelectedCustomer,
     setGstEnabled,
     setCgstRate,
     setSgstRate,
@@ -97,7 +103,7 @@ export default function InvoiceWizard() {
   );
 
   useEffect(() => {
-    fetch("/api/settings")
+    fetch("/api/settings/billing-defaults")
       .then((r) => r.json())
       .then((s) => {
         setGstEnabled(s.gstEnabled ?? true);
@@ -106,16 +112,26 @@ export default function InvoiceWizard() {
       });
     const prefillName = searchParams.get("customerName");
     const prefillMobile = searchParams.get("customerMobile");
-    if (prefillName) setCustomerName(prefillName);
-    if (prefillMobile) setCustomerMobile(prefillMobile);
+    const prefillCustomerId = searchParams.get("customerId");
+    if (prefillCustomerId) {
+      fetch(`/api/customers/${prefillCustomerId}`)
+        .then((r) => r.json())
+        .then((c) => {
+          if (c?.id) {
+            setSelectedCustomer(customerToSearchResult(c));
+          }
+        });
+    } else {
+      if (prefillName) setCustomerName(prefillName);
+      if (prefillMobile) setCustomerMobile(prefillMobile);
+    }
     return () => reset();
-  }, [searchParams, setCustomerName, setCustomerMobile, setGstEnabled, setCgstRate, setSgstRate, reset]);
+  }, [searchParams, setCustomerName, setCustomerMobile, setSelectedCustomer, setGstEnabled, setCgstRate, setSgstRate, reset]);
 
   const goTo = (next: Step) => setStep(next);
 
   const validateStep = (s: Step): boolean => {
-    if (s === 0 && !customerName.trim()) {
-      toast.error("Enter customer name");
+    if (s === 0 && !validateCustomerStep(customerId)) {
       return false;
     }
     if (s === 1) {
@@ -173,8 +189,11 @@ export default function InvoiceWizard() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          customerId: customerId || undefined,
           customerName: customerName.trim(),
           customerMobile: customerMobile.trim() || undefined,
+          customerAddress: customerAddress.trim() || undefined,
+          customerGst: customerGst.trim() || undefined,
           invoiceDate,
           paymentStatus,
           paymentMethod,
@@ -252,7 +271,7 @@ export default function InvoiceWizard() {
       </header>
 
       <nav
-        className="mb-5 flex flex-wrap items-center justify-center gap-1 rounded-lg border border-primary/15 bg-card/75 px-2 py-1.5 shadow-md shadow-primary/5 backdrop-blur-md"
+        className="mb-5 flex flex-wrap items-center justify-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:border-primary/15 dark:bg-card/75 dark:shadow-md dark:shadow-primary/5 dark:backdrop-blur-md"
         aria-label="Invoice steps"
       >
         {STEPS.map((label, i) => {
@@ -287,29 +306,8 @@ export default function InvoiceWizard() {
         <div className="lg:col-span-3">
           <div key={step} className="transition-opacity duration-200">
             {step === 0 && (
-              <StepCard title="Customer" description="Name required · mobile optional">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-sm font-semibold">Customer Name *</Label>
-                    <Input
-                      className="h-11 border-primary/20 text-base"
-                      placeholder="Customer name"
-                      value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      autoFocus
-                    />
-                  </div>
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <Label className="text-sm font-semibold">Mobile Number</Label>
-                    <Input
-                      className="h-11 border-primary/20 text-base"
-                      placeholder="Optional"
-                      inputMode="tel"
-                      value={customerMobile}
-                      onChange={(e) => setCustomerMobile(e.target.value)}
-                    />
-                  </div>
-                </div>
+              <StepCard title="Customer" description="Search existing or create new customer">
+                <InvoiceCustomerStep />
               </StepCard>
             )}
 
@@ -441,7 +439,7 @@ export default function InvoiceWizard() {
             {step === 3 && (
               <StepCard title="Review" description="Confirm before generating">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <section className="rounded-lg border border-primary/15 bg-card/60 p-3">
+                  <section className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 dark:border-primary/15 dark:bg-card/60">
                     <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">
                       Customer
                     </h4>
@@ -450,7 +448,7 @@ export default function InvoiceWizard() {
                       <p className="text-sm text-muted-foreground">{customerMobile}</p>
                     )}
                   </section>
-                  <section className="rounded-lg border border-primary/15 bg-card/60 p-3">
+                  <section className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 dark:border-primary/15 dark:bg-card/60">
                     <h4 className="mb-1 text-xs font-bold uppercase tracking-wide text-primary">
                       Payment
                     </h4>
@@ -462,7 +460,7 @@ export default function InvoiceWizard() {
                       Due {formatCurrency(payment.amountRemaining)}
                     </p>
                   </section>
-                  <section className="rounded-lg border border-primary/15 bg-card/60 p-3 sm:col-span-2">
+                  <section className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:col-span-2 dark:border-primary/15 dark:bg-card/60">
                     <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-primary">
                       Items ({items.length})
                     </h4>

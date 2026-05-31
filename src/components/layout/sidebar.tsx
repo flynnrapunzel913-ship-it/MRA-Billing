@@ -1,53 +1,172 @@
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  Users,
-  FileText,
-  BarChart3,
-  Settings,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+"use client";
+
+
+
 import { Role } from "@prisma/client";
-import { SidebarBrand } from "@/components/branding/academy-logo";
 
-const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "RECEPTIONIST"] },
-  { href: "/customers", label: "Customers", icon: Users, roles: ["ADMIN", "RECEPTIONIST"] },
-  { href: "/invoices", label: "Invoices", icon: FileText, roles: ["ADMIN", "RECEPTIONIST"] },
-  { href: "/reports", label: "Reports", icon: BarChart3, roles: ["ADMIN"] },
-  { href: "/settings", label: "Settings", icon: Settings, roles: ["ADMIN"] },
-];
+import { cn } from "@/lib/utils";
 
-export function Sidebar({ role }: { role: Role }) {
-  const pathname = usePathname();
+import { getNavGroupsForRole } from "./nav-config";
+
+import { SidebarNavGroups } from "./sidebar-nav-link";
+
+import { SidebarLogoCard } from "./sidebar-logo-card";
+
+import { SidebarUserCard } from "./sidebar-user-card";
+
+
+
+const sidebarShellClass = cn(
+
+  "relative flex min-h-screen h-screen w-64 shrink-0 flex-col border-r",
+
+  "border-[#E2E8F0] bg-white shadow-[4px_0_24px_rgba(0,0,0,0.03)]",
+
+  "dark:border-white/[0.08] dark:bg-gradient-to-b dark:from-[#07111F] dark:via-[#0B1730] dark:to-[#0D2342] dark:shadow-none"
+
+);
+
+
+
+function SidebarWaveOverlay() {
 
   return (
-    <aside className="hidden w-64 shrink-0 border-r border-white/30 bg-card/90 backdrop-blur-md lg:block dark:border-white/10">
-      <SidebarBrand />
-      <nav className="space-y-1 p-4">
-        {navItems
-          .filter((item) => item.roles.includes(role))
-          .map((item) => {
-            const Icon = item.icon;
-            const active = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                  active
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </Link>
-            );
-          })}
-      </nav>
-    </aside>
+
+    <>
+
+      <div
+
+        className="pointer-events-none absolute inset-0 opacity-[0.04] dark:opacity-[0.04]"
+
+        style={{
+
+          backgroundImage: "url(/backgrounds/pool-background.png)",
+
+          backgroundSize: "cover",
+
+          backgroundPosition: "center",
+
+        }}
+
+        aria-hidden
+
+      />
+
+      <div
+
+        className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0EA5E9]/[0.04] via-transparent to-[#38BDF8]/[0.06] dark:from-[#38BDF8]/[0.03] dark:to-[#0EA5E9]/[0.05]"
+
+        aria-hidden
+
+      />
+
+    </>
+
   );
+
 }
+
+
+
+export function Sidebar({
+
+  role,
+
+  userName,
+
+  className,
+
+  onNavigate,
+
+}: {
+
+  role: Role;
+
+  userName: string;
+
+  className?: string;
+
+  onNavigate?: () => void;
+
+}) {
+
+  const groups = getNavGroupsForRole(role);
+
+
+
+  return (
+
+    <aside className={cn(sidebarShellClass, "hidden lg:sticky lg:top-0 lg:flex", className)}>
+
+      <SidebarWaveOverlay />
+
+      <div className="relative z-10 flex h-full min-h-0 flex-col">
+
+        <SidebarLogoCard />
+
+        <nav className="flex-1 overflow-y-auto px-3 py-2">
+
+          <SidebarNavGroups groups={groups} onNavigate={onNavigate} />
+
+        </nav>
+
+        <SidebarUserCard userName={userName} role={role} />
+
+      </div>
+
+    </aside>
+
+  );
+
+}
+
+
+
+export function MobileSidebar({
+
+  role,
+
+  userName,
+
+  onNavigate,
+
+}: {
+
+  role: Role;
+
+  userName: string;
+
+  onNavigate?: () => void;
+
+}) {
+
+  const groups = getNavGroupsForRole(role);
+
+
+
+  return (
+
+    <aside className={cn(sidebarShellClass, "flex h-full flex-col")}>
+
+      <SidebarWaveOverlay />
+
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col pt-14">
+
+        <SidebarLogoCard />
+
+        <nav className="flex-1 overflow-y-auto px-3 py-2">
+
+          <SidebarNavGroups groups={groups} onNavigate={onNavigate} />
+
+        </nav>
+
+        <SidebarUserCard userName={userName} role={role} />
+
+      </div>
+
+    </aside>
+
+  );
+
+}
+

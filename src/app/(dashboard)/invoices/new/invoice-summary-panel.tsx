@@ -48,7 +48,11 @@ export function InvoiceSummaryPanel({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "sticky top-4 overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-b from-card/95 via-card/90 to-[#0070C0]/8 p-3 shadow-[0_8px_32px_rgba(0,112,192,0.12)] backdrop-blur-lg dark:shadow-[0_8px_32px_rgba(0,112,192,0.18)]",
+        "sticky top-4 overflow-hidden rounded-xl border p-3 backdrop-blur-lg",
+        "border-[#0EA5E9]/20 bg-gradient-to-b from-white via-white to-[#E0F2FE]/40",
+        "shadow-[0_8px_30px_rgba(14,165,233,0.1)]",
+        "dark:border-primary/20 dark:from-card/95 dark:via-card/90 dark:to-[#0070C0]/8",
+        "dark:shadow-[0_8px_32px_rgba(0,112,192,0.18)]",
         className
       )}
     >
@@ -105,7 +109,7 @@ export function InvoiceSummaryPanel({ className }: { className?: string }) {
             </>
           )}
 
-          <div className="mt-2 rounded-lg border border-primary/25 bg-gradient-to-r from-primary/15 via-[#38bdf8]/10 to-primary/5 px-2.5 py-2 shadow-[0_0_24px_rgba(0,112,192,0.2)]">
+          <div className="mt-2 rounded-lg border border-[#0EA5E9]/25 bg-gradient-to-r from-[#0EA5E9]/10 via-[#38bdf8]/8 to-[#E0F2FE]/50 px-2.5 py-2 shadow-[0_4px_20px_rgba(14,165,233,0.12)] dark:border-primary/25 dark:from-primary/15 dark:via-[#38bdf8]/10 dark:to-primary/5 dark:shadow-[0_0_24px_rgba(0,112,192,0.2)]">
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-foreground">Grand Total</span>
               <span className="text-lg font-bold tabular-nums text-primary">
@@ -140,7 +144,9 @@ export function InvoiceSummaryMobileBar({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-gradient-to-r from-card/90 to-primary/5 px-3 py-2 text-sm shadow-md backdrop-blur-md lg:hidden",
+        "flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm backdrop-blur-md lg:hidden",
+        "border-[#0EA5E9]/20 bg-gradient-to-r from-white to-[#E0F2FE]/40 shadow-[0_4px_16px_rgba(14,165,233,0.08)]",
+        "dark:border-primary/20 dark:from-card/90 dark:to-primary/5 dark:shadow-md",
         className
       )}
     >

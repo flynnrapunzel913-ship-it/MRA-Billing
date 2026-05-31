@@ -9,6 +9,11 @@ import {
 } from "@/lib/invoice-utils";
 import { generateMembershipId } from "@/lib/utils";
 import { serializeInvoiceForJson } from "@/lib/serialize-prisma";
+import { recordCustomerActivity } from "@/lib/customer-activity";
+import { recordUserActivity } from "@/lib/user-activity";
+import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { apiErrorResponse, prismaErrorMessage } from "@/lib/api-error";
+import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 
 async function getGstSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
@@ -25,23 +30,12 @@ function parseOptionalDate(value?: string) {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function prismaErrorMessage(error: unknown): string {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P1001") {
-      return "Database is unavailable. Please check your connection and try again.";
-    }
-    if (error.code === "P2002") {
-      return "A record with this value already exists.";
-    }
-  }
-  if (error instanceof Error) return error.message;
-  return "Invoice creation failed";
-}
-
 export async function GET(request: NextRequest) {
   try {
     const { error } = await requireAuth();
     if (error) return error;
+
+    const invoiceWhere = await getActiveInvoiceWhere();
 
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get("q") || "";
@@ -49,6 +43,7 @@ export async function GET(request: NextRequest) {
 
     const invoices = await prisma.invoice.findMany({
       where: {
+        ...invoiceWhere,
         AND: [
           q
             ? {
@@ -71,12 +66,8 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(invoices.map(serializeInvoiceForJson));
-  } catch (e) {
-    console.error("[GET /api/invoices]", e);
-    return NextResponse.json(
-      { success: false, error: prismaErrorMessage(e) },
-      { status: 500 }
-    );
+  } catch (error) {
+    return apiErrorResponse(error, "Failed to load invoices");
   }
 }
 
@@ -144,29 +135,55 @@ export async function POST(request: NextRequest) {
     const year = invoiceDate.getFullYear();
 
     const invoice = await prisma.$transaction(async (tx) => {
-      let customerId: string | null = null;
+      let customerId: string | null = data.customerId ?? null;
+      let customerName = data.customerName;
+      let customerMobile = data.customerMobile?.trim() || null;
+      let customerAddress = data.customerAddress?.trim() || null;
+      let customerGst = data.customerGst?.trim() || null;
 
-      const mobile = data.customerMobile?.trim();
-      if (mobile) {
-        const existing = await tx.customer.findFirst({ where: { mobile } });
-        if (existing) {
-          if (existing.name !== data.customerName) {
-            await tx.customer.update({
-              where: { id: existing.id },
-              data: { name: data.customerName },
+      if (customerId) {
+        const customer = await tx.customer.findUnique({ where: { id: customerId } });
+        if (!customer) {
+          throw new Error("Selected customer not found");
+        }
+        customerName = customer.name;
+        customerMobile = customer.mobile;
+        customerAddress = customer.address;
+        customerGst = customer.gstNumber;
+      } else {
+        const mobile = data.customerMobile?.trim();
+        if (mobile) {
+          const existing = await tx.customer.findFirst({ where: { mobile } });
+          if (existing) {
+            if (existing.name !== data.customerName) {
+              await tx.customer.update({
+                where: { id: existing.id },
+                data: { name: data.customerName },
+              });
+            }
+            customerId = existing.id;
+            customerName = existing.name;
+            customerMobile = existing.mobile;
+            customerAddress = existing.address;
+            customerGst = existing.gstNumber;
+          } else {
+            const customer = await tx.customer.create({
+              data: {
+                name: data.customerName,
+                mobile,
+                address: data.customerAddress?.trim() || null,
+                gstNumber: data.customerGst || null,
+                membershipId: generateMembershipId(),
+              },
             });
+            customerId = customer.id;
+            await recordCustomerActivity(
+              tx,
+              customer.id,
+              "CUSTOMER_ADDED",
+              `${customer.name} was added to the academy`
+            );
           }
-          customerId = existing.id;
-        } else {
-          const customer = await tx.customer.create({
-            data: {
-              name: data.customerName,
-              mobile,
-              gstNumber: data.customerGst || null,
-              membershipId: generateMembershipId(),
-            },
-          });
-          customerId = customer.id;
         }
       }
 
@@ -178,16 +195,16 @@ export async function POST(request: NextRequest) {
 
       const invoiceNumber = formatInvoiceNumber(year, sequence.lastNumber);
 
-      return tx.invoice.create({
+      const created = await tx.invoice.create({
         data: {
           invoiceNumber,
           invoiceDate,
           dueDate,
           customerId,
-          customerName: data.customerName,
-          customerMobile: data.customerMobile || null,
-          customerAddress: null,
-          customerGst: data.customerGst || null,
+          customerName,
+          customerMobile,
+          customerAddress,
+          customerGst,
           subtotal: totals.subtotal,
           gstEnabled: totals.gstEnabled,
           cgstRate: totals.cgstRate,
@@ -218,14 +235,54 @@ export async function POST(request: NextRequest) {
         },
         include: { items: true, customer: true },
       });
+
+      if (customerId) {
+        await recordCustomerActivity(
+          tx,
+          customerId,
+          "INVOICE_CREATED",
+          `Invoice ${invoiceNumber} created`
+        );
+
+        if (paymentAmounts.amountPaid > 0) {
+          await recordCustomerActivity(
+            tx,
+            customerId,
+            "PAYMENT_MADE",
+            `Payment of ₹${paymentAmounts.amountPaid.toFixed(2)} received for ${invoiceNumber}`
+          );
+        }
+
+        const hasPackage = data.items.some((item) => item.itemType === COACHING_PACKAGE_TYPE);
+        if (hasPackage) {
+          const packageItem = data.items.find((item) => item.itemType === COACHING_PACKAGE_TYPE);
+          await recordCustomerActivity(
+            tx,
+            customerId,
+            "PACKAGE_PURCHASED",
+            packageItem?.description
+              ? `Package purchased: ${packageItem.description}`
+              : "Coaching package purchased"
+          );
+        }
+      }
+
+      await recordUserActivity(
+        tx,
+        user!.id!,
+        "INVOICE_CREATED",
+        invoiceNumber
+      );
+
+      return created;
     });
 
     return NextResponse.json(serializeInvoiceForJson(invoice), { status: 201 });
-  } catch (e) {
-    console.error("[POST /api/invoices]", e);
-    const message = prismaErrorMessage(e);
+  } catch (error) {
+    const message = prismaErrorMessage(error);
     const status =
-      e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P1001" ? 503 : 500;
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001" ? 503 : 500;
+    console.error("API ERROR:", error);
     return NextResponse.json({ success: false, error: message }, { status });
   }
 }

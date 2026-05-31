@@ -11,15 +11,23 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
-export const customerSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  mobile: z.string().optional().or(z.literal("")),
-  email: z.string().email().optional().or(z.literal("")),
+/** Minimal fields for fast receptionist customer creation */
+export const quickCustomerSchema = z.object({
+  name: z.string().min(2, "Customer name is required"),
+  mobile: z
+    .string()
+    .min(10, "Mobile number is required")
+    .max(15, "Enter a valid mobile number"),
+});
+
+export const customerSchema = quickCustomerSchema.extend({
   address: z.string().optional(),
+  emergencyContact: z.string().optional(),
+  parentName: z.string().optional(),
   gstNumber: z.string().optional(),
   membershipId: z.string().optional(),
   dateJoined: z.string().optional(),
-  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
+  status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]).default("ACTIVE"),
 });
 
 export const invoiceItemSchema = z.object({
@@ -33,8 +41,10 @@ export const invoiceItemSchema = z.object({
 
 export const invoiceSchema = z
   .object({
+    customerId: z.string().optional(),
     customerName: z.string().min(2, "Customer name is required"),
     customerMobile: z.string().optional(),
+    customerAddress: z.string().optional(),
     customerGst: z.string().optional(),
     invoiceDate: z.string(),
     notes: z.string().optional(),
@@ -99,7 +109,33 @@ export const settingsSchema = z.object({
   termsAndConditions: z.string(),
 });
 
+export const createUserSchema = z.object({
+  name: z.string().min(2, "Full name is required"),
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["ADMIN", "RECEPTIONIST"]),
+});
+
+export const updateUserSchema = z.object({
+  name: z.string().min(2, "Full name is required"),
+  email: z.string().email("Enter a valid email"),
+  role: z.enum(["ADMIN", "RECEPTIONIST"]),
+  status: z.enum(["ACTIVE", "DISABLED"]),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters")
+    .optional()
+    .or(z.literal("")),
+});
+
+export const resetPasswordSchema = z.object({
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type InvoiceInput = z.infer<typeof invoiceSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;

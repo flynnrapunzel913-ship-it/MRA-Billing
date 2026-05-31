@@ -32,8 +32,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user) return null;
 
+        const { isUserDisabled } = await import("@/lib/user-queries");
+        if (isUserDisabled(user as { status?: string })) return null;
+
         const valid = await bcrypt.compare(parsed.data.password, user.password);
         if (!valid) return null;
+
+        const { recordUserActivity } = await import("@/lib/user-activity");
+        void recordUserActivity(prisma, user.id, "LOGIN", `${user.name} logged in`);
 
         return {
           id: user.id,

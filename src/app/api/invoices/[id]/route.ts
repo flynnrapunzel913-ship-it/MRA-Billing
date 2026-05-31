@@ -1,40 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
+import { apiErrorResponse } from "@/lib/api-error";
+import { getActiveInvoiceWhere, isSchemaDriftError } from "@/lib/invoice-filters";
+import { recordUserActivity } from "@/lib/user-activity";
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAuth();
-  if (error) return error;
+  try {
+    const { error } = await requireAuth();
+    if (error) return error;
 
-  const { id } = await params;
+    const { id } = await params;
+    const invoiceWhere = await getActiveInvoiceWhere();
 
-  const invoice = await prisma.invoice.findUnique({
-    where: { id },
-    include: {
-      items: { orderBy: { slNo: "asc" } },
-      customer: true,
-      createdBy: { select: { name: true } },
-    },
-  });
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, ...invoiceWhere },
+      include: {
+        items: { orderBy: { slNo: "asc" } },
+        customer: true,
+        createdBy: { select: { name: true } },
+      },
+    });
 
-  if (!invoice) {
-    return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(invoice);
+  } catch (error) {
+    return apiErrorResponse(error, "Failed to load invoice");
   }
-
-  return NextResponse.json(invoice);
 }
 
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAuth();
-  if (error) return error;
+  try {
+    const { error, user } = await requireAuth();
+    if (error) return error;
 
-  const { id } = await params;
-  await prisma.invoice.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+    const { id } = await params;
+    const invoiceWhere = await getActiveInvoiceWhere();
+
+    const invoice = await prisma.invoice.findFirst({
+      where: { id, ...invoiceWhere },
+    });
+
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    try {
+      await prisma.invoice.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+    } catch (updateError) {
+      if (isSchemaDriftError(updateError)) {
+        await prisma.invoice.delete({ where: { id } });
+      } else {
+        throw updateError;
+      }
+    }
+
+    if (user?.id) {
+      await recordUserActivity(
+        prisma,
+        user.id,
+        "INVOICE_DELETED",
+        invoice.invoiceNumber
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return apiErrorResponse(error, "Failed to delete invoice");
+  }
 }

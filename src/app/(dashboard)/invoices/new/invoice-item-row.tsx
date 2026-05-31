@@ -27,7 +27,7 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
     useInvoiceStore.getState().updateItem(index, next);
 
   return (
-    <div className="grid grid-cols-12 items-end gap-2 rounded-lg border border-primary/15 bg-card/80 px-2 py-2 shadow-sm backdrop-blur-sm">
+    <div className="grid grid-cols-12 items-end gap-2 rounded-lg border border-[#E2E8F0] bg-white px-2 py-2 shadow-sm dark:border-primary/15 dark:bg-card/80 dark:backdrop-blur-sm">
       <div className="col-span-12 sm:col-span-3">
         <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
           Category

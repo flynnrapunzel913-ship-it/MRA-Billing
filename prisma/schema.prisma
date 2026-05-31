@@ -8,9 +8,33 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+enum CustomerActivityType {
+  CUSTOMER_ADDED
+  INVOICE_CREATED
+  PAYMENT_MADE
+  PACKAGE_PURCHASED
+}
+
 enum Role {
   ADMIN
   RECEPTIONIST
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum UserActivityType {
+  LOGIN
+  INVOICE_CREATED
+  INVOICE_DELETED
+  CUSTOMER_CREATED
+  PASSWORD_RESET
+  USER_DISABLED
+  USER_ENABLED
+  USER_CREATED
+  USER_DELETED
 }
 
 enum CustomerStatus {
@@ -33,33 +57,62 @@ enum InvoicePaymentMethod {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String
-  name      String
-  role      Role      @default(RECEPTIONIST)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  invoices  Invoice[]
+  id         String         @id @default(cuid())
+  email      String         @unique
+  password   String
+  name       String
+  role       Role           @default(RECEPTIONIST)
+  status     UserStatus     @default(ACTIVE)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  invoices   Invoice[]
+  activities UserActivity[]
+}
+
+model UserActivity {
+  id          String           @id @default(cuid())
+  userId      String
+  type        UserActivityType
+  description String
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model Customer {
-  id           String         @id @default(cuid())
-  name         String
-  mobile       String?
-  email        String?
-  address      String?
-  gstNumber    String?
-  membershipId String         @unique
-  dateJoined   DateTime       @default(now())
-  status       CustomerStatus @default(ACTIVE)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  invoices     Invoice[]
+  id               String         @id @default(cuid())
+  name             String
+  mobile           String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  parentName       String?
+  gstNumber        String?
+  membershipId     String         @unique
+  dateJoined       DateTime       @default(now())
+  status           CustomerStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  invoices         Invoice[]
+  activities       CustomerActivity[]
 
   @@index([name])
   @@index([mobile])
   @@index([membershipId])
+}
+
+model CustomerActivity {
+  id          String               @id @default(cuid())
+  customerId  String
+  type        CustomerActivityType
+  description String
+  createdAt   DateTime             @default(now())
+  customer    Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
 }
 
 model Invoice {
@@ -89,6 +142,7 @@ model Invoice {
   createdById      String
   createdAt        DateTime             @default(now())
   updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
   customer         Customer?            @relation(fields: [customerId], references: [id])
   createdBy        User                 @relation(fields: [createdById], references: [id])
   items            InvoiceItem[]
@@ -96,6 +150,7 @@ model Invoice {
   @@index([invoiceDate])
   @@index([invoiceNumber])
   @@index([paymentStatus])
+  @@index([deletedAt])
 }
 
 model InvoiceItem {

@@ -416,7 +416,7 @@ const s = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   infoBox: {
     flex: 1,
@@ -464,7 +464,7 @@ const s = StyleSheet.create({
   footerRow: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 4,
+    marginTop: 28,
   },
   footerLeft: {
     flex: 2,
@@ -491,7 +491,13 @@ const s = StyleSheet.create({
     width: 100,
     height: 40,
     objectFit: "contain",
-    marginBottom: 4,
+  },
+  signatureArea: {
+    height: 80,
+    width: 140,
+    justifyContent: "flex-end",
+    alignItems: "center",
+    marginBottom: 2,
   },
   signatureLine: {
     borderTopWidth: 1,
@@ -738,9 +744,11 @@ export function InvoicePDFDocument({
             </View>
 
             <View style={s.footerRight}>
-              {settings.signatureUrl && (
-                <Image src={settings.signatureUrl} style={s.signatureImage} />
-              )}
+              <View style={s.signatureArea}>
+                {settings.signatureUrl ? (
+                  <Image src={settings.signatureUrl} style={s.signatureImage} />
+                ) : null}
+              </View>
               <Text style={s.signatureLine}>Authorized Signature</Text>
               <Text style={[s.genNote, { marginTop: 6 }]}>{settings.academyName}</Text>
             </View>

@@ -28,7 +28,9 @@ export function InvoiceWizardNav({
   return (
     <div
       className={cn(
-        "mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary/15 bg-card/70 px-3 py-2.5 shadow-sm backdrop-blur-md",
+        "mt-3 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 backdrop-blur-md",
+        "border-[#E2E8F0] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.04)]",
+        "dark:border-primary/15 dark:bg-card/70 dark:shadow-sm",
         className
       )}
     >
@@ -47,7 +49,7 @@ export function InvoiceWizardNav({
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium shadow-md shadow-primary/20 hover:bg-primary/90"
+          className="h-9 rounded-lg px-4 text-sm font-medium"
           onClick={onSubmit}
           disabled={loading}
         >
@@ -67,7 +69,7 @@ export function InvoiceWizardNav({
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-lg bg-primary px-4 text-sm font-medium shadow-md shadow-primary/20 hover:bg-primary/90"
+          className="h-9 rounded-lg px-4 text-sm font-medium"
           onClick={onNext}
           disabled={loading}
         >

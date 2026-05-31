@@ -7,10 +7,15 @@ import {
   type PaymentMethodType,
   isCoachingPackage,
 } from "@/lib/constants";
+import type { CustomerSearchResult } from "@/lib/customer-search";
 
 interface InvoiceFormState {
+  customerId: string | null;
   customerName: string;
   customerMobile: string;
+  customerEmail: string;
+  customerAddress: string;
+  customerGst: string;
   invoiceDate: string;
   notes: string;
   gstEnabled: boolean;
@@ -20,8 +25,13 @@ interface InvoiceFormState {
   paymentMethod: PaymentMethodType | null;
   amountPaid: number;
   items: InvoiceLineItem[];
+  setSelectedCustomer: (customer: CustomerSearchResult) => void;
+  clearSelectedCustomer: () => void;
   setCustomerName: (name: string) => void;
   setCustomerMobile: (mobile: string) => void;
+  setCustomerEmail: (email: string) => void;
+  setCustomerAddress: (address: string) => void;
+  setCustomerGst: (gst: string) => void;
   setInvoiceDate: (date: string) => void;
   setNotes: (notes: string) => void;
   setGstEnabled: (enabled: boolean) => void;
@@ -48,8 +58,12 @@ const defaultItem = (itemType: ItemType = ITEM_TYPES[0]): InvoiceLineItem => ({
 });
 
 export const useInvoiceStore = create<InvoiceFormState>((set) => ({
+  customerId: null,
   customerName: "",
   customerMobile: "",
+  customerEmail: "",
+  customerAddress: "",
+  customerGst: "",
   invoiceDate: today,
   notes: "",
   gstEnabled: true,
@@ -59,8 +73,29 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   paymentMethod: null,
   amountPaid: 0,
   items: [defaultItem()],
+  setSelectedCustomer: (customer) =>
+    set({
+      customerId: customer.id,
+      customerName: customer.name,
+      customerMobile: customer.mobile || "",
+      customerEmail: customer.email || "",
+      customerAddress: customer.address || "",
+      customerGst: customer.gstNumber || "",
+    }),
+  clearSelectedCustomer: () =>
+    set({
+      customerId: null,
+      customerName: "",
+      customerMobile: "",
+      customerEmail: "",
+      customerAddress: "",
+      customerGst: "",
+    }),
   setCustomerName: (customerName) => set({ customerName }),
   setCustomerMobile: (customerMobile) => set({ customerMobile }),
+  setCustomerEmail: (customerEmail) => set({ customerEmail }),
+  setCustomerAddress: (customerAddress) => set({ customerAddress }),
+  setCustomerGst: (customerGst) => set({ customerGst }),
   setInvoiceDate: (invoiceDate) => set({ invoiceDate }),
   setNotes: (notes) => set({ notes }),
   setGstEnabled: (gstEnabled) => set({ gstEnabled }),
@@ -97,8 +132,12 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     })),
   reset: () =>
     set({
+      customerId: null,
       customerName: "",
       customerMobile: "",
+      customerEmail: "",
+      customerAddress: "",
+      customerGst: "",
       invoiceDate: today,
       notes: "",
       gstEnabled: true,

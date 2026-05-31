@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatDate } from "@/lib/utils";
+import { readApiResponse } from "@/lib/api-error";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
 
 interface Customer {
@@ -26,16 +27,33 @@ interface Customer {
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
 
-  const loadCustomers = async (q = query) => {
-    const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`);
-    setCustomers(await res.json());
-  };
+  const loadCustomers = useCallback(async (q = query) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`);
+      const result = await readApiResponse<Customer[]>(res, "Failed to load customers");
+
+      if (!result.ok) {
+        toast.error(result.message);
+        setCustomers([]);
+        return;
+      }
+
+      setCustomers(Array.isArray(result.data) ? result.data : []);
+    } catch {
+      toast.error("Failed to load customers");
+      setCustomers([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [query]);
 
   useEffect(() => {
-    loadCustomers();
-  }, []);
+    loadCustomers("");
+  }, [loadCustomers]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,24 +107,38 @@ export default function CustomersPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {customers.map((customer) => (
-                <TableRow key={customer.id}>
-                  <TableCell>
-                    <Link href={`/customers/${customer.id}`} className="font-medium text-primary hover:underline">
-                      {customer.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{customer.mobile}</TableCell>
-                  <TableCell>{customer.membershipId}</TableCell>
-                  <TableCell>{formatDate(customer.dateJoined)}</TableCell>
-                  <TableCell>{customer._count.invoices}</TableCell>
-                  <TableCell>
-                    <Badge variant={customer.status === "ACTIVE" ? "success" : "secondary"}>
-                      {customer.status}
-                    </Badge>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    Loading customers…
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : customers.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    No customers found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                customers.map((customer) => (
+                  <TableRow key={customer.id}>
+                    <TableCell>
+                      <Link href={`/customers/${customer.id}`} className="font-medium text-primary hover:underline">
+                        {customer.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{customer.mobile}</TableCell>
+                    <TableCell>{customer.membershipId}</TableCell>
+                    <TableCell>{formatDate(customer.dateJoined)}</TableCell>
+                    <TableCell>{customer._count.invoices}</TableCell>
+                    <TableCell>
+                      <Badge variant={customer.status === "ACTIVE" ? "success" : "secondary"}>
+                        {customer.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

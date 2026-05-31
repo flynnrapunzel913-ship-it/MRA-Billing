@@ -1,13 +1,35 @@
 import { PrismaClient } from "@prisma/client";
 
+/** Bump when User model / UserActivity changes to bust dev global Prisma cache */
+export const PRISMA_CLIENT_MARKER = "user-management-v2";
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaMarker: string | undefined;
 };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient() {
+  return new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
+}
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+function getPrismaClient(): PrismaClient {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    globalForPrisma.prisma &&
+    globalForPrisma.prismaMarker !== PRISMA_CLIENT_MARKER
+  ) {
+    void globalForPrisma.prisma.$disconnect().catch(() => undefined);
+    globalForPrisma.prisma = undefined;
+  }
+
+  if (!globalForPrisma.prisma) {
+    globalForPrisma.prisma = createPrismaClient();
+    globalForPrisma.prismaMarker = PRISMA_CLIENT_MARKER;
+  }
+
+  return globalForPrisma.prisma;
+}
+
+export const prisma = getPrismaClient();

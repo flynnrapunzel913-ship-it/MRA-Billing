@@ -46,7 +46,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md border-white/50 shadow-xl">
+      <Card className="w-full max-w-md border-[#E2E8F0] shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/50 dark:shadow-xl">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
             <AcademyLogo />
