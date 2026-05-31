@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { paymentStatusLabel } from "@/lib/constants";
+import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 
 export default function InvoicesPage() {
   const [invoices, setInvoices] = useState<any[]>([]);
@@ -81,7 +81,7 @@ export default function InvoicesPage() {
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatCurrency(Number(invoice.grandTotal))}</TableCell>
                   <TableCell>
-                    <Badge variant={invoice.paymentStatus === "FULLY_PAID" ? "success" : "warning"}>
+                    <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
                       {paymentStatusLabel(invoice.paymentStatus)}
                     </Badge>
                   </TableCell>

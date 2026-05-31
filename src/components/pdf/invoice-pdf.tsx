@@ -76,6 +76,8 @@ function paymentStatusLabel(status: string): string {
       return "PAID IN FULL";
     case "PARTIALLY_PAID":
       return "PARTIALLY PAID";
+    case "PENDING":
+      return "PAYMENT PENDING";
     default:
       return status;
   }
@@ -87,6 +89,8 @@ function paymentStatusColor(status: string): string {
       return SUCCESS;
     case "PARTIALLY_PAID":
       return WARNING;
+    case "PENDING":
+      return DANGER;
     default:
       return TEXT_SECONDARY;
   }
@@ -705,7 +709,8 @@ export function InvoicePDFDocument({
                 Mode: {paymentMethodLabel(invoice.paymentMethod)}
               </Text>
               <PaymentStatusBadge status={invoice.paymentStatus} />
-              {invoice.paymentStatus === "PARTIALLY_PAID" && (
+              {(invoice.paymentStatus === "PARTIALLY_PAID" ||
+                invoice.paymentStatus === "PENDING") && (
                 <>
                   <Text style={[s.infoBoxLine, { marginTop: 5 }]}>
                     Paid: {formatMoney(invoice.amountPaid)}

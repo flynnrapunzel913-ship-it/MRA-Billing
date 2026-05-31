@@ -6,10 +6,10 @@ import {
   FileText,
   BarChart3,
   Settings,
-  Waves,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Role } from "@prisma/client";
+import { SidebarBrand } from "@/components/branding/academy-logo";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "RECEPTIONIST"] },
@@ -24,15 +24,7 @@ export function Sidebar({ role }: { role: Role }) {
 
   return (
     <aside className="hidden w-64 shrink-0 border-r border-white/30 bg-card/90 backdrop-blur-md lg:block dark:border-white/10">
-      <div className="flex h-16 items-center gap-3 border-b px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Waves className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">MR Academy</p>
-          <p className="text-xs text-muted-foreground">Billing System</p>
-        </div>
-      </div>
+      <SidebarBrand />
       <nav className="space-y-1 p-4">
         {navItems
           .filter((item) => item.roles.includes(role))

@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { paymentStatusLabel } from "@/lib/constants";
+import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 
 const COLORS = ["#0070C0", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1"];
 
@@ -175,7 +175,7 @@ export default function DashboardPage() {
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatCurrency(Number(invoice.grandTotal))}</TableCell>
                   <TableCell>
-                    <Badge variant={invoice.paymentStatus === "FULLY_PAID" ? "success" : "warning"}>
+                    <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
                       {paymentStatusLabel(invoice.paymentStatus)}
                     </Badge>
                   </TableCell>

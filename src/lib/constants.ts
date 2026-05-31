@@ -4,7 +4,7 @@ export const COACHING_PACKAGE_TYPE = "Coaching Package" as const;
 
 export type ItemType = (typeof ITEM_TYPES)[number];
 
-export const PAYMENT_STATUSES = ["FULLY_PAID", "PARTIALLY_PAID"] as const;
+export const PAYMENT_STATUSES = ["FULLY_PAID", "PARTIALLY_PAID", "PENDING"] as const;
 
 export type PaymentStatusType = (typeof PAYMENT_STATUSES)[number];
 
@@ -15,13 +15,23 @@ export type PaymentMethodType = (typeof PAYMENT_METHODS)[number];
 export function paymentStatusLabel(status: PaymentStatusType | string) {
   if (status === "FULLY_PAID") return "Fully Paid";
   if (status === "PARTIALLY_PAID") return "Partially Paid";
+  if (status === "PENDING") return "Pending";
   return status;
 }
 
 export function paymentStatusPdfLabel(status: PaymentStatusType | string) {
   if (status === "FULLY_PAID") return "PAID";
   if (status === "PARTIALLY_PAID") return "PARTIALLY PAID";
+  if (status === "PENDING") return "PENDING";
   return status;
+}
+
+export function paymentStatusBadgeVariant(
+  status: PaymentStatusType | string
+): "success" | "warning" | "destructive" {
+  if (status === "FULLY_PAID") return "success";
+  if (status === "PARTIALLY_PAID") return "warning";
+  return "destructive";
 }
 
 export function paymentMethodLabel(method: PaymentMethodType | string) {

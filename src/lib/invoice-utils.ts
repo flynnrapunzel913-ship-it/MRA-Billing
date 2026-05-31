@@ -72,6 +72,10 @@ export function calculatePaymentAmounts(
     return { amountPaid: round2(grandTotal), amountRemaining: 0 };
   }
 
+  if (paymentStatus === "PENDING") {
+    return { amountPaid: 0, amountRemaining: round2(grandTotal) };
+  }
+
   const amountPaid = round2(amountPaidInput ?? 0);
   if (amountPaid > grandTotal) {
     throw new Error("Amount paid cannot exceed grand total");

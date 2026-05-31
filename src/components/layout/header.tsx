@@ -22,7 +22,9 @@ export function Header({ userName, role, onMenuClick }: HeaderProps) {
           <Menu className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-lg font-semibold">MR Academy Billing System</h1>
+          <h1 className="text-base font-semibold tracking-tight sm:text-lg">
+            MR Academy Billing
+          </h1>
           <p className="text-xs text-muted-foreground capitalize">{role.toLowerCase()} portal</p>
         </div>
       </div>

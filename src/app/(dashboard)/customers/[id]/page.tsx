@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
-import { paymentStatusLabel } from "@/lib/constants";
+import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 
 export default function CustomerDetailPage() {
   const params = useParams();
@@ -43,7 +43,7 @@ export default function CustomerDetailPage() {
         <Button variant="outline" onClick={() => setEditOpen(true)}>Edit</Button>
         <Button asChild>
           <Link
-            href={`/invoices/new?customerName=${encodeURIComponent(customer.name)}&customerMobile=${encodeURIComponent(customer.mobile || "")}&customerAddress=${encodeURIComponent(customer.address || "")}`}
+            href={`/invoices/new?customerName=${encodeURIComponent(customer.name)}&customerMobile=${encodeURIComponent(customer.mobile || "")}`}
           >
             Create Invoice
           </Link>
@@ -90,7 +90,7 @@ export default function CustomerDetailPage() {
                   <TableCell>{formatDate(invoice.invoiceDate)}</TableCell>
                   <TableCell>{formatCurrency(Number(invoice.grandTotal))}</TableCell>
                   <TableCell>
-                    <Badge variant={invoice.paymentStatus === "FULLY_PAID" ? "success" : "warning"}>
+                    <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
                       {paymentStatusLabel(invoice.paymentStatus)}
                     </Badge>
                   </TableCell>

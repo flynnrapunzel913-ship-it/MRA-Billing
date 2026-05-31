@@ -16,7 +16,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { paymentStatusLabel, paymentMethodLabel, isCoachingPackage } from "@/lib/constants";
+import {
+  paymentStatusLabel,
+  paymentStatusBadgeVariant,
+  paymentMethodLabel,
+  isCoachingPackage,
+} from "@/lib/constants";
 
 export default function InvoiceDetailPage() {
   const params = useParams();
@@ -77,7 +82,7 @@ export default function InvoiceDetailPage() {
             <h2 className="text-2xl font-bold">{invoice.invoiceNumber}</h2>
             <p className="text-sm text-muted-foreground">{invoice.customerName}</p>
           </div>
-          <Badge variant={invoice.paymentStatus === "FULLY_PAID" ? "success" : "warning"}>
+          <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
             {paymentStatusLabel(invoice.paymentStatus)}
           </Badge>
         </div>

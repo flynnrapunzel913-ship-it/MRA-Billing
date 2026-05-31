@@ -14,6 +14,7 @@ import {
   BarChart3,
   Settings,
 } from "lucide-react";
+import { SidebarBrand } from "@/components/branding/academy-logo";
 
 const mobileNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -42,8 +43,14 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
       <Sidebar role={user.role} />
       {mobileOpen && (
         <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setMobileOpen(false)}>
-          <div className="absolute left-0 top-0 h-full w-64 bg-card/95 p-4 backdrop-blur-md" onClick={(e) => e.stopPropagation()}>
-            <nav className="space-y-1 pt-16">
+          <div
+            className="absolute left-0 top-0 flex h-full w-64 flex-col bg-card/95 backdrop-blur-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="pt-14">
+              <SidebarBrand />
+            </div>
+            <nav className="flex-1 space-y-1 p-4">
               {filteredMobileNav.map((item) => {
                 const Icon = item.icon;
                 return (

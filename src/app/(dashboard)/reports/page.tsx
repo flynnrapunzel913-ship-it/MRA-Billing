@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { paymentStatusLabel } from "@/lib/constants";
 
 const reportTypes = [
   { value: "revenue", label: "Revenue Report" },
@@ -167,7 +168,7 @@ function ReportTable({ type, rows, summary }: { type: string; rows: any[]; summa
               <TableCell>{row.customerName}</TableCell>
               <TableCell>{row.invoiceNumber}</TableCell>
               <TableCell>{formatCurrency(Number(row.amountPaid))}</TableCell>
-              <TableCell>{row.paymentStatus === "FULLY_PAID" ? "Fully Paid" : "Partially Paid"}</TableCell>
+              <TableCell>{paymentStatusLabel(row.paymentStatus)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

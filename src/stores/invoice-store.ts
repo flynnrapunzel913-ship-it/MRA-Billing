@@ -1,10 +1,5 @@
 import { create } from "zustand";
-import {
-  calculateInvoiceTotals,
-  calculatePaymentAmounts,
-  lineTotal,
-  type InvoiceLineItem,
-} from "@/lib/invoice-utils";
+import { lineTotal, type InvoiceLineItem } from "@/lib/invoice-utils";
 import {
   ITEM_TYPES,
   type ItemType,
@@ -16,20 +11,22 @@ import {
 interface InvoiceFormState {
   customerName: string;
   customerMobile: string;
-  customerAddress: string;
-  saveCustomer: boolean;
   invoiceDate: string;
   notes: string;
+  gstEnabled: boolean;
+  cgstRate: number;
+  sgstRate: number;
   paymentStatus: PaymentStatusType;
   paymentMethod: PaymentMethodType | null;
   amountPaid: number;
   items: InvoiceLineItem[];
   setCustomerName: (name: string) => void;
   setCustomerMobile: (mobile: string) => void;
-  setCustomerAddress: (address: string) => void;
-  setSaveCustomer: (save: boolean) => void;
   setInvoiceDate: (date: string) => void;
   setNotes: (notes: string) => void;
+  setGstEnabled: (enabled: boolean) => void;
+  setCgstRate: (rate: number) => void;
+  setSgstRate: (rate: number) => void;
   setPaymentStatus: (status: PaymentStatusType) => void;
   setPaymentMethod: (method: PaymentMethodType) => void;
   setAmountPaid: (amount: number) => void;
@@ -53,21 +50,32 @@ const defaultItem = (itemType: ItemType = ITEM_TYPES[0]): InvoiceLineItem => ({
 export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   customerName: "",
   customerMobile: "",
-  customerAddress: "",
-  saveCustomer: false,
   invoiceDate: today,
   notes: "",
+  gstEnabled: true,
+  cgstRate: 9,
+  sgstRate: 9,
   paymentStatus: "FULLY_PAID",
   paymentMethod: null,
   amountPaid: 0,
   items: [defaultItem()],
   setCustomerName: (customerName) => set({ customerName }),
   setCustomerMobile: (customerMobile) => set({ customerMobile }),
-  setCustomerAddress: (customerAddress) => set({ customerAddress }),
-  setSaveCustomer: (saveCustomer) => set({ saveCustomer }),
   setInvoiceDate: (invoiceDate) => set({ invoiceDate }),
   setNotes: (notes) => set({ notes }),
-  setPaymentStatus: (paymentStatus) => set({ paymentStatus }),
+  setGstEnabled: (gstEnabled) => set({ gstEnabled }),
+  setCgstRate: (cgstRate) => set({ cgstRate }),
+  setSgstRate: (sgstRate) => set({ sgstRate }),
+  setPaymentStatus: (paymentStatus) =>
+    set((state) => ({
+      paymentStatus,
+      amountPaid:
+        paymentStatus === "PARTIALLY_PAID"
+          ? state.amountPaid
+          : paymentStatus === "PENDING"
+            ? 0
+            : state.amountPaid,
+    })),
   setPaymentMethod: (paymentMethod) => set({ paymentMethod }),
   setAmountPaid: (amountPaid) => set({ amountPaid }),
   addItem: (itemType) =>
@@ -91,10 +99,11 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     set({
       customerName: "",
       customerMobile: "",
-      customerAddress: "",
-      saveCustomer: false,
       invoiceDate: today,
       notes: "",
+      gstEnabled: true,
+      cgstRate: 9,
+      sgstRate: 9,
       paymentStatus: "FULLY_PAID",
       paymentMethod: null,
       amountPaid: 0,
