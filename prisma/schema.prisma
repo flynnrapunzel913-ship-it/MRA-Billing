@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvoicePaymentStatus {
+  FULLY_PAID
+  PARTIALLY_PAID
+}
+
+enum InvoicePaymentMethod {
+  CASH
+  CARD
+  UPI
+  OTHER
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String
+  name      String
+  role      Role      @default(RECEPTIONIST)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  invoices  Invoice[]
+}
+
+model Customer {
+  id           String         @id @default(cuid())
+  name         String
+  mobile       String?
+  email        String?
+  address      String?
+  gstNumber    String?
+  membershipId String         @unique
+  dateJoined   DateTime       @default(now())
+  status       CustomerStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  invoices     Invoice[]
+
+  @@index([name])
+  @@index([mobile])
+  @@index([membershipId])
+}
+
+model Invoice {
+  id               String               @id @default(cuid())
+  invoiceNumber    String               @unique
+  invoiceDate      DateTime             @default(now())
+  dueDate          DateTime
+  customerId       String?
+  customerName     String
+  customerMobile   String?
+  customerAddress  String?
+  customerGst      String?
+  subtotal         Decimal              @db.Decimal(12, 2)
+  cgstRate         Decimal              @default(9) @db.Decimal(5, 2)
+  sgstRate         Decimal              @default(9) @db.Decimal(5, 2)
+  cgstAmount       Decimal              @db.Decimal(12, 2)
+  sgstAmount       Decimal              @db.Decimal(12, 2)
+  totalGst         Decimal              @db.Decimal(12, 2)
+  grandTotal       Decimal              @db.Decimal(12, 2)
+  amountInWords    String
+  paymentStatus    InvoicePaymentStatus @default(FULLY_PAID)
+  paymentMethod    InvoicePaymentMethod @default(CASH)
+  amountPaid       Decimal              @db.Decimal(12, 2)
+  amountRemaining  Decimal              @db.Decimal(12, 2)
+  gstEnabled       Boolean              @default(true)
+  notes            String?
+  createdById      String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  customer         Customer?            @relation(fields: [customerId], references: [id])
+  createdBy        User                 @relation(fields: [createdById], references: [id])
+  items            InvoiceItem[]
+
+  @@index([invoiceDate])
+  @@index([invoiceNumber])
+  @@index([paymentStatus])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  slNo        Int
+  itemType    String
+  description String
+  quantity    Int     @default(1)
+  unitPrice        Decimal   @db.Decimal(10, 2)
+  amount           Decimal   @db.Decimal(12, 2)
+  packageStartDate DateTime?
+  packageEndDate   DateTime?
+  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceSequence {
+  id         String @id @default(cuid())
+  year       Int    @unique
+  lastNumber Int    @default(0)
+}
+
+model Settings {
+  id                 String   @id @default("default")
+  academyName        String   @default("MR Academy")
+  address            String   @default("")
+  phonePrimary       String   @default("")
+  phoneSecondary     String?
+  email              String   @default("")
+  website            String?
+  gstNumber          String   @default("")
+  gstEnabled         Boolean  @default(true)
+  defaultCgstRate    Decimal  @default(9) @db.Decimal(5, 2)
+  defaultSgstRate    Decimal  @default(9) @db.Decimal(5, 2)
+  bankName           String?
+  bankAccount        String?
+  bankIfsc           String?
+  bankBranch         String?
+  upiId              String?
+  upiQrCode          String?
+  logoUrl            String   @default("/branding/logo.png")
+  signatureUrl       String?
+  footerImageUrl     String   @default("/branding/footer-curves.jpeg")
+  headerImageUrl     String   @default("/branding/address-panel.jpeg")
+  brandColor         String   @default("#0070C0")
+  termsAndConditions String   @default("1. Fees once paid are non-refundable.\n2. Subject to academy rules.\n3. This is a computer generated invoice.")
+  updatedAt          DateTime @updatedAt
+}
