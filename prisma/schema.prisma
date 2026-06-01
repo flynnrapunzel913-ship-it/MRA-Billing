@@ -56,6 +56,11 @@ enum InvoicePaymentMethod {
   OTHER
 }
 
+enum CatalogItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
 model User {
   id         String         @id @default(cuid())
   email      String         @unique
@@ -198,4 +203,31 @@ model Settings {
   brandColor         String   @default("#0070C0")
   termsAndConditions String   @default("1. Fees once paid are non-refundable.\n2. Subject to academy rules.\n3. This is a computer generated invoice.")
   updatedAt          DateTime @updatedAt
+}
+
+model Subscription {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  duration    String
+  price       Decimal            @db.Decimal(10, 2)
+  status      CatalogItemStatus  @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status])
+  @@index([name])
+}
+
+model AcademyProduct {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal            @db.Decimal(10, 2)
+  status      CatalogItemStatus  @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([status])
+  @@index([name])
 }

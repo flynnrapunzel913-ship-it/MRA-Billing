@@ -132,9 +132,28 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
+export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
+
+export const subscriptionSchema = z.object({
+  name: z.string().min(2, "Subscription name is required"),
+  description: z.string().optional(),
+  duration: z.string().min(1, "Duration is required"),
+  price: z.number().nonnegative("Price must be zero or greater"),
+  status: catalogItemStatusSchema.default("ACTIVE"),
+});
+
+export const academyProductSchema = z.object({
+  name: z.string().min(2, "Product name is required"),
+  description: z.string().optional(),
+  price: z.number().nonnegative("Price must be zero or greater"),
+  status: catalogItemStatusSchema.default("ACTIVE"),
+});
+
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type SubscriptionInput = z.infer<typeof subscriptionSchema>;
+export type AcademyProductInput = z.infer<typeof academyProductSchema>;
 export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type InvoiceInput = z.infer<typeof invoiceSchema>;

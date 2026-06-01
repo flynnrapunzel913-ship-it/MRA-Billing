@@ -1,7 +1,7 @@
 "use client";
 
 import { Trash2 } from "lucide-react";
-import { ITEM_TYPES } from "@/lib/constants";
+import { ITEM_TYPES, isCoachingPackage } from "@/lib/constants";
 import { lineTotal } from "@/lib/invoice-utils";
 import { useInvoiceStore } from "@/stores/invoice-store";
 import type { InvoiceLineItem } from "@/lib/invoice-utils";
@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 
 interface InvoiceItemRowProps {
   index: number;
@@ -56,7 +56,33 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
           onChange={(e) => update({ ...item, description: e.target.value })}
         />
       </div>
-      <div className="col-span-4 sm:col-span-1">
+      {isCoachingPackage(item.itemType) && (
+        <>
+          <div className="col-span-6 sm:col-span-2">
+            <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+              Start
+            </span>
+            <Input
+              className="h-9 text-sm"
+              type="date"
+              value={item.packageStartDate ?? ""}
+              onChange={(e) => update({ ...item, packageStartDate: e.target.value })}
+            />
+          </div>
+          <div className="col-span-6 sm:col-span-2">
+            <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
+              End
+            </span>
+            <Input
+              className="h-9 text-sm"
+              type="date"
+              value={item.packageEndDate ?? ""}
+              onChange={(e) => update({ ...item, packageEndDate: e.target.value })}
+            />
+          </div>
+        </>
+      )}
+      <div className={cn("col-span-4", isCoachingPackage(item.itemType) ? "sm:col-span-1" : "sm:col-span-1")}>
         <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
           Qty
         </span>

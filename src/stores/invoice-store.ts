@@ -6,8 +6,13 @@ import {
   type PaymentStatusType,
   type PaymentMethodType,
   isCoachingPackage,
+  COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
+import {
+  subscriptionInvoiceDescription,
+  packageEndDateFromDuration,
+} from "@/lib/catalog";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -41,6 +46,12 @@ interface InvoiceFormState {
   setPaymentMethod: (method: PaymentMethodType) => void;
   setAmountPaid: (amount: number) => void;
   addItem: (itemType?: ItemType) => void;
+  addSubscriptionFromCatalog: (item: {
+    name: string;
+    duration: string;
+    price: number;
+  }) => void;
+  addProductFromCatalog: (item: { name: string; price: number }) => void;
   updateItem: (index: number, item: InvoiceLineItem) => void;
   removeItem: (index: number) => void;
   reset: () => void;
@@ -115,6 +126,38 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   setAmountPaid: (amountPaid) => set({ amountPaid }),
   addItem: (itemType) =>
     set((state) => ({ items: [...state.items, defaultItem(itemType)] })),
+  addSubscriptionFromCatalog: (item) =>
+    set((state) => {
+      const start = state.invoiceDate;
+      const end = packageEndDateFromDuration(start, item.duration);
+      return {
+        items: [
+          ...state.items,
+          {
+            itemType: COACHING_PACKAGE_TYPE,
+            description: subscriptionInvoiceDescription(item.name, item.duration),
+            quantity: 1,
+            unitPrice: item.price,
+            packageStartDate: start,
+            packageEndDate: end,
+          },
+        ],
+      };
+    }),
+  addProductFromCatalog: (item) =>
+    set((state) => ({
+      items: [
+        ...state.items,
+        {
+          itemType: "Accessories / Products" as ItemType,
+          description: item.name,
+          quantity: 1,
+          unitPrice: item.price,
+          packageStartDate: "",
+          packageEndDate: "",
+        },
+      ],
+    })),
   updateItem: (index, item) =>
     set((state) => {
       const next = { ...item };

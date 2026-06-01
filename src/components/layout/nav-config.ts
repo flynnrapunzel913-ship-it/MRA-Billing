@@ -5,6 +5,7 @@ import {
   BarChart3,
   TrendingUp,
   UserCog,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -52,6 +53,12 @@ export const navGroups: NavGroup[] = [
         href: "/reports/revenue",
         label: "Revenue",
         icon: TrendingUp,
+        roles: ["ADMIN"],
+      },
+      {
+        href: "/admin/subscriptions",
+        label: "Subscription Management",
+        icon: Layers,
         roles: ["ADMIN"],
       },
       {

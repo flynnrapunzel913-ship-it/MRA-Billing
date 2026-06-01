@@ -30,6 +30,7 @@ import { InvoiceWizardNav } from "./invoice-wizard-nav";
 import { InvoiceSummaryPanel, InvoiceSummaryMobileBar } from "./invoice-summary-panel";
 import { InvoiceItemRow } from "./invoice-item-row";
 import { InvoiceCustomerStep, validateCustomerStep } from "@/components/invoices/invoice-customer-step";
+import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -92,6 +93,8 @@ export default function InvoiceWizard() {
     setPaymentMethod,
     setAmountPaid,
     addItem,
+    addSubscriptionFromCatalog,
+    addProductFromCatalog,
     reset,
   } = useInvoiceStore();
 
@@ -314,32 +317,34 @@ export default function InvoiceWizard() {
             {step === 1 && (
               <StepCard
                 title="Invoice Items"
-                description="Add coaching or products"
-                headerAction={
-                  <div className="flex flex-wrap gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 border-primary/25"
-                      onClick={() => addItem("Coaching Package")}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Coaching
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-9 border-primary/25"
-                      onClick={() => addItem("Accessories / Products")}
-                    >
-                      <Plus className="mr-1 h-4 w-4" />
-                      Product
-                    </Button>
-                  </div>
-                }
+                description="Select from catalog or add custom line items"
               >
+                <div className="mb-4 grid gap-4 sm:grid-cols-2">
+                  <CatalogItemPicker
+                    type="subscription"
+                    label="Add Subscription"
+                    placeholder="Select subscription…"
+                    onSelect={(item) => {
+                      if ("duration" in item) {
+                        addSubscriptionFromCatalog({
+                          name: item.name,
+                          duration: item.duration,
+                          price: item.price,
+                        });
+                        toast.success(`Added ${item.name}`);
+                      }
+                    }}
+                  />
+                  <CatalogItemPicker
+                    type="product"
+                    label="Add Product"
+                    placeholder="Select product…"
+                    onSelect={(item) => {
+                      addProductFromCatalog({ name: item.name, price: item.price });
+                      toast.success(`Added ${item.name}`);
+                    }}
+                  />
+                </div>
                 <div className="space-y-2">
                   {items.map((item, index) => (
                     <InvoiceItemRow
@@ -357,7 +362,7 @@ export default function InvoiceWizard() {
                   onClick={() => addItem()}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add More Item
+                  Add Custom Item
                 </Button>
               </StepCard>
             )}
