@@ -9,15 +9,13 @@ import { Button } from "@/components/ui/button";
 import { getInitials, roleLabel } from "./nav-config";
 
 export function ProfileView({
-  userName,
-  email,
+  username,
   role,
 }: {
-  userName: string;
-  email: string;
+  username: string;
   role: Role;
 }) {
-  const initials = getInitials(userName);
+  const initials = getInitials(username);
 
   return (
     <div className="mx-auto max-w-lg space-y-4">
@@ -26,8 +24,8 @@ export function ProfileView({
           <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#00C2FF] to-[#00E5D4] text-xl font-bold text-white shadow-[0_0_24px_rgba(0,194,255,0.4)]">
             {initials}
           </div>
-          <CardTitle>{userName}</CardTitle>
-          <p className="text-sm text-muted-foreground">{email}</p>
+          <CardTitle>{username}</CardTitle>
+          <p className="text-sm text-muted-foreground">Username</p>
           <span className="mt-1 inline-flex rounded-full border border-[#00C2FF]/30 bg-[#00C2FF]/10 px-3 py-0.5 text-xs font-semibold text-[#00A8D4] dark:text-[#00E5D4]">
             {roleLabel(role)}
           </span>

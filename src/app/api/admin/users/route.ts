@@ -38,10 +38,10 @@ export async function POST(request: NextRequest) {
 
     const data = parsed.data;
     const existing = await prisma.user.findUnique({
-      where: { email: data.email.toLowerCase() },
+      where: { username: data.username.toLowerCase() },
     });
     if (existing) {
-      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+      return NextResponse.json({ error: "Username already in use" }, { status: 409 });
     }
 
     const hashed = await bcrypt.hash(data.password, 10);
@@ -49,8 +49,7 @@ export async function POST(request: NextRequest) {
     const created = await prisma.$transaction(async (tx) => {
       const user = await createUserRecord(
         {
-          name: data.name.trim(),
-          email: data.email.toLowerCase(),
+          username: data.username.toLowerCase(),
           password: hashed,
           role: data.role,
         },
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest) {
         tx,
         admin!.id!,
         "USER_CREATED",
-        `Created ${data.role.toLowerCase()} account for ${user.name}`
+        `Created ${data.role.toLowerCase()} account for ${user.username}`
       );
 
       return user;

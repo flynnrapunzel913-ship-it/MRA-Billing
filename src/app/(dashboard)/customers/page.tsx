@@ -5,6 +5,7 @@ import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { cn } from "@/lib/utils";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
@@ -14,6 +15,7 @@ import { CustomerFormDialog } from "@/components/customers/customer-form-dialog"
 import { CustomerDrawer } from "@/components/customers/customer-drawer";
 import { CustomersTable } from "@/components/customers/customers-table";
 import { ServiceFilterSelect } from "@/components/customers/service-filter";
+import { readApiResponse } from "@/lib/api-error";
 import {
   buildCustomerInvoiceIndex,
   filterCustomers,
@@ -37,6 +39,8 @@ export default function CustomersPage() {
   const [selected, setSelected] = useState<CustomerListRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<CustomerListRow | null>(null);
+  const [deleteCustomer, setDeleteCustomer] = useState<CustomerListRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 200);
 
@@ -46,6 +50,10 @@ export default function CustomersPage() {
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
     "/api/invoices"
   );
+  const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
+    "/api/dashboard"
+  );
+  const isAdmin = dashboardMeta?.role === "ADMIN";
 
   const invoiceIndex = useMemo(
     () => buildCustomerInvoiceIndex(invoices ?? []),
@@ -76,6 +84,26 @@ export default function CustomersPage() {
     setSelected(null);
     setEditCustomer(customer);
     setFormOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteCustomer) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/customers/${deleteCustomer.id}`, { method: "DELETE" });
+      const result = await readApiResponse(res, "Failed to delete customer");
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Customer deleted");
+      setDeleteCustomer(null);
+      invalidateCachePrefix("/api/customers");
+      invalidateCache("/api/invoices");
+      void refetch();
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (isLoading && !customers?.length) {
@@ -139,6 +167,8 @@ export default function CustomersPage() {
           customers={filtered}
           invoiceIndex={invoiceIndex}
           onViewDetails={setSelected}
+          isAdmin={isAdmin}
+          onDelete={(customer) => setDeleteCustomer(customer)}
         />
       )}
 
@@ -167,6 +197,27 @@ export default function CustomersPage() {
             : undefined
         }
       />
+
+      <Modal
+        open={!!deleteCustomer}
+        onClose={() => setDeleteCustomer(null)}
+        title="Delete Customer"
+        description="This action cannot be undone."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteCustomer(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Delete <strong>{deleteCustomer?.name}</strong> from customers?
+        </p>
+      </Modal>
     </div>
   );
 }

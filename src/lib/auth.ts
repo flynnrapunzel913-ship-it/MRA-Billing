@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "./prisma";
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  username: z.string().min(3).regex(/^\S+$/),
   password: z.string().min(6),
 });
 
@@ -19,7 +19,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
@@ -27,7 +27,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!parsed.success) return null;
 
         const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email.toLowerCase() },
+          where: { username: parsed.data.username.toLowerCase() },
         });
 
         if (!user) return null;
@@ -43,8 +43,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         return {
           id: user.id,
-          email: user.email,
-          name: user.name,
+          name: user.username,
+          username: user.username,
           role: user.role,
         };
       },
@@ -55,6 +55,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = user.role;
+        token.username = (user as { username?: string }).username ?? user.name ?? "";
       }
       return token;
     },
@@ -62,6 +63,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as "ADMIN" | "RECEPTIONIST";
+        session.user.username = token.username as string;
+        session.user.name = token.username as string;
       }
       return session;
     },

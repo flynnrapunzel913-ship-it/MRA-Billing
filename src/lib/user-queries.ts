@@ -56,8 +56,7 @@ export async function supportsUserStatus(): Promise<boolean> {
 
 export type SafeUserListItem = {
   id: string;
-  name: string;
-  email: string;
+  username: string;
   role: string;
   status: "ACTIVE" | "DISABLED";
   createdAt: Date;
@@ -66,8 +65,7 @@ export type SafeUserListItem = {
 
 const baseUserSelect = {
   id: true,
-  name: true,
-  email: true,
+  username: true,
   role: true,
   createdAt: true,
   _count: { select: { invoices: true } },
@@ -100,8 +98,7 @@ export async function countActiveUsers(): Promise<number> {
 
 export async function createUserRecord(
   data: {
-    name: string;
-    email: string;
+    username: string;
     password: string;
     role: "ADMIN" | "RECEPTIONIST";
   },
@@ -112,29 +109,28 @@ export async function createUserRecord(
   return db.user.create({
     data: withStatus
       ? {
-          name: data.name,
-          email: data.email,
+          name: data.username,
+          username: data.username,
           password: data.password,
           role: data.role,
           status: "ACTIVE",
         }
       : {
-          name: data.name,
-          email: data.email,
+          name: data.username,
+          username: data.username,
           password: data.password,
           role: data.role,
         },
     select: withStatus
-      ? { id: true, name: true, email: true, role: true, status: true, createdAt: true }
-      : { id: true, name: true, email: true, role: true, createdAt: true },
+      ? { id: true, username: true, role: true, status: true, createdAt: true }
+      : { id: true, username: true, role: true, createdAt: true },
   });
 }
 
 export async function updateUserRecord(
   id: string,
   data: {
-    name: string;
-    email: string;
+    username: string;
     role: "ADMIN" | "RECEPTIONIST";
     status: "ACTIVE" | "DISABLED";
     password?: string;
@@ -144,16 +140,16 @@ export async function updateUserRecord(
   const withStatus = await supportsUserStatus();
 
   const updateData: Prisma.UserUpdateInput = {
-    name: data.name,
-    email: data.email,
+    name: data.username,
+    username: data.username,
     role: data.role,
     ...(data.password ? { password: data.password } : {}),
     ...(withStatus ? { status: data.status } : {}),
   };
 
   const select = withStatus
-    ? { id: true, name: true, email: true, role: true, status: true, createdAt: true }
-    : { id: true, name: true, email: true, role: true, createdAt: true };
+    ? { id: true, username: true, role: true, status: true, createdAt: true }
+    : { id: true, username: true, role: true, createdAt: true };
 
   const updated = await db.user.update({
     where: { id },

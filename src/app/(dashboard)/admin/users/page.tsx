@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,8 +21,7 @@ import { roleLabel } from "@/components/layout/nav-config";
 
 interface UserRecord {
   id: string;
-  name: string;
-  email: string;
+  username: string;
   role: "ADMIN" | "RECEPTIONIST";
   status: "ACTIVE" | "DISABLED";
   createdAt: string;
@@ -36,6 +35,7 @@ export default function AdminUsersPage() {
   const [editUser, setEditUser] = useState<UserRecord | undefined>();
   const [deleteUser, setDeleteUser] = useState<UserRecord | undefined>();
   const [deleting, setDeleting] = useState(false);
+  const [search, setSearch] = useState("");
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -74,6 +74,15 @@ export default function AdminUsersPage() {
     }
   };
 
+  const filtered = users.filter((user) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      user.username.toLowerCase().includes(q) ||
+      roleLabel(user.role).toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -95,6 +104,16 @@ export default function AdminUsersPage() {
         </Button>
       </div>
 
+      <div className="relative max-w-sm">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by username or role…"
+          className="flex h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm"
+        />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Employees</CardTitle>
@@ -102,14 +121,13 @@ export default function AdminUsersPage() {
         <CardContent>
           {loading ? (
             <p className="py-10 text-center text-muted-foreground">Loading users…</p>
-          ) : users.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-muted-foreground">No employees yet.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
+                  <TableHead>Username</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Invoices</TableHead>
@@ -117,10 +135,9 @@ export default function AdminUsersPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {filtered.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-semibold">{user.name}</TableCell>
-                    <TableCell>{user.email}</TableCell>
+                    <TableCell className="font-semibold">{user.username}</TableCell>
                     <TableCell>{roleLabel(user.role)}</TableCell>
                     <TableCell>
                       <Badge variant={user.status === "ACTIVE" ? "success" : "secondary"}>
@@ -185,7 +202,7 @@ export default function AdminUsersPage() {
         }
       >
         <p className="text-sm text-muted-foreground">
-          Permanently delete <strong>{deleteUser?.name}</strong>? This cannot be undone.
+          Permanently delete <strong>{deleteUser?.username}</strong>? This cannot be undone.
         </p>
       </Modal>
     </div>

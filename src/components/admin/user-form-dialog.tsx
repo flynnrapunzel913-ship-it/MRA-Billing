@@ -15,12 +15,10 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations";
-import { roleLabel } from "@/components/layout/nav-config";
 
 interface UserRecord {
   id: string;
-  name: string;
-  email: string;
+  username: string;
   role: "ADMIN" | "RECEPTIONIST";
   status: "ACTIVE" | "DISABLED";
 }
@@ -45,14 +43,13 @@ export function UserFormDialog({
 
   const createForm = useForm<CreateUserInput>({
     resolver: zodResolver(createUserSchema),
-    defaultValues: { name: "", email: "", password: "", role: "RECEPTIONIST" },
+    defaultValues: { username: "", password: "", role: "RECEPTIONIST" },
   });
 
   const editForm = useForm<UpdateUserInput>({
     resolver: zodResolver(updateUserSchema),
     defaultValues: {
-      name: "",
-      email: "",
+      username: "",
       role: "RECEPTIONIST",
       status: "ACTIVE",
       password: "",
@@ -62,14 +59,13 @@ export function UserFormDialog({
   useEffect(() => {
     if (initialData) {
       editForm.reset({
-        name: initialData.name,
-        email: initialData.email,
+        username: initialData.username,
         role: initialData.role,
         status: initialData.status,
         password: "",
       });
     } else {
-      createForm.reset({ name: "", email: "", password: "", role: "RECEPTIONIST" });
+      createForm.reset({ username: "", password: "", role: "RECEPTIONIST" });
     }
   }, [initialData, createForm, editForm]);
 
@@ -159,14 +155,9 @@ export function UserFormDialog({
         >
           <form id="edit-user-form" onSubmit={handleSubmit(onEdit)} className="space-y-4">
             <div className="space-y-2">
-              <Label>Full Name *</Label>
-              <Input {...register("name")} className="h-11" />
-              {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-            </div>
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input {...register("email")} type="email" className="h-11" />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              <Label>Username *</Label>
+              <Input {...register("username")} className="h-11" />
+              {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -209,7 +200,7 @@ export function UserFormDialog({
           open={resetOpen}
           onClose={() => setResetOpen(false)}
           title="Reset Password"
-          description={`Set a new password for ${initialData.name}. Existing password cannot be viewed.`}
+          description={`Set a new password for ${initialData.username}. Existing password cannot be viewed.`}
           maxWidth="md"
           footer={
             <>
@@ -258,14 +249,9 @@ export function UserFormDialog({
     >
       <form id="create-user-form" onSubmit={handleSubmit(onCreate)} className="space-y-4">
         <div className="space-y-2">
-          <Label>Full Name *</Label>
-          <Input {...register("name")} placeholder="e.g. Rahul" className="h-11" autoFocus />
-          {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label>Email *</Label>
-          <Input {...register("email")} type="email" placeholder="rahul@mraacademy.com" className="h-11" />
-          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+          <Label>Username *</Label>
+          <Input {...register("username")} placeholder="e.g. receptionist1" className="h-11" autoFocus />
+          {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
         </div>
         <div className="space-y-2">
           <Label>Password *</Label>

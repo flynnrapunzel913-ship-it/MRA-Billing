@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { getCustomerWithDetails } from "@/lib/customer-queries";
@@ -95,7 +95,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireAdmin();
     if (error) return error;
 
     const { id } = await params;

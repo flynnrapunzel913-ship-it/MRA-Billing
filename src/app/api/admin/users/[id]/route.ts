@@ -65,11 +65,11 @@ export async function PUT(
       return NextResponse.json({ error: "You cannot disable your own account" }, { status: 400 });
     }
 
-    const emailTaken = await prisma.user.findFirst({
-      where: { email: data.email.toLowerCase(), NOT: { id } },
+    const usernameTaken = await prisma.user.findFirst({
+      where: { username: data.username.toLowerCase(), NOT: { id } },
     });
-    if (emailTaken) {
-      return NextResponse.json({ error: "Email already in use" }, { status: 409 });
+    if (usernameTaken) {
+      return NextResponse.json({ error: "Username already in use" }, { status: 409 });
     }
 
     const passwordHash =
@@ -84,8 +84,7 @@ export async function PUT(
       const user = await updateUserRecord(
         id,
         {
-          name: data.name.trim(),
-          email: data.email.toLowerCase(),
+          username: data.username.toLowerCase(),
           role: data.role,
           status: data.status,
           password: passwordHash,
@@ -98,7 +97,7 @@ export async function PUT(
           tx,
           admin!.id!,
           "PASSWORD_RESET",
-          `Reset password for ${user.name}`
+          `Reset password for ${user.username}`
         );
       }
 
@@ -107,7 +106,7 @@ export async function PUT(
           tx,
           admin!.id!,
           data.status === "DISABLED" ? "USER_DISABLED" : "USER_ENABLED",
-          `${data.status === "DISABLED" ? "Disabled" : "Enabled"} ${user.name}`
+          `${data.status === "DISABLED" ? "Disabled" : "Enabled"} ${user.username}`
         );
       }
 
@@ -157,7 +156,7 @@ export async function DELETE(
         tx,
         admin!.id!,
         "USER_DELETED",
-        `Deleted user ${existing.name}`
+        `Deleted user ${existing.username}`
       );
       await tx.user.delete({ where: { id } });
     });
@@ -206,7 +205,7 @@ export async function PATCH(
         tx,
         admin!.id!,
         "PASSWORD_RESET",
-        `Reset password for ${existing.name}`
+        `Reset password for ${existing.username}`
       );
     });
 

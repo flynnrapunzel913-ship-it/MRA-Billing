@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,12 +22,16 @@ interface CustomersTableProps {
   customers: CustomerListRow[];
   invoiceIndex: Map<string, InvoiceIndexEntry>;
   onViewDetails: (customer: CustomerListRow) => void;
+  isAdmin?: boolean;
+  onDelete?: (customer: CustomerListRow) => void;
 }
 
 export function CustomersTable({
   customers,
   invoiceIndex,
   onViewDetails,
+  isAdmin = false,
+  onDelete,
 }: CustomersTableProps) {
   return (
     <div className="glass-panel overflow-hidden rounded-[20px]">
@@ -65,15 +70,29 @@ export function CustomersTable({
                   <Badge variant={display.variant}>{display.label}</Badge>
                 </TableCell>
                 <TableCell className="px-4 py-3 text-right">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => onViewDetails(customer)}
-                  >
-                    View Details
-                  </Button>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => onViewDetails(customer)}
+                    >
+                      View Details
+                    </Button>
+                    {isAdmin && onDelete && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="h-8 w-8 border-destructive/30 text-destructive hover:bg-destructive/10"
+                        onClick={() => onDelete(customer)}
+                        aria-label={`Delete ${customer.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );

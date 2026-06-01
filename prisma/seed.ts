@@ -8,23 +8,31 @@ async function main() {
   const receptionPassword = await bcrypt.hash("reception123", 10);
 
   await prisma.user.upsert({
-    where: { email: "admin@mraacademy.com" },
-    update: {},
+    where: { username: "admin" },
+    update: {
+      name: "admin",
+      email: null,
+    },
     create: {
-      email: "admin@mraacademy.com",
+      username: "admin",
+      email: null,
       password: adminPassword,
-      name: "Academy Admin",
+      name: "admin",
       role: Role.ADMIN,
     },
   });
 
   await prisma.user.upsert({
-    where: { email: "reception@mraacademy.com" },
-    update: {},
+    where: { username: "receptionist1" },
+    update: {
+      name: "receptionist1",
+      email: null,
+    },
     create: {
-      email: "reception@mraacademy.com",
+      username: "receptionist1",
+      email: null,
       password: receptionPassword,
-      name: "Front Desk",
+      name: "receptionist1",
       role: Role.RECEPTIONIST,
     },
   });
@@ -68,8 +76,8 @@ async function main() {
   });
 
   console.log("Database seeded successfully");
-  console.log("Admin: admin@mraacademy.com / admin123");
-  console.log("Receptionist: reception@mraacademy.com / reception123");
+  console.log("Admin: admin / admin123");
+  console.log("Receptionist: receptionist1 / reception123");
 }
 
 main()

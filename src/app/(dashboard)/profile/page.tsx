@@ -8,8 +8,7 @@ export default async function ProfilePage() {
 
   return (
     <ProfileView
-      userName={session.user.name || "User"}
-      email={session.user.email || ""}
+      username={session.user.username || session.user.name || "user"}
       role={session.user.role}
     />
   );

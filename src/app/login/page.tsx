@@ -22,20 +22,20 @@ export default function LoginPage() {
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "admin@mraacademy.com", password: "admin123" },
+    defaultValues: { username: "admin", password: "admin123" },
   });
 
   const onSubmit = async (data: LoginInput) => {
     setLoading(true);
     const result = await signIn("credentials", {
-      email: data.email,
+      username: data.username,
       password: data.password,
       redirect: false,
     });
     setLoading(false);
 
     if (result?.error) {
-      toast.error("Invalid email or password");
+      toast.error("Invalid username or password");
       return;
     }
 
@@ -59,9 +59,9 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" {...register("email")} />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" type="text" placeholder="Enter username" {...register("username")} />
+              {errors.username && <p className="text-sm text-destructive">{errors.username.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -75,7 +75,7 @@ export default function LoginPage() {
             </Button>
           </form>
           <p className="mt-4 text-center text-xs text-muted-foreground">
-            Demo: admin@mraacademy.com / admin123
+            Demo: admin / admin123
           </p>
         </CardContent>
       </Card>

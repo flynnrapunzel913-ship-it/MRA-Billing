@@ -7,7 +7,10 @@ import {
 } from "@/lib/constants";
 
 export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .regex(/^\S+$/, "Username cannot contain spaces"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -110,15 +113,19 @@ export const settingsSchema = z.object({
 });
 
 export const createUserSchema = z.object({
-  name: z.string().min(2, "Full name is required"),
-  email: z.string().email("Enter a valid email"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .regex(/^\S+$/, "Username cannot contain spaces"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   role: z.enum(["ADMIN", "RECEPTIONIST"]),
 });
 
 export const updateUserSchema = z.object({
-  name: z.string().min(2, "Full name is required"),
-  email: z.string().email("Enter a valid email"),
+  username: z
+    .string()
+    .min(3, "Username must be at least 3 characters")
+    .regex(/^\S+$/, "Username cannot contain spaces"),
   role: z.enum(["ADMIN", "RECEPTIONIST"]),
   status: z.enum(["ACTIVE", "DISABLED"]),
   password: z
