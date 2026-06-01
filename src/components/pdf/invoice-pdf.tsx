@@ -7,6 +7,7 @@ import {
   Image,
 } from "@react-pdf/renderer";
 import { isCoachingPackage, paymentMethodLabel } from "@/lib/constants";
+import type { PdfImageSource } from "@/lib/pdf-image";
 
 interface InvoiceItem {
   slNo: number;
@@ -51,7 +52,7 @@ interface SettingsData {
   website: string | null;
   gstNumber: string;
   gstEnabled: boolean;
-  logoUrl: string;
+  logoUrl: PdfImageSource;
   footerImageUrl: string;
   signatureUrl: string | null;
   brandColor: string;
@@ -135,11 +136,8 @@ const s = StyleSheet.create({
     paddingBottom: 70,
   },
   headerWrap: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
     backgroundColor: "#ffffff",
+    paddingBottom: 4,
   },
   headerTopStripe: {
     height: 5,
@@ -154,28 +152,28 @@ const s = StyleSheet.create({
     gap: 0,
   },
   logoBox: {
-    width: "35%",
+    width: "38%",
     borderWidth: 1,
     borderColor: BORDER,
     borderRightWidth: 0,
     backgroundColor: "#ffffff",
-    padding: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     alignItems: "center",
     justifyContent: "center",
     borderTopLeftRadius: 4,
     borderBottomLeftRadius: 4,
-    minHeight: 90,
+    minHeight: 88,
   },
   logo: {
-    width: 160,
-    height: 64,
-    objectFit: "contain",
+    width: 175,
+    height: 70,
   },
-  academyName: {
-    fontSize: 7,
-    color: TEXT_MUTED,
-    marginTop: 4,
-    letterSpacing: 0.5,
+  academyNameFallback: {
+    fontSize: 11,
+    fontFamily: "Helvetica-Bold",
+    color: BRAND,
+    letterSpacing: 0.8,
     textTransform: "uppercase",
   },
   contactPanel: {
@@ -221,8 +219,8 @@ const s = StyleSheet.create({
     marginHorizontal: 24,
   },
   content: {
-    marginTop: 138,
     paddingHorizontal: 24,
+    paddingTop: 8,
   },
   titleBand: {
     flexDirection: "row",
@@ -553,12 +551,19 @@ function LetterheadHeader({ settings }: { settings: SettingsData }) {
   const showGst = settings.gstEnabled && settings.gstNumber;
 
   return (
-    <View style={s.headerWrap} fixed>
+    <View style={s.headerWrap}>
       <View style={s.headerTopStripe} />
       <View style={s.headerRow}>
         <View style={s.logoBox}>
-          <Image src={settings.logoUrl} style={s.logo} />
-          <Text style={s.academyName}>{settings.academyName}</Text>
+          {settings.logoUrl ? (
+            <Image
+              src={settings.logoUrl as never}
+              style={s.logo}
+              cache={false}
+            />
+          ) : (
+            <Text style={s.academyNameFallback}>{settings.academyName}</Text>
+          )}
         </View>
         <View style={s.contactPanel}>
           <View style={s.contactGrid}>
@@ -575,6 +580,8 @@ function LetterheadHeader({ settings }: { settings: SettingsData }) {
 }
 
 function LetterheadFooter({ footerUrl }: { footerUrl: string }) {
+  if (!footerUrl) return null;
+
   return (
     <View style={s.footerWrap} fixed>
       <Image src={footerUrl} style={s.footerImage} />

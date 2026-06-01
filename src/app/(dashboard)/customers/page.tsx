@@ -1,150 +1,172 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
-import { readApiResponse } from "@/lib/api-error";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { cn } from "@/lib/utils";
+import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
+import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
+import { CustomerDrawer } from "@/components/customers/customer-drawer";
+import { CustomersTable } from "@/components/customers/customers-table";
+import { ServiceFilterSelect } from "@/components/customers/service-filter";
+import {
+  buildCustomerInvoiceIndex,
+  filterCustomers,
+  type CustomerListRow,
+  type QuickFilter,
+  type ServiceFilter,
+} from "@/lib/customer-list-utils";
 
-interface Customer {
-  id: string;
-  name: string;
-  mobile: string;
-  email: string | null;
-  membershipId: string;
-  status: string;
-  dateJoined: string;
-  _count: { invoices: number };
-}
+const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
+  { id: "all", label: "All Customers" },
+  { id: "active", label: "Active" },
+  { id: "renewal_due", label: "Renewal Due" },
+  { id: "pending_payment", label: "Pending Payment" },
+  { id: "recent", label: "Recent" },
+];
 
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
+  const [selected, setSelected] = useState<CustomerListRow | null>(null);
+  const [formOpen, setFormOpen] = useState(false);
+  const [editCustomer, setEditCustomer] = useState<CustomerListRow | null>(null);
 
-  const loadCustomers = useCallback(async (q = query) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/customers?q=${encodeURIComponent(q)}`);
-      const result = await readApiResponse<Customer[]>(res, "Failed to load customers");
+  const debouncedSearch = useDebouncedValue(search, 200);
 
-      if (!result.ok) {
-        toast.error(result.message);
-        setCustomers([]);
-        return;
-      }
+  const { data: customers, isLoading, refetch } = useCachedFetch<CustomerListRow[]>(
+    "/api/customers?q="
+  );
+  const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
+    "/api/invoices"
+  );
 
-      setCustomers(Array.isArray(result.data) ? result.data : []);
-    } catch {
-      toast.error("Failed to load customers");
-      setCustomers([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [query]);
+  const invoiceIndex = useMemo(
+    () => buildCustomerInvoiceIndex(invoices ?? []),
+    [invoices]
+  );
 
-  useEffect(() => {
-    loadCustomers("");
-  }, [loadCustomers]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    loadCustomers(query);
-  };
+  const filtered = useMemo(
+    () =>
+      filterCustomers(customers ?? [], {
+        search: debouncedSearch,
+        quickFilter,
+        serviceFilter,
+        invoiceIndex,
+      }),
+    [customers, debouncedSearch, quickFilter, serviceFilter, invoiceIndex]
+  );
 
   const handleCreated = () => {
-    setOpen(false);
-    toast.success("Customer created");
-    loadCustomers();
+    setFormOpen(false);
+    setEditCustomer(null);
+    toast.success("Customer saved");
+    invalidateCachePrefix("/api/customers");
+    invalidateCache("/api/invoices");
+    void refetch();
   };
 
+  const openEdit = (customer: CustomerListRow) => {
+    setSelected(null);
+    setEditCustomer(customer);
+    setFormOpen(true);
+  };
+
+  if (isLoading && !customers?.length) {
+    return <PageSkeleton className="mx-auto w-full" />;
+  }
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Customers</h2>
-          <p className="text-sm text-muted-foreground">Manage academy members and billing history</p>
+    <div className="mx-auto w-full space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="h-11 pl-10"
+            placeholder="Search by name or mobile number..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
-        <Button onClick={() => setOpen(true)}>
+        <Button size="lg" className="shrink-0" onClick={() => {
+          setEditCustomer(null);
+          setFormOpen(true);
+        }}>
           <Plus className="mr-2 h-4 w-4" />
           Add Customer
         </Button>
       </div>
 
-      <Card>
-        <CardHeader>
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                className="pl-9"
-                placeholder="Search by name, mobile, membership ID..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </div>
-            <Button type="submit" variant="secondary">Search</Button>
-          </form>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Membership ID</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead>Invoices</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    Loading customers…
-                  </TableCell>
-                </TableRow>
-              ) : customers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                    No customers found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                customers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell>
-                      <Link href={`/customers/${customer.id}`} className="font-medium text-primary hover:underline">
-                        {customer.name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{customer.mobile}</TableCell>
-                    <TableCell>{customer.membershipId}</TableCell>
-                    <TableCell>{formatDate(customer.dateJoined)}</TableCell>
-                    <TableCell>{customer._count.invoices}</TableCell>
-                    <TableCell>
-                      <Badge variant={customer.status === "ACTIVE" ? "success" : "secondary"}>
-                        {customer.status}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))
+      <div className="flex flex-col items-center gap-3 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
+        <div className="flex flex-wrap justify-center gap-2">
+          {QUICK_FILTERS.map((pill) => (
+            <button
+              key={pill.id}
+              type="button"
+              onClick={() => setQuickFilter(pill.id)}
+              className={cn(
+                "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
+                quickFilter === pill.id
+                  ? "nav-pill-active"
+                  : "border border-border/60 bg-card/40 text-foreground/80 hover:bg-muted/40"
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            >
+              {pill.label}
+            </button>
+          ))}
+        </div>
 
-      <CustomerFormDialog open={open} onOpenChange={setOpen} onSuccess={handleCreated} />
+        <ServiceFilterSelect value={serviceFilter} onChange={setServiceFilter} />
+      </div>
+
+      <p className="text-center text-xs text-muted-foreground">
+        {filtered.length} customer{filtered.length === 1 ? "" : "s"}
+        {isLoading ? " · refreshing…" : ""}
+      </p>
+
+      {filtered.length === 0 ? (
+        <div className="glass-panel rounded-[20px] px-6 py-16 text-center">
+          <p className="text-sm font-medium text-foreground">No customers match your search.</p>
+        </div>
+      ) : (
+        <CustomersTable
+          customers={filtered}
+          invoiceIndex={invoiceIndex}
+          onViewDetails={setSelected}
+        />
+      )}
+
+      <CustomerDrawer
+        customer={selected}
+        invoiceIndex={invoiceIndex}
+        onClose={() => setSelected(null)}
+        onEdit={openEdit}
+      />
+
+      <CustomerFormDialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditCustomer(null);
+        }}
+        onSuccess={handleCreated}
+        initialData={
+          editCustomer
+            ? {
+                id: editCustomer.id,
+                name: editCustomer.name,
+                mobile: editCustomer.mobile ?? "",
+                status: editCustomer.status,
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

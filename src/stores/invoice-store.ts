@@ -27,6 +27,7 @@ interface InvoiceFormState {
   items: InvoiceLineItem[];
   setSelectedCustomer: (customer: CustomerSearchResult) => void;
   clearSelectedCustomer: () => void;
+  clearCustomerLink: () => void;
   setCustomerName: (name: string) => void;
   setCustomerMobile: (mobile: string) => void;
   setCustomerEmail: (email: string) => void;
@@ -87,6 +88,13 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
       customerId: null,
       customerName: "",
       customerMobile: "",
+      customerEmail: "",
+      customerAddress: "",
+      customerGst: "",
+    }),
+  clearCustomerLink: () =>
+    set({
+      customerId: null,
       customerEmail: "",
       customerAddress: "",
       customerGst: "",

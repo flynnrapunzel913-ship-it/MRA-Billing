@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-/** Canonical MR Academy logo served from /public/backgrounds */
-export const ACADEMY_LOGO_SRC = "/backgrounds/MR_logo.png";
+import { ACADEMY_LOGO_PATH } from "@/lib/branding-assets";
+
+/** Canonical MR Academy logo served from /public/branding */
+export const ACADEMY_LOGO_SRC = ACADEMY_LOGO_PATH;
 
 type AcademyLogoProps = {
   className?: string;
@@ -18,7 +20,7 @@ export function AcademyLogo({ className, alt = "MR Academy" }: AcademyLogoProps)
     <img
       src={ACADEMY_LOGO_SRC}
       alt={alt}
-      className={cn("h-14 w-auto max-w-full object-contain object-center", className)}
+      className={cn("h-20 w-auto max-w-full object-contain object-center", className)}
       decoding="async"
     />
   );

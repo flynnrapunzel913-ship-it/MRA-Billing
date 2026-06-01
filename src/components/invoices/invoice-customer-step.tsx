@@ -1,20 +1,25 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search, UserPlus, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
-import {
-  parseSearchQueryForCreate,
-  type CustomerSearchResult,
-} from "@/lib/customer-search";
+import { customerToSearchResult, type CustomerSearchResult } from "@/lib/customer-search";
 import { readApiResponse } from "@/lib/api-error";
+import { invalidateCachePrefix } from "@/lib/client-cache";
 import { useInvoiceStore } from "@/stores/invoice-store";
-import { QuickCustomerModal } from "@/components/customers/quick-customer-modal";
+
+function normalizeMobile(value: string) {
+  return value.replace(/\D/g, "");
+}
+
+function formatMobileDisplay(digits: string) {
+  const d = digits.slice(0, 10);
+  if (d.length <= 5) return d;
+  return `${d.slice(0, 5)} ${d.slice(5)}`;
+}
 
 export function InvoiceCustomerStep() {
   const {
@@ -22,20 +27,19 @@ export function InvoiceCustomerStep() {
     customerName,
     customerMobile,
     setSelectedCustomer,
-    clearSelectedCustomer,
+    setCustomerName,
+    setCustomerMobile,
+    clearCustomerLink,
   } = useInvoiceStore();
 
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
+  const [nameOpen, setNameOpen] = useState(false);
   const [results, setResults] = useState<CustomerSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createPrefill, setCreatePrefill] = useState({ name: "", mobile: "" });
-  const containerRef = useRef<HTMLDivElement>(null);
-  const debouncedQuery = useDebouncedValue(query, 250);
+  const nameRef = useRef<HTMLDivElement>(null);
+  const debouncedName = useDebouncedValue(customerName, 250);
 
   useEffect(() => {
-    if (!debouncedQuery.trim()) {
+    if (!nameOpen || !debouncedName.trim()) {
       setResults([]);
       return;
     }
@@ -44,23 +48,24 @@ export function InvoiceCustomerStep() {
       setLoading(true);
       try {
         const res = await fetch(
-          `/api/customers?q=${encodeURIComponent(debouncedQuery.trim())}`
+          `/api/customers?q=${encodeURIComponent(debouncedName.trim())}`
         );
         const result = await readApiResponse<CustomerSearchResult[]>(res, "Search failed");
         if (result.ok) {
-          setResults(Array.isArray(result.data) ? result.data : []);
+          const rows = Array.isArray(result.data) ? result.data : [];
+          setResults(rows.map((row) => customerToSearchResult(row)));
         }
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [debouncedQuery]);
+  }, [debouncedName, nameOpen]);
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      if (nameRef.current && !nameRef.current.contains(e.target as Node)) {
+        setNameOpen(false);
       }
     };
     document.addEventListener("mousedown", onClick);
@@ -69,174 +74,186 @@ export function InvoiceCustomerStep() {
 
   const handleSelect = (customer: CustomerSearchResult) => {
     setSelectedCustomer(customer);
-    setQuery(customer.name);
-    setOpen(false);
+    if (customer.mobile) {
+      setCustomerMobile(formatMobileDisplay(normalizeMobile(customer.mobile)));
+    }
+    setNameOpen(false);
   };
 
-  const openCreateModal = (fromQuery?: string) => {
-    setCreatePrefill(parseSearchQueryForCreate(fromQuery ?? query));
-    setCreateOpen(true);
-    setOpen(false);
+  const handleNameChange = (value: string) => {
+    if (customerId) clearCustomerLink();
+    setCustomerName(value);
+    setNameOpen(true);
   };
 
-  if (customerId) {
-    return (
-      <>
-        <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 dark:border-primary/15 dark:bg-card/60">
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Check className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="font-semibold text-foreground">{customerName}</p>
-                <p className="text-xs text-muted-foreground">Ready for invoice</p>
-              </div>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 text-muted-foreground"
-              onClick={() => {
-                clearSelectedCustomer();
-                setQuery("");
-              }}
-            >
-              <X className="mr-1 h-3.5 w-3.5" />
-              Change
-            </Button>
-          </div>
-          <dl className="grid gap-2 text-sm sm:grid-cols-2">
-            <div>
-              <dt className="text-muted-foreground">Mobile</dt>
-              <dd className="font-medium">{customerMobile || "—"}</dd>
-            </div>
-          </dl>
-        </div>
+  const handleMobileChange = (value: string) => {
+    if (customerId) clearCustomerLink();
+    const digits = normalizeMobile(value);
+    setCustomerMobile(formatMobileDisplay(digits));
+  };
 
-        <QuickCustomerModal
-          open={createOpen}
-          initialName={createPrefill.name}
-          initialMobile={createPrefill.mobile}
-          onClose={() => setCreateOpen(false)}
-          onCreated={(c) => {
-            setSelectedCustomer(c);
-            setQuery(c.name);
-          }}
-        />
-      </>
-    );
-  }
+  const mobileDigits = normalizeMobile(customerMobile);
+  const isExisting = Boolean(customerId);
 
   return (
-    <>
-      <div className="space-y-3" ref={containerRef}>
-        <div className="relative">
-          <Label className="mb-1.5 block text-sm font-semibold">Find Customer</Label>
-          <Search className="pointer-events-none absolute left-3 top-[2.35rem] h-4 w-4 text-muted-foreground" />
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="relative space-y-1.5" ref={nameRef}>
+          <Label htmlFor="invoice-customer-name" className="text-sm font-semibold">
+            Customer Name *
+          </Label>
           <Input
-            className="h-11 border-primary/20 pl-9 text-base"
-            placeholder="Search by name or mobile…"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setOpen(true);
-            }}
-            onFocus={() => query.trim() && setOpen(true)}
+            id="invoice-customer-name"
+            className="h-11 text-base"
+            placeholder="Start typing a name…"
+            value={customerName}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onFocus={() => customerName.trim() && setNameOpen(true)}
+            autoComplete="off"
             autoFocus
           />
 
-          {open && query.trim() ? (
+          {nameOpen && customerName.trim() ? (
             <div
               className={cn(
                 "absolute left-0 right-0 top-[calc(100%+6px)] z-50 overflow-hidden rounded-xl border",
-                "border-[#E2E8F0] bg-white shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
-                "dark:border-white/10 dark:bg-[#0B1730]/95"
+                "border-border bg-card shadow-[var(--shadow-card)]"
               )}
             >
               {loading ? (
                 <p className="px-4 py-3 text-sm text-muted-foreground">Searching…</p>
               ) : results.length === 0 ? (
-                <div className="px-4 py-3">
-                  <p className="text-sm text-muted-foreground">No customers found</p>
-                  <button
-                    type="button"
-                    className="mt-2 flex w-full items-center gap-2 rounded-lg px-2 py-2.5 text-sm font-medium text-primary hover:bg-primary/5"
-                    onClick={() => openCreateModal(query)}
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Create New Customer
-                  </button>
-                </div>
+                <p className="px-4 py-3 text-sm text-muted-foreground">
+                  No saved match — enter mobile below; customer will be saved when you continue.
+                </p>
               ) : (
-                <ul className="max-h-56 overflow-y-auto py-1">
+                <ul className="max-h-48 overflow-y-auto py-1">
                   {results.map((customer) => (
                     <li key={customer.id}>
                       <button
                         type="button"
-                        className="block w-full px-4 py-2.5 text-left transition-colors hover:bg-[#F0F9FF] dark:hover:bg-white/[0.06]"
+                        className="block w-full px-4 py-2.5 text-left transition-colors hover:bg-primary/5"
                         onClick={() => handleSelect(customer)}
                       >
                         <p className="text-sm font-medium">{customer.name}</p>
                         <p className="text-xs text-muted-foreground">
-                          {[customer.mobile, customer.membershipId]
-                            .filter(Boolean)
-                            .join(" · ")}
+                          {customer.mobile || "No mobile on file"}
                         </p>
                       </button>
                     </li>
                   ))}
-                  <li className="border-t border-[#E2E8F0] dark:border-white/10">
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/5"
-                      onClick={() => openCreateModal(query)}
-                    >
-                      <UserPlus className="h-4 w-4" />
-                      Create New Customer
-                    </button>
-                  </li>
                 </ul>
               )}
             </div>
           ) : null}
         </div>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="h-10 w-full border-dashed border-primary/30 sm:w-auto"
-          onClick={() => openCreateModal()}
-        >
-          <UserPlus className="mr-2 h-4 w-4" />
-          Create New Customer
-        </Button>
-
-        <p className="text-xs text-muted-foreground">
-          Search by name or phone. New customers are saved and selected instantly — no page
-          switching.
-        </p>
+        <div className="space-y-1.5">
+          <Label htmlFor="invoice-customer-mobile" className="text-sm font-semibold">
+            Mobile Number *
+          </Label>
+          <Input
+            id="invoice-customer-mobile"
+            className="h-11 text-base"
+            inputMode="tel"
+            placeholder="10-digit mobile"
+            value={customerMobile}
+            onChange={(e) => handleMobileChange(e.target.value)}
+          />
+          {isExisting ? (
+            <p className="text-xs text-muted-foreground">
+              Loaded from saved customer. Edit the name to use a different number.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Required for new customers — saved to your directory when you go to the next step.
+            </p>
+          )}
+        </div>
       </div>
-
-      <QuickCustomerModal
-        open={createOpen}
-        initialName={createPrefill.name}
-        initialMobile={createPrefill.mobile}
-        onClose={() => setCreateOpen(false)}
-        onCreated={(c) => {
-          setSelectedCustomer(c);
-          setQuery(c.name);
-        }}
-      />
-    </>
+    </div>
   );
 }
 
-export function validateCustomerStep(customerId: string | null): boolean {
-  if (!customerId) {
-    toast.error("Select or create a customer to continue");
+export function validateCustomerStep(
+  customerName: string,
+  customerMobile: string
+): boolean {
+  const name = customerName.trim();
+  const mobile = normalizeMobile(customerMobile);
+
+  if (!name) {
+    toast.error("Enter customer name");
+    return false;
+  }
+  if (mobile.length < 10) {
+    toast.error("Enter a valid 10-digit mobile number");
     return false;
   }
   return true;
+}
+
+/** Ensures customer exists in DB (link, match by mobile, or create). */
+export async function prepareCustomerStep(): Promise<boolean> {
+  const state = useInvoiceStore.getState();
+  const name = state.customerName.trim();
+  const mobile = normalizeMobile(state.customerMobile);
+
+  if (!validateCustomerStep(name, state.customerMobile)) {
+    return false;
+  }
+
+  if (state.customerId) {
+    return true;
+  }
+
+  try {
+    const searchRes = await fetch(`/api/customers?q=${encodeURIComponent(mobile)}`);
+    const searchResult = await readApiResponse<CustomerSearchResult[]>(
+      searchRes,
+      "Could not look up customer"
+    );
+    if (searchResult.ok) {
+      const rows = Array.isArray(searchResult.data) ? searchResult.data : [];
+      const existing = rows.find((row) => normalizeMobile(row.mobile ?? "") === mobile);
+      if (existing) {
+        const linked = customerToSearchResult(existing);
+        state.setSelectedCustomer(linked);
+        state.setCustomerMobile(formatMobileDisplay(mobile));
+        if (linked.name.toLowerCase() !== name.toLowerCase()) {
+          state.setCustomerName(name);
+        }
+        invalidateCachePrefix("/api/customers");
+        return true;
+      }
+    }
+
+    const createRes = await fetch("/api/customers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, mobile, status: "ACTIVE" }),
+    });
+    const createResult = await readApiResponse<{
+      id: string;
+      name: string;
+      mobile: string | null;
+      membershipId: string;
+      dateJoined: string;
+      status: string;
+    }>(createRes, "Failed to save customer");
+
+    if (!createResult.ok) {
+      toast.error(createResult.message);
+      return false;
+    }
+
+    state.setSelectedCustomer(customerToSearchResult(createResult.data));
+    state.setCustomerMobile(formatMobileDisplay(mobile));
+    invalidateCachePrefix("/api/customers");
+    toast.success("Customer saved");
+    return true;
+  } catch {
+    toast.error("Failed to save customer");
+    return false;
+  }
 }

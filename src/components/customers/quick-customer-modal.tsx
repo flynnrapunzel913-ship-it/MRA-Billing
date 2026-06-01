@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
+import { invalidateCachePrefix } from "@/lib/client-cache";
 import { customerToSearchResult, type CustomerSearchResult } from "@/lib/customer-search";
 
 interface QuickCustomerModalProps {
@@ -73,8 +74,9 @@ export function QuickCustomerModal({
         return;
       }
 
+      invalidateCachePrefix("/api/customers");
       onCreated(customerToSearchResult(result.data));
-      toast.success("Customer created and selected");
+      toast.success("Customer saved and selected");
       onClose();
     } catch {
       toast.error("Failed to create customer");

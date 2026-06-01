@@ -8,7 +8,7 @@ interface InvoiceWizardNavProps {
   step: number;
   loading?: boolean;
   onBack: () => void;
-  onNext: () => void;
+  onNext: () => void | Promise<void>;
   onSubmit: () => void;
   className?: string;
 }
@@ -28,9 +28,7 @@ export function InvoiceWizardNav({
   return (
     <div
       className={cn(
-        "mt-3 flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 backdrop-blur-md",
-        "border-[#E2E8F0] bg-white shadow-[0_4px_16px_rgba(0,0,0,0.04)]",
-        "dark:border-primary/15 dark:bg-card/70 dark:shadow-sm",
+        "glass-panel mt-3 flex items-center justify-between gap-3 rounded-xl px-3 py-2.5",
         className
       )}
     >
@@ -48,8 +46,9 @@ export function InvoiceWizardNav({
       {isLast ? (
         <Button
           type="button"
+          variant="aqua"
           size="sm"
-          className="h-9 rounded-lg px-4 text-sm font-medium"
+          className="h-9 rounded-lg px-4 text-sm font-semibold"
           onClick={onSubmit}
           disabled={loading}
         >

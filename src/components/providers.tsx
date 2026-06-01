@@ -6,10 +6,17 @@ import { Toaster } from "sonner";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+    <SessionProvider refetchOnWindowFocus={false} refetchInterval={0}>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="dark"
+        enableSystem
+        enableColorScheme
+        storageKey="mra-billing-theme"
+        disableTransitionOnChange={false}
+      >
         {children}
-        <Toaster richColors position="top-right" />
+        <Toaster richColors position="top-right" theme="system" />
       </ThemeProvider>
     </SessionProvider>
   );

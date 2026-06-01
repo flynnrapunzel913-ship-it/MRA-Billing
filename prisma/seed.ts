@@ -31,7 +31,11 @@ async function main() {
 
   await prisma.settings.upsert({
     where: { id: "default" },
-    update: {},
+    update: {
+      logoUrl: "/branding/logo.png",
+      headerImageUrl: "/branding/address-panel.jpeg",
+      footerImageUrl: "/branding/footer-curves.jpeg",
+    },
     create: {
       id: "default",
       academyName: "MR Academy",

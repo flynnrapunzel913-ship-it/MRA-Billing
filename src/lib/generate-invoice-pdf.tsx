@@ -1,5 +1,6 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { InvoicePDFDocument } from "@/components/pdf/invoice-pdf";
+import { getAcademyLogoForPdf, type PdfImageSource } from "@/lib/pdf-image";
 
 interface InvoiceData {
   invoiceNumber: string;
@@ -42,7 +43,7 @@ interface SettingsData {
   website: string | null;
   gstNumber: string;
   gstEnabled: boolean;
-  logoUrl: string;
+  logoUrl: PdfImageSource;
   footerImageUrl: string;
   signatureUrl: string | null;
   brandColor: string;
@@ -53,5 +54,9 @@ export async function generateInvoicePdfBuffer(
   invoice: InvoiceData,
   settings: SettingsData
 ) {
-  return renderToBuffer(<InvoicePDFDocument invoice={invoice} settings={settings} />);
+  const logoUrl = getAcademyLogoForPdf();
+
+  return renderToBuffer(
+    <InvoicePDFDocument invoice={invoice} settings={{ ...settings, logoUrl }} />
+  );
 }

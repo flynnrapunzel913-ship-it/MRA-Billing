@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { Sidebar, MobileSidebar } from "./sidebar";
-import { Header } from "./header";
+import { useEffect } from "react";
 import { Role } from "@prisma/client";
+import { prefetchJson } from "@/lib/client-cache";
+import { FloatingHeader } from "./floating-header";
+import { NavDock } from "./nav-dock";
+import { MobileTabBar } from "./mobile-tab-bar";
 
 interface DashboardShellProps {
   user: { name?: string | null; role: Role };
@@ -11,34 +13,23 @@ interface DashboardShellProps {
 }
 
 export function DashboardShell({ user, children }: DashboardShellProps) {
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const userName = user.name || "Front Desk";
+  useEffect(() => {
+    prefetchJson("/api/dashboard");
+    prefetchJson("/api/customers?q=");
+    prefetchJson("/api/invoices");
+    if (user.role === "ADMIN") {
+      prefetchJson("/api/settings");
+    }
+  }, [user.role]);
 
   return (
-    <div className="flex min-h-screen items-stretch">
-      <Sidebar role={user.role} userName={userName} />
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        >
-          <div className="absolute left-0 top-0 h-full" onClick={(e) => e.stopPropagation()}>
-            <MobileSidebar
-              role={user.role}
-              userName={userName}
-              onNavigate={() => setMobileOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Header
-          userName={userName}
-          role={user.role}
-          onMenuClick={() => setMobileOpen(true)}
-        />
-        <main className="flex-1 overflow-auto p-4 lg:p-6">{children}</main>
+    <div className="flex min-h-screen flex-col">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col items-center px-3 pt-2 sm:px-4 lg:pt-0">
+        <FloatingHeader role={user.role} />
+        <NavDock role={user.role} />
+        <main className="w-full max-w-6xl pb-24 pt-4 lg:pb-8 lg:pt-5">{children}</main>
       </div>
+      <MobileTabBar role={user.role} />
     </div>
   );
 }

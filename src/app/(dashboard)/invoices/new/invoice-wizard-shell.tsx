@@ -12,16 +12,27 @@ export function InvoiceWizardShell({
   return (
     <div
       className={cn(
-        "relative -m-4 min-h-full overflow-visible p-4 lg:-m-6 lg:p-6",
+        "relative -mx-4 mt-6 min-h-[calc(100dvh-10rem)] overflow-visible p-3 sm:mt-8 sm:p-4",
+        "lg:-mx-6 lg:mt-10 lg:min-h-[calc(100dvh-12rem)] lg:p-6",
         className
       )}
     >
-      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute left-1/4 top-20 h-72 w-72 -translate-x-1/2 rounded-full bg-[#0EA5E9]/12 blur-[100px] dark:bg-[#0070C0]/25" />
-        <div className="absolute right-0 top-1/3 h-56 w-56 rounded-full bg-[#38bdf8]/10 blur-[80px] dark:bg-[#38bdf8]/20" />
-        <div className="absolute bottom-0 left-1/2 h-48 w-96 -translate-x-1/2 rounded-full bg-[#0284C7]/8 blur-[90px] dark:bg-[#0070C0]/10" />
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-0 rounded-2xl border border-border/60",
+          "bg-[#e8f7fc]/96 shadow-[var(--shadow-card)] backdrop-blur-md",
+          "dark:border-primary/15 dark:bg-[#041018]/96"
+        )}
+        aria-hidden
+      />
+
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl" aria-hidden>
+        <div className="absolute left-1/4 top-16 h-56 w-56 -translate-x-1/2 rounded-full bg-primary/12 blur-[90px]" />
+        <div className="absolute right-8 top-1/4 h-44 w-44 rounded-full bg-primary/8 blur-[70px]" />
+        <div className="absolute bottom-8 left-1/2 h-40 w-80 -translate-x-1/2 rounded-full bg-primary/6 blur-[80px]" />
       </div>
-      <div className="relative z-10">{children}</div>
+
+      <div className="relative z-10 mx-auto w-full max-w-6xl">{children}</div>
     </div>
   );
 }

@@ -1,40 +1,40 @@
+"use client";
+
+import { useTheme } from "next-themes";
+import { useEffect, useState } from "react";
+
 export function AppBackground({ children }: { children: React.ReactNode }) {
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const isDark = !mounted ? true : resolvedTheme === "dark";
+
   return (
     <>
-      {/* Pool watermark — subtle in light, full in dark */}
       <div
-        className="pointer-events-none fixed inset-0 -z-30 bg-cover bg-center bg-no-repeat opacity-[0.035] dark:opacity-100"
-        style={{ backgroundImage: "url(/backgrounds/pool-background.png)" }}
+        className="pointer-events-none fixed inset-0 -z-30 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url(/backgrounds/pool-background.png?v=2)" }}
         aria-hidden
       />
-
-      {/* Light: soft blue-tinted base (no dark overlay) */}
       <div
-        className="pointer-events-none fixed inset-0 -z-20 bg-[#F8FBFF] dark:hidden"
+        className="pointer-events-none fixed inset-0 -z-20 transition-colors duration-300"
+        style={{ backgroundColor: "var(--overlay)" }}
         aria-hidden
       />
-
-      {/* Dark: pool dimming overlay — unchanged */}
-      <div
-        className="pointer-events-none fixed inset-0 -z-20 hidden bg-black/50 dark:block"
-        aria-hidden
-      />
-
-      {/* Light: radial glows + gradient */}
-      <div className="pointer-events-none fixed inset-0 -z-10 dark:hidden" aria-hidden>
-        <div className="absolute -left-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#0EA5E9]/10 blur-[100px]" />
-        <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-[#38BDF8]/8 blur-[90px]" />
-        <div className="absolute left-1/2 top-1/3 h-64 w-[32rem] -translate-x-1/2 rounded-full bg-[#0284C7]/6 blur-[80px]" />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#0EA5E9]/[0.06] via-[#F8FBFF]/80 to-[#38BDF8]/[0.08]" />
-      </div>
-
-      {/* Dark: gradient overlay — unchanged */}
-      <div
-        className="pointer-events-none fixed inset-0 -z-10 hidden bg-gradient-to-br from-[#0070C0]/15 via-[#0b1220]/50 to-[#38bdf8]/12 dark:block"
-        aria-hidden
-      />
-
-      <div className="relative min-h-screen">{children}</div>
+      {!isDark && (
+        <div className="pointer-events-none fixed inset-0 -z-10 transition-opacity duration-300" aria-hidden>
+          <div className="absolute inset-0 bg-gradient-to-br from-[#00C2FF]/12 via-[#e8f7fc]/78 to-[#00E5D4]/10" />
+        </div>
+      )}
+      {isDark && (
+        <div className="pointer-events-none fixed inset-0 -z-10 transition-opacity duration-300" aria-hidden>
+          <div className="absolute inset-0 bg-gradient-to-br from-[#00C2FF]/8 via-[#041018]/90 to-[#00E5D4]/6" />
+          <div className="absolute inset-0 bg-[#020810]/35" />
+        </div>
+      )}
+      <div className="relative min-h-screen text-foreground">{children}</div>
     </>
   );
 }

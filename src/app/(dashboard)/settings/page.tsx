@@ -1,6 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { invalidateCache } from "@/lib/client-cache";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -20,7 +23,7 @@ function parseTermsPreview(text?: string) {
 }
 
 export default function SettingsPage() {
-  const [loading, setLoading] = useState(true);
+  const { data: settings, isLoading: loading } = useCachedFetch<SettingsInput>("/api/settings");
 
   const {
     register,
@@ -45,18 +48,14 @@ export default function SettingsPage() {
   const termsPreview = parseTermsPreview(termsText);
 
   useEffect(() => {
-    fetch("/api/settings")
-      .then((r) => r.json())
-      .then((data) => {
-        reset({
-          ...data,
-          gstEnabled: data.gstEnabled ?? true,
-          defaultCgstRate: Number(data.defaultCgstRate ?? 9),
-          defaultSgstRate: Number(data.defaultSgstRate ?? 9),
-        });
-        setLoading(false);
-      });
-  }, [reset]);
+    if (!settings) return;
+    reset({
+      ...settings,
+      gstEnabled: settings.gstEnabled ?? true,
+      defaultCgstRate: Number(settings.defaultCgstRate ?? 9),
+      defaultSgstRate: Number(settings.defaultSgstRate ?? 9),
+    });
+  }, [settings, reset]);
 
   const onSubmit = async (data: SettingsInput) => {
     const res = await fetch("/api/settings", {
@@ -68,23 +67,17 @@ export default function SettingsPage() {
       toast.error("Failed to save settings");
       return;
     }
+    invalidateCache("/api/settings");
     toast.success("Settings updated");
   };
 
-  if (loading) {
-    return <div className="py-20 text-center text-muted-foreground">Loading settings...</div>;
+  if (loading && !settings) {
+    return <PageSkeleton className="max-w-3xl" />;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Academy Settings</h2>
-        <p className="text-sm text-muted-foreground">
-          Configure letterhead, GST, invoice terms, and branding
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-5">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Card>
           <CardHeader>
             <CardTitle>Academy Details</CardTitle>

@@ -24,14 +24,16 @@ export function isSchemaDriftError(error: unknown): boolean {
   return false;
 }
 
-let cachedActiveInvoiceWhere: Prisma.InvoiceWhereInput | undefined;
+/** Cached after first schema probe — defaults to soft-delete filter for speed */
+let cachedActiveInvoiceWhere: Prisma.InvoiceWhereInput = { deletedAt: null };
+let schemaProbeDone = false;
 
 /**
  * Returns `{ deletedAt: null }` when soft-delete migration is applied,
  * or `{}` when the column does not exist yet (avoids crashing list/dashboard APIs).
  */
 export async function getActiveInvoiceWhere(): Promise<Prisma.InvoiceWhereInput> {
-  if (cachedActiveInvoiceWhere !== undefined) {
+  if (schemaProbeDone) {
     return cachedActiveInvoiceWhere;
   }
 
@@ -52,6 +54,7 @@ export async function getActiveInvoiceWhere(): Promise<Prisma.InvoiceWhereInput>
     }
   }
 
+  schemaProbeDone = true;
   return cachedActiveInvoiceWhere;
 }
 
