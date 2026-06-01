@@ -1,36 +1,37 @@
-import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { canAccessRoute } from "@/lib/permissions";
+import { NextResponse } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+const protectedPrefixes = [
+  "/dashboard",
+  "/customers",
+  "/invoices",
+  "/reports",
+  "/admin",
+  "/settings",
+  "/profile",
+];
 
-  if (
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/api/auth") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/branding") ||
-    pathname.startsWith("/backgrounds") ||
-    pathname === "/favicon.ico"
-  ) {
-    return NextResponse.next();
+export default auth((req) => {
+  const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth;
+
+  const isProtected = protectedPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+
+  if (isProtected && !isLoggedIn) {
+    const login = new URL("/login", req.nextUrl);
+    login.searchParams.set("callbackUrl", pathname);
+    return NextResponse.redirect(login);
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("callbackUrl", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  if (!canAccessRoute(session.user.role, pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (pathname === "/login" && isLoggedIn) {
+    return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|backgrounds|.*\\..*).*)"],
 };

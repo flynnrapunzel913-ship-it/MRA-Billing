@@ -45,15 +45,15 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md border-[#E2E8F0] shadow-[0_8px_30px_rgba(0,0,0,0.08)] dark:border-white/50 dark:shadow-xl">
+    <div className="flex min-h-screen items-center justify-center p-4 pb-8">
+      <Card className="w-full max-w-md border-[#00C2FF]/25 shadow-[0_16px_48px_rgba(0,194,255,0.15)]">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
-            <AcademyLogo />
+            <AcademyLogo className="h-24 sm:h-28" />
           </div>
           <div>
-            <CardTitle>MR Academy Billing System</CardTitle>
-            <CardDescription>Sign in to manage invoices and customers</CardDescription>
+            <CardTitle className="text-xl uppercase tracking-[0.12em]">Billing System</CardTitle>
+            <CardDescription>Swimming academy — sign in to continue</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
@@ -66,9 +66,11 @@ export default function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" {...register("password")} />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+              {errors.password && (
+                <p className="text-sm text-destructive">{errors.password.message}</p>
+              )}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" size="lg" disabled={loading}>
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>

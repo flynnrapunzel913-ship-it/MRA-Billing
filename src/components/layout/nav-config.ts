@@ -33,15 +33,15 @@ export const navGroups: NavGroup[] = [
         roles: ["ADMIN", "RECEPTIONIST"],
       },
       {
-        href: "/customers",
-        label: "Customers",
-        icon: Users,
-        roles: ["ADMIN", "RECEPTIONIST"],
-      },
-      {
         href: "/invoices",
         label: "Invoices",
         icon: FileText,
+        roles: ["ADMIN", "RECEPTIONIST"],
+      },
+      {
+        href: "/customers",
+        label: "Customers",
+        icon: Users,
         roles: ["ADMIN", "RECEPTIONIST"],
       },
     ],
@@ -84,6 +84,11 @@ export function getNavGroupsForRole(role: Role): NavGroup[] {
       items: group.items.filter((item) => item.roles.includes(role)),
     }))
     .filter((group) => group.items.length > 0);
+}
+
+/** Flat list for horizontal nav dock (desktop). */
+export function getDockNavItems(role: Role): NavItem[] {
+  return getNavGroupsForRole(role).flatMap((group) => group.items);
 }
 
 /** Returns the single nav href that should be active for the current pathname. */

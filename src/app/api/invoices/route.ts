@@ -134,8 +134,12 @@ export async function POST(request: NextRequest) {
     dueDate.setDate(dueDate.getDate() + 7);
     const year = invoiceDate.getFullYear();
 
-    const invoice = await prisma.$transaction(async (tx) => {
-      let customerId: string | null = data.customerId ?? null;
+    const { invoice, linkedCustomerId, customerJustCreated } = await prisma.$transaction(
+      async (tx) => {
+        let linkedCustomerId: string | null = data.customerId ?? null;
+        let customerJustCreated: { id: string; name: string } | null = null;
+
+        let customerId: string | null = linkedCustomerId;
       let customerName = data.customerName;
       let customerMobile = data.customerMobile?.trim() || null;
       let customerAddress = data.customerAddress?.trim() || null;
@@ -177,15 +181,12 @@ export async function POST(request: NextRequest) {
               },
             });
             customerId = customer.id;
-            await recordCustomerActivity(
-              tx,
-              customer.id,
-              "CUSTOMER_ADDED",
-              `${customer.name} was added to the academy`
-            );
+            customerJustCreated = { id: customer.id, name: customer.name };
           }
         }
       }
+
+      linkedCustomerId = customerId;
 
       const sequence = await tx.invoiceSequence.upsert({
         where: { year },
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
 
       const invoiceNumber = formatInvoiceNumber(year, sequence.lastNumber);
 
-      const created = await tx.invoice.create({
+      const invoice = await tx.invoice.create({
         data: {
           invoiceNumber,
           invoiceDate,
@@ -235,47 +236,54 @@ export async function POST(request: NextRequest) {
         },
         include: { items: true, customer: true },
       });
-
-      if (customerId) {
-        await recordCustomerActivity(
-          tx,
-          customerId,
-          "INVOICE_CREATED",
-          `Invoice ${invoiceNumber} created`
-        );
-
-        if (paymentAmounts.amountPaid > 0) {
-          await recordCustomerActivity(
-            tx,
-            customerId,
-            "PAYMENT_MADE",
-            `Payment of ₹${paymentAmounts.amountPaid.toFixed(2)} received for ${invoiceNumber}`
-          );
-        }
-
-        const hasPackage = data.items.some((item) => item.itemType === COACHING_PACKAGE_TYPE);
-        if (hasPackage) {
-          const packageItem = data.items.find((item) => item.itemType === COACHING_PACKAGE_TYPE);
-          await recordCustomerActivity(
-            tx,
-            customerId,
-            "PACKAGE_PURCHASED",
-            packageItem?.description
-              ? `Package purchased: ${packageItem.description}`
-              : "Coaching package purchased"
-          );
-        }
+      
+      return { invoice, linkedCustomerId, customerJustCreated };
       }
+    );
 
-      await recordUserActivity(
-        tx,
-        user!.id!,
+    const invoiceNumber = invoice.invoiceNumber;
+
+    if (customerJustCreated) {
+      await recordCustomerActivity(
+        prisma,
+        customerJustCreated.id,
+        "CUSTOMER_ADDED",
+        `${customerJustCreated.name} was added to the academy`
+      );
+    }
+
+    if (linkedCustomerId) {
+      await recordCustomerActivity(
+        prisma,
+        linkedCustomerId,
         "INVOICE_CREATED",
-        invoiceNumber
+        `Invoice ${invoiceNumber} created`
       );
 
-      return created;
-    });
+      if (paymentAmounts.amountPaid > 0) {
+        await recordCustomerActivity(
+          prisma,
+          linkedCustomerId,
+          "PAYMENT_MADE",
+          `Payment of ₹${paymentAmounts.amountPaid.toFixed(2)} received for ${invoiceNumber}`
+        );
+      }
+
+      const hasPackage = data.items.some((item) => item.itemType === COACHING_PACKAGE_TYPE);
+      if (hasPackage) {
+        const packageItem = data.items.find((item) => item.itemType === COACHING_PACKAGE_TYPE);
+        await recordCustomerActivity(
+          prisma,
+          linkedCustomerId,
+          "PACKAGE_PURCHASED",
+          packageItem?.description
+            ? `Package purchased: ${packageItem.description}`
+            : "Coaching package purchased"
+        );
+      }
+    }
+
+    await recordUserActivity(prisma, user!.id!, "INVOICE_CREATED", invoiceNumber);
 
     return NextResponse.json(serializeInvoiceForJson(invoice), { status: 201 });
   } catch (error) {

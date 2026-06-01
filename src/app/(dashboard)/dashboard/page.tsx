@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { PageSkeleton } from "@/components/ui/page-skeleton";
 import Link from "next/link";
 import { FileText, Users, Clock, Plus, Receipt, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,7 +22,6 @@ import {
   AdminDashboardView,
   type AdminDashboardData,
 } from "@/components/admin/admin-dashboard-view";
-import { readApiResponse } from "@/lib/api-error";
 import { formatKpiValue, normalizeDashboardKpis, normalizeDashboardPayload } from "@/lib/dashboard-kpis";
 
 interface ReceptionistDashboardData {
@@ -44,26 +45,22 @@ function isAdminDashboard(data: DashboardData): data is AdminDashboardData {
   return data.role === "ADMIN";
 }
 
-const glassCard = cn(
-  "rounded-xl border backdrop-blur-md transition-all duration-200",
-  "border-[#E2E8F0]/90 bg-white/90 shadow-[0_4px_24px_rgba(0,112,192,0.07)]",
-  "dark:border-white/10 dark:bg-card/85 dark:shadow-[0_4px_24px_rgba(0,112,192,0.12)]"
-);
+const glassCard = cn("glass-panel transition-all duration-200");
 
 const kpiCards = [
   {
     key: "invoices",
     label: "Invoices Generated",
     icon: FileText,
-    accent: "from-[#0070C0]/15 to-[#0EA5E9]/5",
-    iconBg: "bg-[#0070C0]/10 text-[#0070C0] dark:bg-[#0070C0]/20 dark:text-[#38bdf8]",
+    accent: "from-primary/15 to-primary/5",
+    iconBg: "bg-primary/15 text-primary",
   },
   {
     key: "students",
     label: "Active Students",
     icon: Users,
     accent: "from-[#0284C7]/15 to-[#38bdf8]/5",
-    iconBg: "bg-[#0284C7]/10 text-[#0284C7] dark:bg-[#0284C7]/20 dark:text-[#38bdf8]",
+    iconBg: "bg-[#0284C7]/15 text-[#0284C7]",
   },
   {
     key: "pending",
@@ -84,15 +81,9 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">
-            Day-to-day overview — invoices, students, and collections
-          </p>
-        </div>
-        <Button asChild className="bg-[#0070C0] hover:bg-[#005499]">
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div className="flex justify-end">
+        <Button asChild size="lg">
           <Link href="/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
             New Invoice
@@ -108,7 +99,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
               key={kpi.key}
               className={cn(
                 glassCard,
-                "group overflow-hidden border-[#0070C0]/15 hover:-translate-y-0.5 hover:border-[#0070C0]/30 hover:shadow-[0_8px_32px_rgba(0,112,192,0.14)]"
+                "group overflow-hidden border-primary/15 hover:-translate-y-0.5 hover:border-primary/30"
               )}
             >
               <CardContent className="relative p-6 sm:p-7">
@@ -142,9 +133,9 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
       </div>
 
       <Card className={cn(glassCard, "overflow-hidden")}>
-        <CardHeader className="border-b border-[#E2E8F0]/80 px-5 py-4 dark:border-white/10">
+        <CardHeader className="border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-[#0070C0] dark:text-[#38bdf8]" />
+            <Receipt className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Recent Invoices</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">Latest 10 invoices, newest first</p>
@@ -152,7 +143,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
         <CardContent className="p-0">
           {(data.recentInvoices ?? []).length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0070C0]/10 text-[#0070C0]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                 <FileText className="h-7 w-7" />
               </div>
               <div>
@@ -161,7 +152,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                   Create your first invoice to start tracking academy billing.
                 </p>
               </div>
-              <Button asChild className="bg-[#0070C0] hover:bg-[#005499]">
+              <Button asChild>
                 <Link href="/invoices/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Invoice
@@ -172,7 +163,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#E2E8F0]/80 bg-[#E8F4FE]/50 hover:bg-[#E8F4FE]/50 dark:border-white/10 dark:bg-[#0070C0]/10">
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
                     <TableHead className="font-semibold">Invoice No</TableHead>
                     <TableHead className="font-semibold">Customer</TableHead>
                     <TableHead className="font-semibold">Date</TableHead>
@@ -186,14 +177,14 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                     <TableRow
                       key={invoice.id}
                       className={cn(
-                        "border-[#E2E8F0]/60 transition-colors hover:bg-[#0070C0]/[0.03] dark:border-white/5",
-                        index % 2 === 1 && "bg-[#F8FAFC]/60 dark:bg-white/[0.02]"
+                        "transition-colors hover:bg-muted/30",
+                        index % 2 === 1 && "bg-muted/20"
                       )}
                     >
                       <TableCell>
                         <Link
                           href={`/invoices/${invoice.id}`}
-                          className="font-semibold text-[#0070C0] hover:underline dark:text-[#38bdf8]"
+                          className="font-semibold text-primary hover:underline"
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -211,7 +202,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8 border-[#0070C0]/25" asChild>
+                        <Button variant="outline" size="sm" className="h-8" asChild>
                           <a
                             href={`/api/invoices/${invoice.id}/pdf`}
                             target="_blank"
@@ -235,39 +226,24 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
 }
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const { data: raw, isLoading, error } = useCachedFetch<Record<string, unknown>>("/api/dashboard");
 
-  useEffect(() => {
-    fetch("/api/dashboard")
-      .then(async (res) => {
-        const result = await readApiResponse(res, "Failed to load dashboard");
-        if (!result.ok) {
-          setLoadError(result.message);
-          setData(null);
-          return;
-        }
-        const payload = result.data as unknown as Record<string, unknown>;
-        setData(normalizeDashboardPayload(payload) as DashboardData);
-      })
-      .catch(() => setLoadError("Failed to load dashboard"));
-  }, []);
+  const data = useMemo(
+    () => (raw ? (normalizeDashboardPayload(raw) as DashboardData) : null),
+    [raw]
+  );
 
-  if (loadError) {
+  if (error) {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-        <p>{loadError}</p>
+        <p>{error}</p>
         <p className="text-sm">Try refreshing the page or run database migrations.</p>
       </div>
     );
   }
 
   if (!data) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading dashboard…
-      </div>
-    );
+    return isLoading ? <PageSkeleton className="max-w-6xl" /> : null;
   }
 
   if (isAdminDashboard(data)) {

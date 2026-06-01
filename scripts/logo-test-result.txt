@@ -1,0 +1,5 @@
+logo exists: true size: 56450
+path: OK 1611 bytes
+datauri-png: OK 1628 bytes
+jpeg convert: unrecognised content at end of stream
+buffer-png: OK 1627 bytes

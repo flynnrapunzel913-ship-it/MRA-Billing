@@ -62,39 +62,30 @@ export async function POST(request: NextRequest) {
     const data = parsed.data;
     const membershipId = data.membershipId || generateMembershipId();
 
-    const customer = await prisma.$transaction(async (tx) => {
-      const created = await tx.customer.create({
-        data: {
-          name: data.name,
-          mobile: data.mobile,
-          address: data.address || null,
-          emergencyContact: data.emergencyContact || null,
-          parentName: data.parentName || null,
-          gstNumber: data.gstNumber || null,
-          membershipId,
-          dateJoined: data.dateJoined ? new Date(data.dateJoined) : new Date(),
-          status: data.status,
-        },
-      });
-
-      await recordCustomerActivity(
-        tx,
-        created.id,
-        "CUSTOMER_ADDED",
-        `${created.name} was added to the academy`
-      );
-
-      if (user?.id) {
-        await recordUserActivity(
-          tx,
-          user.id,
-          "CUSTOMER_CREATED",
-          created.name
-        );
-      }
-
-      return created;
+    const customer = await prisma.customer.create({
+      data: {
+        name: data.name,
+        mobile: data.mobile,
+        address: data.address || null,
+        emergencyContact: data.emergencyContact || null,
+        parentName: data.parentName || null,
+        gstNumber: data.gstNumber || null,
+        membershipId,
+        dateJoined: data.dateJoined ? new Date(data.dateJoined) : new Date(),
+        status: data.status,
+      },
     });
+
+    await recordCustomerActivity(
+      prisma,
+      customer.id,
+      "CUSTOMER_ADDED",
+      `${customer.name} was added to the academy`
+    );
+
+    if (user?.id) {
+      await recordUserActivity(prisma, user.id, "CUSTOMER_CREATED", customer.name);
+    }
 
     return NextResponse.json(customer, { status: 201 });
   } catch (error) {

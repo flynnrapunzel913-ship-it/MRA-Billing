@@ -29,7 +29,11 @@ import { InvoiceWizardShell } from "./invoice-wizard-shell";
 import { InvoiceWizardNav } from "./invoice-wizard-nav";
 import { InvoiceSummaryPanel, InvoiceSummaryMobileBar } from "./invoice-summary-panel";
 import { InvoiceItemRow } from "./invoice-item-row";
-import { InvoiceCustomerStep, validateCustomerStep } from "@/components/invoices/invoice-customer-step";
+import {
+  InvoiceCustomerStep,
+  prepareCustomerStep,
+  validateCustomerStep,
+} from "@/components/invoices/invoice-customer-step";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
@@ -47,9 +51,9 @@ function StepCard({
   headerAction?: React.ReactNode;
 }) {
   return (
-    <div className="relative overflow-visible rounded-xl border bg-white shadow-[0_8px_30px_rgba(0,0,0,0.06)] backdrop-blur-md border-[#E2E8F0] dark:border-primary/25 dark:bg-card/85 dark:shadow-[0_8px_40px_rgba(0,112,192,0.2)]">
-      <div className="h-0.5 bg-gradient-to-r from-[#0EA5E9] via-[#38bdf8] to-[#0284C7]/60" />
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E2E8F0] px-4 py-3 sm:px-5 dark:border-primary/10">
+    <div className="glass-panel relative overflow-visible rounded-xl shadow-[var(--shadow-card)]">
+      <div className="h-0.5 bg-gradient-to-r from-primary/80 via-primary/50 to-primary/30" />
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3 sm:px-5">
         <div>
           <h3 className="text-lg font-bold tracking-tight text-foreground">{title}</h3>
           {description && (
@@ -68,6 +72,7 @@ export default function InvoiceWizard() {
   const searchParams = useSearchParams();
   const [step, setStep] = useState<Step>(0);
   const [loading, setLoading] = useState(false);
+  const [stepBusy, setStepBusy] = useState(false);
 
   const {
     customerId,
@@ -134,7 +139,7 @@ export default function InvoiceWizard() {
   const goTo = (next: Step) => setStep(next);
 
   const validateStep = (s: Step): boolean => {
-    if (s === 0 && !validateCustomerStep(customerId)) {
+    if (s === 0 && !validateCustomerStep(customerName, customerMobile)) {
       return false;
     }
     if (s === 1) {
@@ -164,8 +169,18 @@ export default function InvoiceWizard() {
     return true;
   };
 
-  const nextStep = () => {
-    if (!validateStep(step)) return;
+  const nextStep = async () => {
+    if (step === 0) {
+      setStepBusy(true);
+      try {
+        const ok = await prepareCustomerStep();
+        if (!ok) return;
+      } finally {
+        setStepBusy(false);
+      }
+    } else if (!validateStep(step)) {
+      return;
+    }
     if (step < 3) goTo((step + 1) as Step);
   };
 
@@ -174,7 +189,13 @@ export default function InvoiceWizard() {
   };
 
   const submitInvoice = async () => {
-    if (!validateStep(0) || !validateStep(1) || !validateStep(2)) return;
+    setStepBusy(true);
+    try {
+      const customerReady = await prepareCustomerStep();
+      if (!customerReady || !validateStep(1) || !validateStep(2)) return;
+    } finally {
+      setStepBusy(false);
+    }
 
     for (const item of items) {
       if (!isCoachingPackage(item.itemType)) continue;
@@ -274,7 +295,7 @@ export default function InvoiceWizard() {
       </header>
 
       <nav
-        className="mb-5 flex flex-wrap items-center justify-center gap-1 rounded-lg border border-[#E2E8F0] bg-white px-2 py-1.5 shadow-[0_4px_16px_rgba(0,0,0,0.04)] dark:border-primary/15 dark:bg-card/75 dark:shadow-md dark:shadow-primary/5 dark:backdrop-blur-md"
+        className="glass-panel mb-5 flex flex-wrap items-center justify-center gap-1 rounded-xl px-2 py-1.5"
         aria-label="Invoice steps"
       >
         {STEPS.map((label, i) => {
@@ -309,7 +330,7 @@ export default function InvoiceWizard() {
         <div className="lg:col-span-3">
           <div key={step} className="transition-opacity duration-200">
             {step === 0 && (
-              <StepCard title="Customer" description="Search existing or create new customer">
+              <StepCard title="Customer" description="Name and mobile — pick existing or add new">
                 <InvoiceCustomerStep />
               </StepCard>
             )}
@@ -482,9 +503,11 @@ export default function InvoiceWizard() {
                         </li>
                       ))}
                     </ul>
-                    <div className="mt-2 flex justify-between border-t border-primary/15 pt-2 font-bold">
+                    <div className="invoice-total-aqua mt-3 flex justify-between rounded-lg px-3 py-2.5 font-bold">
                       <span>Grand Total</span>
-                      <span className="text-primary">{formatCurrency(totals.grandTotal)}</span>
+                      <span className="invoice-total-value text-lg tabular-nums">
+                        {formatCurrency(totals.grandTotal)}
+                      </span>
                     </div>
                   </section>
                 </div>
@@ -494,7 +517,7 @@ export default function InvoiceWizard() {
 
           <InvoiceWizardNav
             step={step}
-            loading={loading}
+            loading={loading || stepBusy}
             onBack={prevStep}
             onNext={nextStep}
             onSubmit={submitInvoice}

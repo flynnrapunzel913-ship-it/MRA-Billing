@@ -33,26 +33,22 @@ export interface AdminDashboardData {
   }>;
 }
 
-const glassCard = cn(
-  "rounded-xl border backdrop-blur-md transition-all duration-200",
-  "border-[#E2E8F0]/90 bg-white/90 shadow-[0_4px_24px_rgba(0,112,192,0.07)]",
-  "dark:border-white/10 dark:bg-card/85 dark:shadow-[0_4px_24px_rgba(0,112,192,0.12)]"
-);
+const glassCard = cn("glass-panel transition-all duration-200");
 
 const kpiCards = [
   {
     key: "invoices",
     label: "Invoices Generated",
     icon: FileText,
-    accent: "from-[#0070C0]/15 to-[#0EA5E9]/5",
-    iconBg: "bg-[#0070C0]/10 text-[#0070C0] dark:text-[#38bdf8]",
+    accent: "from-primary/15 to-primary/5",
+    iconBg: "bg-primary/15 text-primary",
   },
   {
     key: "students",
     label: "Active Students",
     icon: Users,
     accent: "from-[#0284C7]/15 to-[#38bdf8]/5",
-    iconBg: "bg-[#0284C7]/10 text-[#0284C7] dark:text-[#38bdf8]",
+    iconBg: "bg-[#0284C7]/15 text-[#0284C7]",
   },
   {
     key: "pending",
@@ -75,12 +71,9 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">Admin Dashboard</h2>
-          <p className="text-sm text-muted-foreground">
-            Day-to-day overview — invoices, students, and collections
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          Day-to-day overview — invoices, students, and collections
+        </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
             <Link href="/reports/revenue">Revenue Reports</Link>
@@ -88,7 +81,7 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
           <Button variant="outline" asChild>
             <Link href="/admin/users">User Management</Link>
           </Button>
-          <Button asChild className="bg-[#0070C0] hover:bg-[#005499]">
+          <Button asChild>
             <Link href="/invoices/new">
               <Plus className="mr-2 h-4 w-4" />
               New Invoice
@@ -105,7 +98,7 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
               key={kpi.key}
               className={cn(
                 glassCard,
-                "group overflow-hidden border-[#0070C0]/15 hover:-translate-y-0.5 hover:border-[#0070C0]/30"
+                "group overflow-hidden border-primary/15 hover:-translate-y-0.5 hover:border-primary/30"
               )}
             >
               <CardContent className="relative p-6">
@@ -119,7 +112,9 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">{kpi.label}</p>
-                    <p className="text-3xl font-bold tabular-nums">{formatKpiValue(kpiValues[kpi.key])}</p>
+                    <p className="text-3xl font-bold tabular-nums text-foreground">
+                      {formatKpiValue(kpiValues[kpi.key])}
+                    </p>
                   </div>
                 </div>
               </CardContent>
@@ -129,9 +124,9 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
       </div>
 
       <Card className={cn(glassCard, "overflow-hidden")}>
-        <CardHeader className="border-b border-[#E2E8F0]/80 px-5 py-4 dark:border-white/10">
+        <CardHeader className="border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-[#0070C0]" />
+            <Receipt className="h-5 w-5 text-primary" />
             <CardTitle className="text-lg">Recent Invoices</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">Latest 10 invoices, newest first</p>
@@ -139,11 +134,11 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
         <CardContent className="p-0">
           {(data.recentInvoices ?? []).length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0070C0]/10 text-[#0070C0]">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                 <FileText className="h-7 w-7" />
               </div>
               <p className="font-semibold text-foreground">No invoices generated yet</p>
-              <Button asChild className="bg-[#0070C0] hover:bg-[#005499]">
+              <Button asChild>
                 <Link href="/invoices/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Invoice
@@ -154,7 +149,7 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-[#E2E8F0]/80 bg-[#E8F4FE]/50 hover:bg-[#E8F4FE]/50 dark:border-white/10 dark:bg-[#0070C0]/10">
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
                     <TableHead className="font-semibold">Invoice No</TableHead>
                     <TableHead className="font-semibold">Customer</TableHead>
                     <TableHead className="font-semibold">Date</TableHead>
@@ -168,14 +163,14 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
                     <TableRow
                       key={invoice.id}
                       className={cn(
-                        "border-[#E2E8F0]/60 transition-colors hover:bg-[#0070C0]/[0.03] dark:border-white/5",
-                        index % 2 === 1 && "bg-[#F8FAFC]/60 dark:bg-white/[0.02]"
+                        "transition-colors hover:bg-muted/30",
+                        index % 2 === 1 && "bg-muted/20"
                       )}
                     >
                       <TableCell>
                         <Link
                           href={`/invoices/${invoice.id}`}
-                          className="font-semibold text-[#0070C0] hover:underline dark:text-[#38bdf8]"
+                          className="font-semibold text-primary hover:underline"
                         >
                           {invoice.invoiceNumber}
                         </Link>
@@ -191,7 +186,7 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8 border-[#0070C0]/25" asChild>
+                        <Button variant="outline" size="sm" className="h-8" asChild>
                           <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
                             <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
                             View PDF
