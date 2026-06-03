@@ -92,8 +92,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-source-serif);
-  --font-mono: var(--font-source-serif);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
   --radius-lg: var(--radius);
 }
 
@@ -101,10 +101,46 @@
   border-color: var(--border);
 }
 
+html {
+  font-size: 16px;
+}
+
+html[data-ui-font-size="small"] {
+  font-size: 14px;
+}
+
+html[data-ui-font-size="medium"] {
+  font-size: 16px;
+}
+
+html[data-ui-font-size="large"] {
+  font-size: 18px;
+}
+
+html[data-ui-font-size="xlarge"] {
+  font-size: 20px;
+}
+
+html:not([data-ui-font]) body,
+html[data-ui-font="sans"] body {
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+html[data-ui-font="serif"] body {
+  font-family: var(--font-source-serif), "Source Serif 4", Georgia, serif;
+}
+
+html[data-ui-font="rounded"] body {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+}
+
+html[data-ui-font="mono"] body {
+  font-family: var(--font-jetbrains-mono), ui-monospace, monospace;
+}
+
 body {
   background: transparent;
   color: var(--foreground);
-  font-family: var(--font-sans), "Source Serif 4", Georgia, serif;
 }
 
 .glass-panel {

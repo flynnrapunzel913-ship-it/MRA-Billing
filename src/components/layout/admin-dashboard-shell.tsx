@@ -19,6 +19,7 @@ export function AdminDashboardShell({ user, children }: AdminDashboardShellProps
     prefetchJson("/api/invoices");
     prefetchJson("/api/stock/summary");
     prefetchJson("/api/settings");
+    prefetchJson("/api/profile");
   }, []);
 
   return (

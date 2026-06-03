@@ -61,8 +61,17 @@ export function prismaErrorMessage(error: unknown): string {
     if (error.code === "P2002") {
       return "A record with this value already exists.";
     }
+    if (error.code === "P2028") {
+      return "Database is busy. Please wait a moment and try again.";
+    }
   }
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    const msg = error.message.toLowerCase();
+    if (msg.includes("unable to start a transaction")) {
+      return "Database is busy. Please wait a moment and try again.";
+    }
+    return error.message;
+  }
   return "Request failed";
 }
 

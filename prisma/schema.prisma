@@ -76,6 +76,8 @@ model User {
   name         String
   role         Role            @default(RECEPTIONIST)
   status       UserStatus      @default(ACTIVE)
+  uiFontFamily String          @default("sans")
+  uiFontSize   String          @default("medium")
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
   invoices     Invoice[]

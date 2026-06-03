@@ -55,58 +55,60 @@ export async function POST(request: NextRequest) {
     const year = purchaseDate.getFullYear();
     const meta = getRequestMeta(request);
 
-    const entry = await prisma.$transaction(async (tx) => {
-      const seq = await tx.stockSequence.upsert({
-        where: { year },
-        create: { year, lastNumber: 1 },
-        update: { lastNumber: { increment: 1 } },
-      });
+    // Keep DB transaction short — file moves must not run inside $transaction (pool timeout).
+    const created = await prisma.$transaction(
+      async (tx) => {
+        const seq = await tx.stockSequence.upsert({
+          where: { year },
+          create: { year, lastNumber: 1 },
+          update: { lastNumber: { increment: 1 } },
+        });
 
-      const stockNumber = formatStockNumber(year, seq.lastNumber);
+        const stockNumber = formatStockNumber(year, seq.lastNumber);
 
-      const created = await tx.stockEntry.create({
-        data: {
-          stockNumber,
-          itemName: data.itemName.trim(),
-          category: data.category.trim(),
-          quantityPurchased: data.quantityPurchased,
-          totalCost: new Prisma.Decimal(data.totalCost),
-          supplierName: data.supplierName.trim(),
-          purchaseDate,
-          remarks: data.remarks?.trim() || null,
-          billPdfUrl: null,
-          billFileName: data.billFileName?.trim() || null,
-          createdById: user!.id!,
-        },
-      });
-
-      if (data.billPdfUrl) {
-        const bill = await finalizeStockBill(
-          data.billPdfUrl,
-          created.id,
-          data.billFileName
-        );
-        await tx.stockEntry.update({
-          where: { id: created.id },
+        const row = await tx.stockEntry.create({
           data: {
-            billPdfUrl: bill.billPdfUrl,
-            billFileName: bill.billFileName,
+            stockNumber,
+            itemName: data.itemName.trim(),
+            category: data.category.trim(),
+            quantityPurchased: data.quantityPurchased,
+            totalCost: new Prisma.Decimal(data.totalCost),
+            supplierName: data.supplierName.trim(),
+            purchaseDate,
+            remarks: data.remarks?.trim() || null,
+            billPdfUrl: null,
+            billFileName: data.billFileName?.trim() || null,
+            createdById: user!.id!,
           },
         });
-      }
 
-      await recordStockActivity(tx, {
-        stockEntryId: created.id,
-        userId: user!.id!,
-        type: "STOCK_CREATED",
-        description: `${stockNumber} — ${data.itemName} (${data.quantityPurchased} units)`,
-        ...meta,
-      });
+        await recordStockActivity(tx, {
+          stockEntryId: row.id,
+          userId: user!.id!,
+          type: "STOCK_CREATED",
+          description: `${stockNumber} — ${data.itemName} (${data.quantityPurchased} units)`,
+          ...meta,
+        });
 
-      return tx.stockEntry.findUniqueOrThrow({
+        return row;
+      },
+      { maxWait: 10_000, timeout: 15_000 }
+    );
+
+    if (data.billPdfUrl) {
+      const bill = await finalizeStockBill(data.billPdfUrl, created.id, data.billFileName);
+      await prisma.stockEntry.update({
         where: { id: created.id },
-        include: stockListInclude,
+        data: {
+          billPdfUrl: bill.billPdfUrl,
+          billFileName: bill.billFileName,
+        },
       });
+    }
+
+    const entry = await prisma.stockEntry.findUniqueOrThrow({
+      where: { id: created.id },
+      include: stockListInclude,
     });
 
     return NextResponse.json(serializeStockForJson(entry), { status: 201 });

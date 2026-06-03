@@ -20,6 +20,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
     prefetchJson("/api/customers?q=");
     prefetchJson("/api/invoices");
     prefetchJson("/api/stock");
+    prefetchJson("/api/profile");
     if (user.role === "ADMIN") {
       prefetchJson("/api/stock/summary");
       prefetchJson("/api/settings");

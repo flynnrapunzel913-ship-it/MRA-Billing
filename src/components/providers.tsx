@@ -3,6 +3,7 @@
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
+import { UiPreferencesProvider } from "@/components/providers/ui-preferences-provider";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -15,8 +16,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         storageKey="mra-billing-theme"
         disableTransitionOnChange={false}
       >
-        {children}
-        <Toaster richColors position="top-right" theme="system" />
+        <UiPreferencesProvider>
+          {children}
+          <Toaster richColors position="top-right" theme="system" />
+        </UiPreferencesProvider>
       </ThemeProvider>
     </SessionProvider>
   );
