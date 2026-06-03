@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Upload, FileText, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { stockEntrySchema, type StockEntryInput } from "@/lib/validations";
 import { STOCK_CATEGORIES } from "@/lib/constants";
 import { readApiResponse, messageFromApiBody } from "@/lib/api-error";
@@ -234,7 +234,7 @@ export function StockEntryForm() {
           {saving ? "Saving…" : "Save Stock Entry"}
         </Button>
         <Button type="button" variant="outline" asChild>
-          <Link href="/stock">Cancel</Link>
+          <PrefetchLink href="/stock">Cancel</PrefetchLink>
         </Button>
       </div>
     </form>

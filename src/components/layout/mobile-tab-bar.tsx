@@ -1,11 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Users, FileText, TrendingUp, UserCircle } from "lucide-react";
 import { Role } from "@prisma/client";
 import { cn } from "@/lib/utils";
-import { prefetchRouteData } from "@/lib/nav-prefetch";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 
 type TabItem = {
   href: string;
@@ -44,13 +43,11 @@ export function MobileTabBar({ role }: { role: Role }) {
           const active = isTabActive(pathname, tab.href);
           const Icon = tab.icon;
           return (
-            <Link
+            <PrefetchLink
               key={tab.href}
               href={tab.href}
-              prefetch
-              onTouchStart={() => prefetchRouteData(tab.href)}
               className={cn(
-                "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-all",
+                "flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl px-1 py-1.5 text-[10px] font-medium transition-colors duration-100",
                 active ? "text-primary" : "text-muted-foreground"
               )}
             >
@@ -63,7 +60,7 @@ export function MobileTabBar({ role }: { role: Role }) {
                 <Icon className="h-4 w-4" />
               </span>
               <span className="truncate">{tab.label}</span>
-            </Link>
+            </PrefetchLink>
           );
         })}
       </div>

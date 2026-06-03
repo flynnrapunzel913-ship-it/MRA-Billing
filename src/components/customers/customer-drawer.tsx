@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import Link from "next/link";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
+import { DrawerSkeleton } from "@/components/ui/skeletons";
 import { FileText, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -196,7 +197,7 @@ export function CustomerDrawer({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {isLoading && !detail ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">Loading profile…</p>
+            <DrawerSkeleton />
           ) : (
             <div className="space-y-6">
               <dl className="space-y-3 text-sm">
@@ -324,12 +325,12 @@ export function CustomerDrawer({
                         className="flex items-center justify-between gap-2 rounded-lg border border-border/50 px-3 py-2"
                       >
                         <div className="min-w-0">
-                          <Link
+                          <PrefetchLink
                             href={`/invoices/${inv.id}`}
                             className="text-sm font-semibold text-primary hover:underline"
                           >
                             {inv.invoiceNumber}
-                          </Link>
+                          </PrefetchLink>
                           <p className="text-xs text-muted-foreground">{formatDate(inv.invoiceDate)}</p>
                         </div>
                         <div className="shrink-0 text-right">
@@ -351,10 +352,10 @@ export function CustomerDrawer({
 
         <div className="flex shrink-0 gap-2 border-t border-border px-5 py-4">
           <Button asChild className="flex-1">
-            <Link href="/invoices/new">
+            <PrefetchLink href={`/invoices/new?customerId=${customer.id}`}>
               <FileText className="mr-2 h-4 w-4" />
               Create Invoice
-            </Link>
+            </PrefetchLink>
           </Button>
           <Button variant="outline" className="flex-1" onClick={() => onEdit(customer)}>
             <Pencil className="mr-2 h-4 w-4" />

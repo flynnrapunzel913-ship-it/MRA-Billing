@@ -2,6 +2,7 @@
 
 import { Package, IndianRupee, CalendarDays, Boxes } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
+import { KpiCardsSkeleton } from "@/components/ui/skeletons";
 
 export interface StockSummary {
   totalEntries: number;
@@ -62,6 +63,10 @@ export function StockSummaryCards({
 }) {
   const cards = allCards.filter((c) => showFinancialMetrics || !c.adminOnly);
 
+  if (loading) {
+    return <KpiCardsSkeleton count={cards.length} />;
+  }
+
   return (
     <div
       className={cn(
@@ -82,7 +87,7 @@ export function StockSummaryCards({
                   {card.label}
                 </p>
                 <p className="mt-2 text-xl font-bold tabular-nums text-foreground sm:text-2xl">
-                  {loading || !summary ? "—" : card.format(summary)}
+                  {summary ? card.format(summary) : "—"}
                 </p>
               </div>
               <div

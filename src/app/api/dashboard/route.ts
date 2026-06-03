@@ -16,8 +16,7 @@ export async function GET() {
     const { start: todayStart, end: todayEnd } = getTodayRange();
 
     if (user!.role === Role.RECEPTIONIST) {
-      const [activeCustomers, invoicesToday, pendingPayments, recentInvoices, recentCustomers] =
-        await Promise.all([
+      const [activeCustomers, invoicesToday, pendingPayments, recentInvoices] = await Promise.all([
         prisma.customer.count({ where: { status: "ACTIVE" } }),
         prisma.invoice.count({
           where: {
@@ -43,18 +42,6 @@ export async function GET() {
             invoiceDate: true,
           },
         }),
-        prisma.customer.findMany({
-          take: 8,
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            name: true,
-            mobile: true,
-            membershipId: true,
-            status: true,
-            createdAt: true,
-          },
-        }),
       ]);
 
       return NextResponse.json({
@@ -63,7 +50,6 @@ export async function GET() {
         invoicesToday: toKpiNumber(invoicesToday),
         pendingPayments: toKpiNumber(pendingPayments),
         recentInvoices: recentInvoices ?? [],
-        recentCustomers: recentCustomers ?? [],
       });
     }
 

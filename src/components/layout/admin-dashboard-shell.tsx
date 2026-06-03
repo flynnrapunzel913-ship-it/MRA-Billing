@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { prefetchJson } from "@/lib/client-cache";
+import { prefetchAppRoutes } from "@/lib/nav-prefetch";
 import { Sidebar } from "./sidebar";
 import { SessionControlPill } from "./session-control-pill";
 
@@ -12,6 +13,7 @@ interface AdminDashboardShellProps {
 
 export function AdminDashboardShell({ user, children }: AdminDashboardShellProps) {
   useEffect(() => {
+    prefetchAppRoutes("ADMIN");
     prefetchJson("/api/dashboard");
     prefetchJson("/api/customers?q=");
     prefetchJson("/api/invoices");

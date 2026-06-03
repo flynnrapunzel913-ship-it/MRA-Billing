@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { ListPageSkeleton } from "@/components/ui/skeletons";
 import { cn } from "@/lib/utils";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
@@ -44,7 +44,7 @@ export default function CustomersPage() {
 
   const debouncedSearch = useDebouncedValue(search, 200);
 
-  const { data: customers, isLoading, refetch } = useCachedFetch<CustomerListRow[]>(
+  const { data: customers, isInitialLoading, isRefreshing, refetch } = useCachedFetch<CustomerListRow[]>(
     "/api/customers?q="
   );
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
@@ -106,8 +106,8 @@ export default function CustomersPage() {
     }
   };
 
-  if (isLoading && !customers?.length) {
-    return <PageSkeleton className="mx-auto w-full" />;
+  if (isInitialLoading && !customers?.length) {
+    return <ListPageSkeleton />;
   }
 
   return (
@@ -155,7 +155,7 @@ export default function CustomersPage() {
 
       <p className="text-center text-xs text-muted-foreground">
         {filtered.length} customer{filtered.length === 1 ? "" : "s"}
-        {isLoading ? " · refreshing…" : ""}
+        {isRefreshing ? " · updating…" : ""}
       </p>
 
       {filtered.length === 0 ? (

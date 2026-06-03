@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { getActiveNavHref, type NavItem } from "./nav-config";
 
 export function SidebarNavLink({
@@ -17,11 +17,11 @@ export function SidebarNavLink({
   const Icon = item.icon;
 
   return (
-    <Link
+    <PrefetchLink
       href={item.href}
       onClick={onNavigate}
       className={cn(
-        "group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+        "group relative flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-medium transition-colors duration-100",
         active
           ? cn(
               "border border-[#0EA5E9]/25 bg-[#0EA5E9]/10 text-[#0284C7]",
@@ -46,7 +46,7 @@ export function SidebarNavLink({
       )}
       <span
         className={cn(
-          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-200",
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-xl transition-all duration-100",
           active
             ? "bg-[#0EA5E9]/15 text-[#0284C7] dark:bg-[#0EA5E9]/20 dark:text-[#38BDF8]"
             : cn(
@@ -60,7 +60,7 @@ export function SidebarNavLink({
         <Icon className="h-4 w-4" strokeWidth={active ? 2.25 : 2} />
       </span>
       <span className={cn(active && "font-semibold tracking-tight")}>{item.label}</span>
-    </Link>
+    </PrefetchLink>
   );
 }
 

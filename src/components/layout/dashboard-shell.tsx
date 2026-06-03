@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { Role } from "@prisma/client";
 import { prefetchJson } from "@/lib/client-cache";
+import { prefetchAppRoutes } from "@/lib/nav-prefetch";
 import { FloatingHeader } from "./floating-header";
 import { NavDock } from "./nav-dock";
 import { MobileTabBar } from "./mobile-tab-bar";
@@ -14,13 +15,13 @@ interface DashboardShellProps {
 
 export function DashboardShell({ user, children }: DashboardShellProps) {
   useEffect(() => {
+    prefetchAppRoutes(user.role);
     prefetchJson("/api/dashboard");
     prefetchJson("/api/customers?q=");
     prefetchJson("/api/invoices");
+    prefetchJson("/api/stock");
     if (user.role === "ADMIN") {
       prefetchJson("/api/stock/summary");
-    }
-    if (user.role === "ADMIN") {
       prefetchJson("/api/settings");
     }
   }, [user.role]);

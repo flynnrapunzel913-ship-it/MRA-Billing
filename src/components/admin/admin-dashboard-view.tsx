@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { FileText, Users, Clock, Plus, Receipt, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,16 +76,16 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
-            <Link href="/reports/revenue">Revenue Reports</Link>
+            <PrefetchLink href="/reports/revenue">Revenue Reports</PrefetchLink>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/admin/users">User Management</Link>
+            <PrefetchLink href="/admin/users">User Management</PrefetchLink>
           </Button>
           <Button asChild>
-            <Link href="/invoices/new">
+            <PrefetchLink href="/invoices/new">
               <Plus className="mr-2 h-4 w-4" />
               New Invoice
-            </Link>
+            </PrefetchLink>
           </Button>
         </div>
       </div>
@@ -139,10 +139,10 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
               </div>
               <p className="font-semibold text-foreground">No invoices generated yet</p>
               <Button asChild>
-                <Link href="/invoices/new">
+                <PrefetchLink href="/invoices/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Create First Invoice
-                </Link>
+                </PrefetchLink>
               </Button>
             </div>
           ) : (
@@ -168,12 +168,12 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
                       )}
                     >
                       <TableCell>
-                        <Link
+                        <PrefetchLink
                           href={`/invoices/${invoice.id}`}
                           className="font-semibold text-primary hover:underline"
                         >
                           {invoice.invoiceNumber}
-                        </Link>
+                        </PrefetchLink>
                       </TableCell>
                       <TableCell className="font-medium">{invoice.customerName}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(invoice.invoiceDate)}</TableCell>

@@ -1,5 +1,5 @@
-import { PageSkeleton } from "@/components/ui/page-skeleton";
+import { DashboardSkeleton } from "@/components/ui/skeletons";
 
 export default function DashboardLoading() {
-  return <PageSkeleton />;
+  return <DashboardSkeleton kpiCount={3} />;
 }

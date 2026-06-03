@@ -1,17 +1,58 @@
 import { prefetchJson } from "@/lib/client-cache";
+import type { Role } from "@prisma/client";
 
-const API_BY_ROUTE: Record<string, string | undefined> = {
+const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/dashboard": "/api/dashboard",
   "/customers": "/api/customers?q=",
   "/invoices": "/api/invoices",
-  "/stock": "/api/stock",
+  "/invoices/history": "/api/invoices",
+  "/invoices/new": ["/api/customers?q=", "/api/catalog/subscriptions", "/api/catalog/products"],
+  "/stock": ["/api/stock", "/api/stock/summary"],
+  "/stock/new": "/api/stock/filters",
   "/settings": "/api/settings",
   "/profile": undefined,
-  "/reports/revenue": "/api/reports/revenue",
+  "/reports/revenue": "/api/admin/revenue",
+  "/reports": "/api/reports",
   "/admin/users": "/api/admin/users",
+  "/admin/subscriptions": "/api/admin/subscriptions",
 };
 
 export function prefetchRouteData(href: string) {
-  const api = API_BY_ROUTE[href];
-  if (api) prefetchJson(api);
+  const base = href.split("?")[0];
+
+  const invoiceDetail = base.match(/^\/invoices\/([^/]+)$/);
+  if (invoiceDetail && invoiceDetail[1] !== "new" && invoiceDetail[1] !== "history") {
+    prefetchJson(`/api/invoices/${invoiceDetail[1]}`);
+  }
+
+  const stockDetail = base.match(/^\/stock\/([^/]+)$/);
+  if (stockDetail && stockDetail[1] !== "new") {
+    prefetchJson(`/api/stock/${stockDetail[1]}`);
+  }
+
+  const customerDetail = base.match(/^\/customers\/([^/]+)$/);
+  if (customerDetail) {
+    prefetchJson(`/api/customers/${customerDetail[1]}`);
+  }
+
+  const apis = API_BY_ROUTE[base];
+  if (!apis) return;
+  const list = Array.isArray(apis) ? apis : [apis];
+  for (const api of list) prefetchJson(api);
+}
+
+export function prefetchAppRoutes(role: Role) {
+  const routes =
+    role === "ADMIN"
+      ? [
+          "/dashboard",
+          "/invoices",
+          "/customers",
+          "/stock",
+          "/reports/revenue",
+          "/admin/users",
+        ]
+      : ["/dashboard", "/invoices", "/customers", "/stock"];
+
+  for (const route of routes) prefetchRouteData(route);
 }

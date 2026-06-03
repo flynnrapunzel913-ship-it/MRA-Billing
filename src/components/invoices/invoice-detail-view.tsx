@@ -4,11 +4,9 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
-  Copy,
   CreditCard,
   FileText,
   Hash,
-  Mail,
   MessageCircle,
   Phone,
   Printer,
@@ -64,9 +62,7 @@ export interface InvoiceDetail {
 
 interface InvoiceDetailViewProps {
   invoice: InvoiceDetail;
-  onDuplicate: () => void;
   onWhatsApp: () => void;
-  onEmail: () => void;
 }
 
 const glassCard = cn(
@@ -146,9 +142,7 @@ function SummaryLine({
 
 export function InvoiceDetailView({
   invoice,
-  onDuplicate,
   onWhatsApp,
-  onEmail,
 }: InvoiceDetailViewProps) {
   const paymentAccent = paymentStatusAccent(invoice.paymentStatus);
   const showGst = invoice.gstEnabled && Number(invoice.totalGst) > 0;
@@ -226,17 +220,9 @@ export function InvoiceDetailView({
                 Print PDF
               </a>
             </Button>
-            <Button variant="outline" className="h-9 border-[#0070C0]/20 bg-white/60 backdrop-blur-sm dark:bg-card/50" onClick={onDuplicate}>
-              <Copy className="mr-2 h-4 w-4" />
-              Duplicate
-            </Button>
             <Button variant="outline" className="h-9 border-[#0070C0]/20 bg-white/60 backdrop-blur-sm dark:bg-card/50" onClick={onWhatsApp}>
               <MessageCircle className="mr-2 h-4 w-4" />
               WhatsApp
-            </Button>
-            <Button variant="outline" className="h-9 border-[#0070C0]/20 bg-white/60 backdrop-blur-sm dark:bg-card/50" onClick={onEmail}>
-              <Mail className="mr-2 h-4 w-4" />
-              Email
             </Button>
           </div>
         </div>

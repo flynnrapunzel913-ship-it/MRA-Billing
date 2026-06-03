@@ -56,7 +56,6 @@ export function normalizeDashboardPayload(data: Record<string, unknown>) {
     role: "RECEPTIONIST" as const,
     ...kpis,
     recentInvoices: Array.isArray(data.recentInvoices) ? data.recentInvoices : [],
-    recentCustomers: Array.isArray(data.recentCustomers) ? data.recentCustomers : [],
   };
 }
 

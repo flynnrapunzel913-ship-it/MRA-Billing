@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { invalidateCache } from "@/lib/client-cache";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
-import Link from "next/link";
+import { ListPageSkeleton } from "@/components/ui/skeletons";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { History, Plus, Search, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,9 @@ export default function InvoicesPage() {
   const [query, setQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<InvoiceListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const debouncedQuery = useDebouncedValue(query, 300);
+  const debouncedQuery = useDebouncedValue(query, 150);
 
-  const { data: invoices, isLoading, refetch } = useCachedFetch<InvoiceListRow[]>("/api/invoices");
+  const { data: invoices, isInitialLoading, refetch } = useCachedFetch<InvoiceListRow[]>("/api/invoices");
   const list = invoices ?? [];
 
   const { recent, history, total } = useMemo(() => splitInvoicesByRecency(list), [list]);
@@ -60,8 +60,8 @@ export default function InvoicesPage() {
     }
   };
 
-  if (isLoading && list.length === 0) {
-    return <PageSkeleton className="mx-auto w-full" />;
+  if (isInitialLoading && list.length === 0) {
+    return <ListPageSkeleton />;
   }
 
   const hasHistory = history.length > 0;
@@ -72,21 +72,21 @@ export default function InvoicesPage() {
         <div className="flex flex-wrap gap-2">
           {hasHistory ? (
             <Button variant="outline" size="lg" asChild>
-              <Link href="/invoices/history">
+              <PrefetchLink href="/invoices/history">
                 <History className="mr-2 h-4 w-4" />
                 History
                 <span className="ml-2 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
                   {history.length}
                 </span>
-              </Link>
+              </PrefetchLink>
             </Button>
           ) : null}
         </div>
         <Button asChild size="lg" className="shrink-0">
-          <Link href="/invoices/new">
+          <PrefetchLink href="/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
             New Invoice
-          </Link>
+          </PrefetchLink>
         </Button>
       </div>
 
@@ -117,12 +117,12 @@ export default function InvoicesPage() {
               <DataRowCard key={invoice.id}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="min-w-0 space-y-1">
-                    <Link
+                    <PrefetchLink
                       href={`/invoices/${invoice.id}`}
                       className="text-base font-semibold text-primary hover:underline"
                     >
                       {invoice.invoiceNumber}
-                    </Link>
+                    </PrefetchLink>
                     <p className="text-sm text-foreground/90">{invoice.customerName}</p>
                     <p className="text-xs text-muted-foreground">{formatDate(invoice.invoiceDate)}</p>
                   </div>
@@ -160,10 +160,10 @@ export default function InvoicesPage() {
       {hasHistory ? (
         <div className="flex justify-center">
           <Button variant="outline" asChild>
-            <Link href="/invoices/history">
+            <PrefetchLink href="/invoices/history">
               <History className="mr-2 h-4 w-4" />
               View all {history.length} older invoices
-            </Link>
+            </PrefetchLink>
           </Button>
         </div>
       ) : null}

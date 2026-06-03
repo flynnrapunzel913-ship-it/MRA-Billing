@@ -13,8 +13,11 @@ export function useCachedFetch<T>(url: string, options?: UseCachedFetchOptions) 
   const ttlMs = options?.ttlMs;
 
   const [data, setData] = useState<T | null>(() => getCachedStale<T>(url));
-  const [isLoading, setIsLoading] = useState(enabled && data === null);
+  const [isLoading, setIsLoading] = useState(enabled && getCachedStale<T>(url) === null);
   const [error, setError] = useState<string | null>(null);
+
+  const isInitialLoading = isLoading && data === null;
+  const isRefreshing = isLoading && data !== null;
 
   const load = useCallback(
     async (force = false) => {
@@ -48,5 +51,5 @@ export function useCachedFetch<T>(url: string, options?: UseCachedFetchOptions) 
     return load(true);
   }, [url, load]);
 
-  return { data, isLoading, error, refetch, setData };
+  return { data, isLoading, isInitialLoading, isRefreshing, error, refetch, setData };
 }

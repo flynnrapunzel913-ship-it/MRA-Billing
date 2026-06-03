@@ -1,6 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
+import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { TableSkeleton } from "@/components/ui/skeletons";
+import { invalidateCache } from "@/lib/client-cache";
 import { Plus, Pencil, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -29,32 +32,14 @@ interface UserRecord {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: users = [], isInitialLoading, refetch } = useCachedFetch<UserRecord[]>(
+    "/api/admin/users"
+  );
   const [formOpen, setFormOpen] = useState(false);
   const [editUser, setEditUser] = useState<UserRecord | undefined>();
   const [deleteUser, setDeleteUser] = useState<UserRecord | undefined>();
   const [deleting, setDeleting] = useState(false);
   const [search, setSearch] = useState("");
-
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/users");
-      const result = await readApiResponse<UserRecord[]>(res, "Failed to load users");
-      if (result.ok) {
-        setUsers(Array.isArray(result.data) ? result.data : []);
-      } else {
-        toast.error(result.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
 
   const handleDelete = async () => {
     if (!deleteUser) return;
@@ -68,13 +53,14 @@ export default function AdminUsersPage() {
       }
       toast.success("User deleted");
       setDeleteUser(undefined);
-      loadUsers();
+      invalidateCache("/api/admin/users");
+      void refetch();
     } finally {
       setDeleting(false);
     }
   };
 
-  const filtered = users.filter((user) => {
+  const filtered = (users ?? []).filter((user) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -119,8 +105,8 @@ export default function AdminUsersPage() {
           <CardTitle>Employees</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <p className="py-10 text-center text-muted-foreground">Loading users…</p>
+          {isInitialLoading ? (
+            <TableSkeleton rows={5} cols={5} />
           ) : filtered.length === 0 ? (
             <p className="py-10 text-center text-muted-foreground">No employees yet.</p>
           ) : (
@@ -181,7 +167,10 @@ export default function AdminUsersPage() {
       <UserFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
-        onSuccess={loadUsers}
+        onSuccess={() => {
+          invalidateCache("/api/admin/users");
+          void refetch();
+        }}
         initialData={editUser}
       />
 

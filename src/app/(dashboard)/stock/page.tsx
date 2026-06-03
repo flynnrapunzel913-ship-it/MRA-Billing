@@ -1,15 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
-import { readApiResponse } from "@/lib/api-error";
+import { StockPageSkeleton } from "@/components/ui/skeletons";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
-import { cn } from "@/lib/utils";
 import { StockSummaryCards, type StockSummary } from "@/components/stock/stock-summary-cards";
 import {
   StockFilters,
@@ -17,6 +13,8 @@ import {
   type StockFilterState,
 } from "@/components/stock/stock-filters";
 import { StockTable, type StockListRow } from "@/components/stock/stock-table";
+import { cn } from "@/lib/utils";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 
 function buildStockQuery(filters: StockFilterState) {
   const params = new URLSearchParams();
@@ -44,12 +42,12 @@ function hasActiveFilters(filters: StockFilterState) {
 export default function StockInventoryPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filters, setFilters] = useState<StockFilterState>(defaultStockFilters);
-  const debouncedQ = useDebouncedValue(filters.q, 250);
+  const debouncedQ = useDebouncedValue(filters.q, 150);
   const filtersActive = hasActiveFilters(filters);
 
-  const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
-    "/api/dashboard"
-  );
+  const { data: dashboardMeta, isInitialLoading: roleLoading } = useCachedFetch<{
+    role?: "ADMIN" | "RECEPTIONIST";
+  }>("/api/dashboard");
   const isAdmin = dashboardMeta?.role === "ADMIN";
 
   const listUrl = useMemo(
@@ -57,50 +55,28 @@ export default function StockInventoryPage() {
     [filters, debouncedQ]
   );
 
-  const [entries, setEntries] = useState<StockListRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: entries,
+    isInitialLoading: listLoading,
+    isRefreshing: listRefreshing,
+  } = useCachedFetch<StockListRow[]>(listUrl);
 
-  const loadEntries = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(listUrl);
-      const result = await readApiResponse<StockListRow[]>(res, "Failed to load stock");
-      if (result.ok) {
-        setEntries(Array.isArray(result.data) ? result.data : []);
-      } else {
-        toast.error(result.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [listUrl]);
+  const {
+    data: summary,
+    isInitialLoading: summaryLoading,
+  } = useCachedFetch<StockSummary>("/api/stock/summary");
 
-  useEffect(() => {
-    void loadEntries();
-  }, [loadEntries]);
-
-  const { data: summary, isLoading: summaryLoading } = useCachedFetch<StockSummary>(
-    "/api/stock/summary"
-  );
-
-  const [filterOptions, setFilterOptions] = useState<{
+  const { data: filterOptions } = useCachedFetch<{
     categories: string[];
     suppliers: string[];
     creators: Array<{ id: string; username: string; name: string }>;
-  }>({ categories: [], suppliers: [], creators: [] });
+  }>("/api/stock/filters", { enabled: searchOpen });
 
-  useEffect(() => {
-    if (!searchOpen) return;
-    void (async () => {
-      const res = await fetch("/api/stock/filters");
-      const result = await readApiResponse<typeof filterOptions>(res, "Failed to load filters");
-      if (result.ok) setFilterOptions(result.data);
-    })();
-  }, [searchOpen]);
-
-  if (!dashboardMeta && summaryLoading) {
-    return <PageSkeleton />;
+  if (roleLoading && !dashboardMeta) {
+    return <StockPageSkeleton kpiCount={2} showFinancial={false} />;
   }
+
+  const rows = entries ?? [];
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
@@ -127,17 +103,17 @@ export default function StockInventoryPage() {
             )}
           </Button>
           <Button className="btn-aqua-cta" asChild>
-            <Link href="/stock/new">
+            <PrefetchLink href="/stock/new">
               <Plus className="mr-2 h-4 w-4" />
               Add New Stock Entry
-            </Link>
+            </PrefetchLink>
           </Button>
         </div>
       </div>
 
       <StockSummaryCards
         summary={summary ?? null}
-        loading={summaryLoading}
+        loading={summaryLoading && !summary}
         showFinancialMetrics={!!isAdmin}
       />
 
@@ -146,9 +122,9 @@ export default function StockInventoryPage() {
           filters={filters}
           onChange={(patch) => setFilters((f) => ({ ...f, ...patch }))}
           isAdmin={!!isAdmin}
-          categories={filterOptions.categories}
-          suppliers={filterOptions.suppliers}
-          creators={filterOptions.creators}
+          categories={filterOptions?.categories ?? []}
+          suppliers={filterOptions?.suppliers ?? []}
+          creators={filterOptions?.creators ?? []}
           onClose={() => setSearchOpen(false)}
           onClear={() => setFilters(defaultStockFilters)}
         />
@@ -175,7 +151,14 @@ export default function StockInventoryPage() {
             </button>
           </p>
         )}
-        <StockTable rows={entries} loading={loading} showCreatedBy={!!isAdmin} />
+        <StockTable
+          rows={rows}
+          loading={listLoading && rows.length === 0}
+          showCreatedBy={!!isAdmin}
+        />
+        {listRefreshing && rows.length > 0 && (
+          <p className="mt-3 text-center text-xs text-muted-foreground">Updating…</p>
+        )}
       </div>
     </div>
   );

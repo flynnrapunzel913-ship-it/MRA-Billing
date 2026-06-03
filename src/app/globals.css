@@ -211,3 +211,18 @@ body {
   color: var(--aqua-primary);
   text-shadow: 0 0 28px rgba(0, 194, 255, 0.4);
 }
+
+/* Snappier taps and clicks across the app */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  button:active:not(:disabled),
+  a:active {
+    transition-duration: 50ms;
+  }
+}

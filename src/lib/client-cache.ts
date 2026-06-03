@@ -1,4 +1,4 @@
-const DEFAULT_TTL_MS = 60_000;
+const DEFAULT_TTL_MS = 120_000;
 
 type CacheEntry<T> = {
   data: T;

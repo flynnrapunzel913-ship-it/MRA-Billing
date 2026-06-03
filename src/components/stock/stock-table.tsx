@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { Eye, FileDown, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { TableSkeleton } from "@/components/ui/skeletons";
 
 export interface StockListRow {
   id: string;
@@ -37,9 +38,7 @@ export function StockTable({
   showCreatedBy?: boolean;
 }) {
   if (loading) {
-    return (
-      <p className="py-12 text-center text-sm text-muted-foreground">Loading stock records…</p>
-    );
+    return <TableSkeleton rows={6} cols={showCreatedBy ? 7 : 6} />;
   }
 
   if (rows.length === 0) {
@@ -94,9 +93,9 @@ export function StockTable({
               <TableCell className="text-right">
                 <div className="flex justify-end gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
-                    <Link href={`/stock/${row.id}`} title="View details">
+                    <PrefetchLink href={`/stock/${row.id}`} title="View details">
                       <Eye className="h-4 w-4" />
-                    </Link>
+                    </PrefetchLink>
                   </Button>
                   {row.billPdfUrl && (
                     <Button variant="ghost" size="icon" className="h-8 w-8" asChild>

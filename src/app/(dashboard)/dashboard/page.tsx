@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
-import { PageSkeleton } from "@/components/ui/page-skeleton";
-import Link from "next/link";
+import { DashboardSkeleton } from "@/components/ui/skeletons";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import {
   FileText,
   Users,
@@ -46,14 +46,6 @@ interface ReceptionistDashboardData {
     customerName: string;
     paymentStatus: string;
     invoiceDate: string;
-  }>;
-  recentCustomers: Array<{
-    id: string;
-    name: string;
-    mobile: string | null;
-    membershipId: string;
-    status: string;
-    createdAt: string;
   }>;
 }
 
@@ -102,13 +94,13 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
     <div className="mx-auto max-w-6xl space-y-5">
       <div className="flex flex-wrap justify-end gap-2">
         <Button variant="outline" asChild>
-          <Link href="/stock/new">Add Stock Entry</Link>
+          <PrefetchLink href="/stock/new">Add Stock Entry</PrefetchLink>
         </Button>
         <Button asChild size="lg">
-          <Link href="/invoices/new">
+          <PrefetchLink href="/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
             New Invoice
-          </Link>
+          </PrefetchLink>
         </Button>
       </div>
 
@@ -155,8 +147,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
         })}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card className={cn(glassCard, "overflow-hidden")}>
+      <Card className={cn(glassCard, "overflow-hidden")}>
           <CardHeader className="border-b border-border px-5 py-4">
             <div className="flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
@@ -188,12 +179,12 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                         className={cn(index % 2 === 1 && "bg-muted/20")}
                       >
                         <TableCell>
-                          <Link
+                          <PrefetchLink
                             href={`/invoices/${invoice.id}`}
                             className="font-semibold text-primary hover:underline"
                           >
                             {invoice.invoiceNumber}
-                          </Link>
+                          </PrefetchLink>
                         </TableCell>
                         <TableCell className="font-medium">{invoice.customerName}</TableCell>
                         <TableCell className="text-muted-foreground">
@@ -224,64 +215,19 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
             )}
             <div className="border-t border-border px-5 py-3">
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/invoices">View all invoices</Link>
+                <PrefetchLink href="/invoices">View all invoices</PrefetchLink>
               </Button>
             </div>
           </CardContent>
-        </Card>
-
-        <Card className={cn(glassCard, "overflow-hidden")}>
-          <CardHeader className="border-b border-border px-5 py-4">
-            <div className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
-              <CardTitle className="text-lg">Recent Customers</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {(data.recentCustomers ?? []).length === 0 ? (
-              <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-                No customers yet.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border">
-                {(data.recentCustomers ?? []).map((customer) => (
-                  <li key={customer.id}>
-                    <Link
-                      href={`/customers/${customer.id}`}
-                      className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/30"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{customer.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {customer.membershipId}
-                          {customer.mobile ? ` · ${customer.mobile}` : ""}
-                        </p>
-                      </div>
-                      <Badge
-                        variant={customer.status === "ACTIVE" ? "success" : "secondary"}
-                        className="shrink-0"
-                      >
-                        {customer.status}
-                      </Badge>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="border-t border-border px-5 py-3">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href="/customers">View all customers</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      </Card>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  const { data: raw, isLoading, error } = useCachedFetch<Record<string, unknown>>("/api/dashboard");
+  const { data: raw, isInitialLoading, error } = useCachedFetch<Record<string, unknown>>(
+    "/api/dashboard"
+  );
 
   const data = useMemo(
     () => (raw ? (normalizeDashboardPayload(raw) as DashboardData) : null),
@@ -298,7 +244,7 @@ export default function DashboardPage() {
   }
 
   if (!data) {
-    return isLoading ? <PageSkeleton className="max-w-6xl" /> : null;
+    return isInitialLoading ? <DashboardSkeleton kpiCount={3} /> : null;
   }
 
   if (isAdminDashboard(data)) {
