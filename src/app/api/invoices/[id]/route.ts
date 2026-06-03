@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveInvoiceWhere, isSchemaDriftError } from "@/lib/invoice-filters";
+import { canDeleteInvoice } from "@/lib/invoice-permissions";
 import { recordUserActivity } from "@/lib/user-activity";
 
 export async function GET(
@@ -52,6 +54,17 @@ export async function DELETE(
 
     if (!invoice) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    }
+
+    if (
+      !canDeleteInvoice(user!.role as Role, user!.id, {
+        createdById: invoice.createdById,
+      })
+    ) {
+      return NextResponse.json(
+        { error: "You do not have permission to delete this invoice" },
+        { status: 403 }
+      );
     }
 
     try {

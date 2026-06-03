@@ -7,6 +7,7 @@ export type InvoiceListRow = {
   invoiceDate: string;
   grandTotal: string | number;
   paymentStatus: string;
+  createdById?: string;
 };
 
 export function sortInvoicesNewestFirst<T extends { invoiceDate: string }>(invoices: T[]): T[] {

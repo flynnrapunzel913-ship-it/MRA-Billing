@@ -225,7 +225,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
 }
 
 export default function DashboardPage() {
-  const { data: raw, isInitialLoading, error } = useCachedFetch<Record<string, unknown>>(
+  const { data: raw, isInitialLoading, error, refetch } = useCachedFetch<Record<string, unknown>>(
     "/api/dashboard"
   );
 
@@ -248,7 +248,7 @@ export default function DashboardPage() {
   }
 
   if (isAdminDashboard(data)) {
-    return <AdminDashboardView data={data} />;
+    return <AdminDashboardView data={data} onInvoiceDeleted={() => refetch()} />;
   }
 
   return <ReceptionistDashboard data={data} />;

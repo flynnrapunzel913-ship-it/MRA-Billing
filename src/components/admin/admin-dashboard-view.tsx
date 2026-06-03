@@ -1,7 +1,10 @@
 "use client";
 
 import { PrefetchLink } from "@/components/ui/prefetch-link";
-import { FileText, Users, Clock, Plus, Receipt, ExternalLink } from "lucide-react";
+import { FileText, Users, Clock, Plus, Receipt, ExternalLink, Trash2 } from "lucide-react";
+import { DeleteInvoiceDialog } from "@/components/invoices/delete-invoice-dialog";
+import { useInvoiceDelete } from "@/lib/hooks/use-invoice-delete";
+import type { InvoiceListRow } from "@/lib/invoice-list-utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +32,7 @@ export interface AdminDashboardData {
     grandTotal: string | number;
     paymentStatus: string;
     invoiceDate: string;
+    createdById?: string;
     createdBy?: { name: string };
   }>;
 }
@@ -59,14 +63,33 @@ const kpiCards = [
   },
 ] as const;
 
-export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
+export function AdminDashboardView({
+  data,
+  onInvoiceDeleted,
+}: {
+  data: AdminDashboardData;
+  onInvoiceDeleted?: () => void | Promise<void>;
+}) {
   const kpis = normalizeAdminDashboardKpis(data as unknown as Record<string, unknown>);
+  const { deleteTarget, setDeleteTarget, deleting, handleDelete } = useInvoiceDelete({
+    onSuccess: onInvoiceDeleted,
+  });
 
   const kpiValues = {
     invoices: kpis.invoicesGenerated,
     students: kpis.activeStudents,
     pending: kpis.pendingPayments,
   };
+
+  const toListRow = (invoice: AdminDashboardData["recentInvoices"][number]): InvoiceListRow => ({
+    id: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    customerName: invoice.customerName,
+    invoiceDate: invoice.invoiceDate,
+    grandTotal: invoice.grandTotal,
+    paymentStatus: invoice.paymentStatus,
+    createdById: invoice.createdById,
+  });
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -186,12 +209,23 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8" asChild>
-                          <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                            View PDF
-                          </a>
-                        </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" className="h-8" asChild>
+                            <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
+                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                              PDF
+                            </a>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => setDeleteTarget(toListRow(invoice))}
+                            aria-label={`Delete ${invoice.invoiceNumber}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -201,6 +235,14 @@ export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
           )}
         </CardContent>
       </Card>
+
+      <DeleteInvoiceDialog
+        open={!!deleteTarget}
+        invoiceNumber={deleteTarget?.invoiceNumber ?? ""}
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

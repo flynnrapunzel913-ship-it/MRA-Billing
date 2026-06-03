@@ -10,6 +10,7 @@ import {
   MessageCircle,
   Phone,
   Printer,
+  Trash2,
   Receipt,
   User,
   Wallet,
@@ -57,12 +58,15 @@ export interface InvoiceDetail {
   amountPaid: string | number;
   amountRemaining: string | number;
   gstEnabled: boolean;
+  createdById?: string;
   items: InvoiceDetailItem[];
 }
 
 interface InvoiceDetailViewProps {
   invoice: InvoiceDetail;
   onWhatsApp: () => void;
+  showDelete?: boolean;
+  onDelete?: () => void;
 }
 
 const glassCard = cn(
@@ -143,6 +147,8 @@ function SummaryLine({
 export function InvoiceDetailView({
   invoice,
   onWhatsApp,
+  showDelete,
+  onDelete,
 }: InvoiceDetailViewProps) {
   const paymentAccent = paymentStatusAccent(invoice.paymentStatus);
   const showGst = invoice.gstEnabled && Number(invoice.totalGst) > 0;
@@ -224,6 +230,16 @@ export function InvoiceDetailView({
               <MessageCircle className="mr-2 h-4 w-4" />
               WhatsApp
             </Button>
+            {showDelete && onDelete ? (
+              <Button
+                variant="outline"
+                className="h-9 border-red-300/50 bg-white/60 text-destructive backdrop-blur-sm hover:bg-destructive/10 dark:bg-card/50"
+                onClick={onDelete}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </Button>
+            ) : null}
           </div>
         </div>
       </section>

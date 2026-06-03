@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { invalidateCache } from "@/lib/client-cache";
+import { useSession } from "next-auth/react";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { useInvoiceDelete } from "@/lib/hooks/use-invoice-delete";
+import { canDeleteInvoice } from "@/lib/invoice-permissions";
 import { ListPageSkeleton } from "@/components/ui/skeletons";
 import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { History, Plus, Search, Trash2 } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -24,10 +25,10 @@ import {
 } from "@/lib/invoice-list-utils";
 
 export default function InvoicesPage() {
+  const { data: session } = useSession();
   const [query, setQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<InvoiceListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const debouncedQuery = useDebouncedValue(query, 150);
+  const { deleteTarget, setDeleteTarget, deleting, handleDelete } = useInvoiceDelete();
 
   const { data: invoices, isInitialLoading, refetch } = useCachedFetch<InvoiceListRow[]>("/api/invoices");
   const list = invoices ?? [];
@@ -39,25 +40,9 @@ export default function InvoicesPage() {
     [recent, debouncedQuery]
   );
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/invoices/${deleteTarget.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        toast.error("Failed to delete invoice");
-        return;
-      }
-      toast.success("Invoice deleted successfully");
-      setDeleteTarget(null);
-      invalidateCache("/api/invoices");
-      invalidateCache("/api/dashboard");
-      await refetch();
-    } catch {
-      toast.error("Failed to delete invoice");
-    } finally {
-      setDeleting(false);
-    }
+  const onConfirmDelete = async () => {
+    await handleDelete();
+    await refetch();
   };
 
   if (isInitialLoading && list.length === 0) {
@@ -139,15 +124,17 @@ export default function InvoicesPage() {
                           PDF
                         </a>
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteTarget(invoice)}
-                        aria-label={`Delete ${invoice.invoiceNumber}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {canDeleteInvoice(session?.user?.role, session?.user?.id, invoice) ? (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 text-muted-foreground hover:text-destructive"
+                          onClick={() => setDeleteTarget(invoice)}
+                          aria-label={`Delete ${invoice.invoiceNumber}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -173,7 +160,7 @@ export default function InvoicesPage() {
         invoiceNumber={deleteTarget?.invoiceNumber ?? ""}
         loading={deleting}
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={onConfirmDelete}
       />
     </div>
   );

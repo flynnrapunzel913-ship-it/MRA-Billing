@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ArrowLeft, History, Search } from "lucide-react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
-import { invalidateCache } from "@/lib/client-cache";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { useInvoiceDelete } from "@/lib/hooks/use-invoice-delete";
+import { canDeleteInvoice } from "@/lib/invoice-permissions";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { filterInvoicesByQuery } from "@/lib/invoice-search";
 import {
@@ -20,10 +21,10 @@ import { InvoicesHistoryTable } from "@/components/invoices/invoices-history-tab
 import { DeleteInvoiceDialog } from "@/components/invoices/delete-invoice-dialog";
 
 export default function InvoiceHistoryPage() {
+  const { data: session } = useSession();
   const [query, setQuery] = useState("");
-  const [deleteTarget, setDeleteTarget] = useState<InvoiceListRow | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const debouncedQuery = useDebouncedValue(query, 300);
+  const { deleteTarget, setDeleteTarget, deleting, handleDelete } = useInvoiceDelete();
 
   const { data: invoices, isLoading, refetch } = useCachedFetch<InvoiceListRow[]>("/api/invoices");
   const list = invoices ?? [];
@@ -37,26 +38,13 @@ export default function InvoiceHistoryPage() {
 
   const grouped = useMemo(() => groupInvoicesByMonth(filteredHistory), [filteredHistory]);
 
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    setDeleting(true);
-    try {
-      const res = await fetch(`/api/invoices/${deleteTarget.id}`, { method: "DELETE" });
-      if (!res.ok) {
-        toast.error("Failed to delete invoice");
-        return;
-      }
-      toast.success("Invoice deleted successfully");
-      setDeleteTarget(null);
-      invalidateCache("/api/invoices");
-      invalidateCache("/api/dashboard");
-      await refetch();
-    } catch {
-      toast.error("Failed to delete invoice");
-    } finally {
-      setDeleting(false);
-    }
+  const onConfirmDelete = async () => {
+    await handleDelete();
+    await refetch();
   };
+
+  const canDelete = (invoice: InvoiceListRow) =>
+    canDeleteInvoice(session?.user?.role, session?.user?.id, invoice);
 
   if (isLoading && list.length === 0) {
     return <PageSkeleton className="mx-auto w-full" />;
@@ -117,7 +105,11 @@ export default function InvoiceHistoryPage() {
                   {group.invoices.length} invoice{group.invoices.length === 1 ? "" : "s"}
                 </span>
               </div>
-              <InvoicesHistoryTable invoices={group.invoices} onDelete={setDeleteTarget} />
+              <InvoicesHistoryTable
+                invoices={group.invoices}
+                onDelete={setDeleteTarget}
+                canDelete={canDelete}
+              />
             </section>
           ))}
         </div>
@@ -128,7 +120,7 @@ export default function InvoiceHistoryPage() {
         invoiceNumber={deleteTarget?.invoiceNumber ?? ""}
         loading={deleting}
         onCancel={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
+        onConfirm={onConfirmDelete}
       />
     </div>
   );

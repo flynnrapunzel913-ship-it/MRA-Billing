@@ -143,6 +143,21 @@ body {
   color: var(--foreground);
 }
 
+/* Numeric fields: keyboard entry only — no scroll-to-change or spinner buttons */
+input[type="number"].no-number-spin,
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type="number"].no-number-spin::-webkit-inner-spin-button,
+input[type="number"].no-number-spin::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .glass-panel {
   border-radius: 24px;
   border: 1px solid var(--border);

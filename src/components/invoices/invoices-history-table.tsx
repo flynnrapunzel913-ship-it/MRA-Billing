@@ -19,9 +19,14 @@ import type { InvoiceListRow } from "@/lib/invoice-list-utils";
 interface InvoicesHistoryTableProps {
   invoices: InvoiceListRow[];
   onDelete?: (invoice: InvoiceListRow) => void;
+  canDelete?: (invoice: InvoiceListRow) => boolean;
 }
 
-export function InvoicesHistoryTable({ invoices, onDelete }: InvoicesHistoryTableProps) {
+export function InvoicesHistoryTable({
+  invoices,
+  onDelete,
+  canDelete,
+}: InvoicesHistoryTableProps) {
   return (
     <div className="glass-panel overflow-hidden rounded-[20px]">
       <Table>
@@ -82,7 +87,7 @@ export function InvoicesHistoryTable({ invoices, onDelete }: InvoicesHistoryTabl
                       PDF
                     </a>
                   </Button>
-                  {onDelete ? (
+                  {onDelete && (!canDelete || canDelete(invoice)) ? (
                     <Button
                       variant="ghost"
                       size="icon"

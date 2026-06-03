@@ -73,6 +73,7 @@ export async function GET() {
           grandTotal: true,
           paymentStatus: true,
           invoiceDate: true,
+          createdById: true,
           createdBy: { select: { name: true } },
         },
       }),
