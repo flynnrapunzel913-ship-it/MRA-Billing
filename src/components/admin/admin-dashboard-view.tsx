@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
-import { formatKpiValue, normalizeDashboardKpis } from "@/lib/dashboard-kpis";
+import { formatKpiValue, normalizeAdminDashboardKpis } from "@/lib/dashboard-kpis";
 
 export interface AdminDashboardData {
   role: "ADMIN";
@@ -60,7 +60,7 @@ const kpiCards = [
 ] as const;
 
 export function AdminDashboardView({ data }: { data: AdminDashboardData }) {
-  const kpis = normalizeDashboardKpis(data as unknown as Record<string, unknown>);
+  const kpis = normalizeAdminDashboardKpis(data as unknown as Record<string, unknown>);
 
   const kpiValues = {
     invoices: kpis.invoicesGenerated,

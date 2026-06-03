@@ -4,7 +4,14 @@ import { useMemo } from "react";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import Link from "next/link";
-import { FileText, Users, Clock, Plus, Receipt, ExternalLink } from "lucide-react";
+import {
+  FileText,
+  Users,
+  Clock,
+  Plus,
+  Receipt,
+  ExternalLink,
+} from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,26 +23,37 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { formatDate, cn } from "@/lib/utils";
 import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 import {
   AdminDashboardView,
   type AdminDashboardData,
 } from "@/components/admin/admin-dashboard-view";
-import { formatKpiValue, normalizeDashboardKpis, normalizeDashboardPayload } from "@/lib/dashboard-kpis";
+import {
+  formatKpiValue,
+  normalizeDashboardPayload,
+  normalizeReceptionistDashboardKpis,
+} from "@/lib/dashboard-kpis";
 
 interface ReceptionistDashboardData {
   role: "RECEPTIONIST";
-  invoicesGenerated: number;
-  activeStudents: number;
+  activeCustomers: number;
+  invoicesToday: number;
   pendingPayments: number;
   recentInvoices: Array<{
     id: string;
     invoiceNumber: string;
     customerName: string;
-    grandTotal: string | number;
     paymentStatus: string;
     invoiceDate: string;
+  }>;
+  recentCustomers: Array<{
+    id: string;
+    name: string;
+    mobile: string | null;
+    membershipId: string;
+    status: string;
+    createdAt: string;
   }>;
 }
 
@@ -47,23 +65,23 @@ function isAdminDashboard(data: DashboardData): data is AdminDashboardData {
 
 const glassCard = cn("glass-panel transition-all duration-200");
 
-const kpiCards = [
+const receptionistKpiCards = [
   {
-    key: "invoices",
-    label: "Invoices Generated",
-    icon: FileText,
-    accent: "from-primary/15 to-primary/5",
-    iconBg: "bg-primary/15 text-primary",
-  },
-  {
-    key: "students",
-    label: "Active Students",
+    key: "customers" as const,
+    label: "Active Customers",
     icon: Users,
     accent: "from-[#0284C7]/15 to-[#38bdf8]/5",
     iconBg: "bg-[#0284C7]/15 text-[#0284C7]",
   },
   {
-    key: "pending",
+    key: "invoicesToday" as const,
+    label: "Invoices Generated Today",
+    icon: FileText,
+    accent: "from-primary/15 to-primary/5",
+    iconBg: "bg-primary/15 text-primary",
+  },
+  {
+    key: "pending" as const,
     label: "Pending Payments",
     icon: Clock,
     accent: "from-amber-500/15 to-amber-400/5",
@@ -72,17 +90,20 @@ const kpiCards = [
 ] as const;
 
 function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
-  const kpis = normalizeDashboardKpis(data as unknown as Record<string, unknown>);
+  const kpis = normalizeReceptionistDashboardKpis(data as unknown as Record<string, unknown>);
 
   const kpiValues = {
-    invoices: kpis.invoicesGenerated,
-    students: kpis.activeStudents,
+    customers: kpis.activeCustomers,
+    invoicesToday: kpis.invoicesToday,
     pending: kpis.pendingPayments,
   };
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <div className="flex justify-end">
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button variant="outline" asChild>
+          <Link href="/stock/new">Add Stock Entry</Link>
+        </Button>
         <Button asChild size="lg">
           <Link href="/invoices/new">
             <Plus className="mr-2 h-4 w-4" />
@@ -92,7 +113,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {kpiCards.map((kpi) => {
+        {receptionistKpiCards.map((kpi) => {
           const Icon = kpi.icon;
           return (
             <Card
@@ -102,7 +123,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                 "group overflow-hidden border-primary/15 hover:-translate-y-0.5 hover:border-primary/30"
               )}
             >
-              <CardContent className="relative p-6 sm:p-7">
+              <CardContent className="relative p-5 sm:p-6">
                 <div
                   className={cn(
                     "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-80",
@@ -110,18 +131,20 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                   )}
                   aria-hidden
                 />
-                <div className="relative flex items-center gap-5">
+                <div className="relative flex items-center gap-4">
                   <div
                     className={cn(
-                      "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-105",
+                      "flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition-transform group-hover:scale-105",
                       kpi.iconBg
                     )}
                   >
-                    <Icon className="h-7 w-7" />
+                    <Icon className="h-6 w-6" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-muted-foreground">{kpi.label}</p>
-                    <p className="mt-1 text-3xl font-bold tabular-nums tracking-tight text-foreground sm:text-4xl">
+                    <p className="text-xs font-medium text-muted-foreground sm:text-sm">
+                      {kpi.label}
+                    </p>
+                    <p className="mt-1 text-2xl font-bold tabular-nums tracking-tight text-foreground sm:text-3xl">
                       {formatKpiValue(kpiValues[kpi.key])}
                     </p>
                   </div>
@@ -132,95 +155,127 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
         })}
       </div>
 
-      <Card className={cn(glassCard, "overflow-hidden")}>
-        <CardHeader className="border-b border-border px-5 py-4">
-          <div className="flex items-center gap-2">
-            <Receipt className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">Recent Invoices</CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground">Latest 10 invoices, newest first</p>
-        </CardHeader>
-        <CardContent className="p-0">
-          {(data.recentInvoices ?? []).length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-                <FileText className="h-7 w-7" />
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card className={cn(glassCard, "overflow-hidden")}>
+          <CardHeader className="border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Receipt className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Recent Invoices</CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">Latest invoices — search and reprint anytime</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            {(data.recentInvoices ?? []).length === 0 ? (
+              <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+                No invoices yet. Create one to get started.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="font-semibold">Invoice No</TableHead>
+                      <TableHead className="font-semibold">Customer</TableHead>
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Status</TableHead>
+                      <TableHead className="text-right font-semibold">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(data.recentInvoices ?? []).map((invoice, index) => (
+                      <TableRow
+                        key={invoice.id}
+                        className={cn(index % 2 === 1 && "bg-muted/20")}
+                      >
+                        <TableCell>
+                          <Link
+                            href={`/invoices/${invoice.id}`}
+                            className="font-semibold text-primary hover:underline"
+                          >
+                            {invoice.invoiceNumber}
+                          </Link>
+                        </TableCell>
+                        <TableCell className="font-medium">{invoice.customerName}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(invoice.invoiceDate)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
+                            {paymentStatusLabel(invoice.paymentStatus)}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" className="h-8" asChild>
+                            <a
+                              href={`/api/invoices/${invoice.id}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                              PDF
+                            </a>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <div>
-                <p className="font-semibold text-foreground">No invoices generated yet</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Create your first invoice to start tracking academy billing.
-                </p>
-              </div>
-              <Button asChild>
-                <Link href="/invoices/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create First Invoice
-                </Link>
+            )}
+            <div className="border-t border-border px-5 py-3">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/invoices">View all invoices</Link>
               </Button>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="font-semibold">Invoice No</TableHead>
-                    <TableHead className="font-semibold">Customer</TableHead>
-                    <TableHead className="font-semibold">Date</TableHead>
-                    <TableHead className="font-semibold text-right">Amount</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data.recentInvoices ?? []).map((invoice, index) => (
-                    <TableRow
-                      key={invoice.id}
-                      className={cn(
-                        "transition-colors hover:bg-muted/30",
-                        index % 2 === 1 && "bg-muted/20"
-                      )}
-                    >
-                      <TableCell>
-                        <Link
-                          href={`/invoices/${invoice.id}`}
-                          className="font-semibold text-primary hover:underline"
-                        >
-                          {invoice.invoiceNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell className="font-medium">{invoice.customerName}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDate(invoice.invoiceDate)}
-                      </TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrency(Number(invoice.grandTotal))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
-                          {paymentStatusLabel(invoice.paymentStatus)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="sm" className="h-8" asChild>
-                          <a
-                            href={`/api/invoices/${invoice.id}/pdf`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                            View PDF
-                          </a>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+          </CardContent>
+        </Card>
+
+        <Card className={cn(glassCard, "overflow-hidden")}>
+          <CardHeader className="border-b border-border px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Recent Customers</CardTitle>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent className="p-0">
+            {(data.recentCustomers ?? []).length === 0 ? (
+              <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+                No customers yet.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {(data.recentCustomers ?? []).map((customer) => (
+                  <li key={customer.id}>
+                    <Link
+                      href={`/customers/${customer.id}`}
+                      className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-muted/30"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{customer.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {customer.membershipId}
+                          {customer.mobile ? ` · ${customer.mobile}` : ""}
+                        </p>
+                      </div>
+                      <Badge
+                        variant={customer.status === "ACTIVE" ? "success" : "secondary"}
+                        className="shrink-0"
+                      >
+                        {customer.status}
+                      </Badge>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="border-t border-border px-5 py-3">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/customers">View all customers</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

@@ -18,6 +18,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
     prefetchJson("/api/customers?q=");
     prefetchJson("/api/invoices");
     if (user.role === "ADMIN") {
+      prefetchJson("/api/stock/summary");
+    }
+    if (user.role === "ADMIN") {
       prefetchJson("/api/settings");
     }
   }, [user.role]);

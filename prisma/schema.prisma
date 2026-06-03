@@ -37,6 +37,13 @@ enum UserActivityType {
   USER_DELETED
 }
 
+enum StockActivityType {
+  STOCK_CREATED
+  STOCK_VIEWED
+  BILL_VIEWED
+  BILL_DOWNLOADED
+}
+
 enum CustomerStatus {
   ACTIVE
   INACTIVE
@@ -62,17 +69,19 @@ enum CatalogItemStatus {
 }
 
 model User {
-  id         String         @id @default(cuid())
-  username   String         @unique
-  email      String?        @unique
-  password   String
-  name       String
-  role       Role           @default(RECEPTIONIST)
-  status     UserStatus     @default(ACTIVE)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  invoices   Invoice[]
-  activities UserActivity[]
+  id           String          @id @default(cuid())
+  username     String          @unique
+  email        String?         @unique
+  password     String
+  name         String
+  role         Role            @default(RECEPTIONIST)
+  status       UserStatus      @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  invoices     Invoice[]
+  activities   UserActivity[]
+  stockEntries StockEntry[]
+  stockLogs    StockActivity[]
 }
 
 model UserActivity {
@@ -231,4 +240,54 @@ model AcademyProduct {
 
   @@index([status])
   @@index([name])
+}
+
+model StockSequence {
+  id         String @id @default(cuid())
+  year       Int    @unique
+  lastNumber Int    @default(0)
+}
+
+/// Physical stock purchases from suppliers. Quantity is purchase-only for now;
+/// future consumption/balance tracking can add StockMovement without changing this table.
+model StockEntry {
+  id                String          @id @default(cuid())
+  stockNumber       String          @unique
+  itemName          String
+  category          String
+  quantityPurchased Int
+  totalCost         Decimal         @db.Decimal(12, 2)
+  supplierName      String
+  purchaseDate      DateTime
+  billPdfUrl        String?
+  billFileName      String?
+  remarks           String?
+  createdById       String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  createdBy         User            @relation(fields: [createdById], references: [id])
+  activities        StockActivity[]
+
+  @@index([purchaseDate])
+  @@index([category])
+  @@index([supplierName])
+  @@index([createdById])
+  @@index([itemName])
+}
+
+model StockActivity {
+  id           String            @id @default(cuid())
+  stockEntryId String
+  userId       String
+  type         StockActivityType
+  description  String
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime          @default(now())
+  stockEntry   StockEntry        @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stockEntryId])
+  @@index([userId])
+  @@index([createdAt])
 }

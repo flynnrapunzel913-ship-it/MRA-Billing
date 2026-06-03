@@ -6,6 +6,7 @@ import {
   TrendingUp,
   UserCog,
   Layers,
+  Package,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -42,6 +43,12 @@ export const navGroups: NavGroup[] = [
         href: "/customers",
         label: "Customers",
         icon: Users,
+        roles: ["ADMIN", "RECEPTIONIST"],
+      },
+      {
+        href: "/stock",
+        label: "Stock Inventory",
+        icon: Package,
         roles: ["ADMIN", "RECEPTIONIST"],
       },
     ],

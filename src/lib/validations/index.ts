@@ -165,3 +165,17 @@ export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type InvoiceInput = z.infer<typeof invoiceSchema>;
 export type SettingsInput = z.infer<typeof settingsSchema>;
+
+export const stockEntrySchema = z.object({
+  itemName: z.string().min(2, "Item name is required"),
+  category: z.string().min(1, "Category is required"),
+  quantityPurchased: z.number().int().positive("Quantity must be at least 1"),
+  totalCost: z.number().nonnegative("Total purchase cost must be zero or greater"),
+  supplierName: z.string().min(2, "Supplier name is required"),
+  purchaseDate: z.string().min(1, "Purchase date is required"),
+  remarks: z.string().optional(),
+  billPdfUrl: z.string().optional(),
+  billFileName: z.string().optional(),
+});
+
+export type StockEntryInput = z.infer<typeof stockEntrySchema>;

@@ -52,3 +52,16 @@ export function paymentMethodLabel(method: PaymentMethodType | string) {
 export function isCoachingPackage(itemType: string) {
   return itemType === COACHING_PACKAGE_TYPE;
 }
+
+/** Stock inventory categories — extend as needed without schema changes */
+export const STOCK_CATEGORIES = [
+  "Costumes",
+  "Caps",
+  "Goggles",
+  "Equipment",
+  "Cleaning Materials",
+  "Tubes & Floats",
+  "Other",
+] as const;
+
+export type StockCategory = (typeof STOCK_CATEGORIES)[number];

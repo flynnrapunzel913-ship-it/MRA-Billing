@@ -128,7 +128,7 @@ export function Header({ userName, role, onMenuClick }: HeaderProps) {
 
           <h1 className="truncate text-base font-semibold tracking-tight text-slate-900 sm:text-lg dark:text-white">
 
-            MRA BLLING
+            MR Academy Billing
 
           </h1>
 

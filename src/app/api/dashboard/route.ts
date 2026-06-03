@@ -1,102 +1,105 @@
 import { NextResponse } from "next/server";
-
 import { Role } from "@prisma/client";
-
 import { prisma } from "@/lib/prisma";
-
 import { requireAuth } from "@/lib/api-auth";
-
 import { apiErrorResponse } from "@/lib/api-error";
-
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
-
 import { toKpiNumber } from "@/lib/dashboard-kpis";
-
-
+import { getTodayRange } from "@/lib/stock-utils";
 
 export async function GET() {
-
   try {
-
     const { error, user } = await requireAuth();
-
     if (error) return error;
 
-
-
     const invoiceWhere = await getActiveInvoiceWhere();
+    const { start: todayStart, end: todayEnd } = getTodayRange();
 
+    if (user!.role === Role.RECEPTIONIST) {
+      const [activeCustomers, invoicesToday, pendingPayments, recentInvoices, recentCustomers] =
+        await Promise.all([
+        prisma.customer.count({ where: { status: "ACTIVE" } }),
+        prisma.invoice.count({
+          where: {
+            ...invoiceWhere,
+            createdAt: { gte: todayStart, lte: todayEnd },
+          },
+        }),
+        prisma.invoice.count({
+          where: {
+            ...invoiceWhere,
+            paymentStatus: { in: ["PARTIALLY_PAID", "PENDING"] },
+          },
+        }),
+        prisma.invoice.findMany({
+          where: invoiceWhere,
+          take: 10,
+          orderBy: { invoiceDate: "desc" },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            customerName: true,
+            paymentStatus: true,
+            invoiceDate: true,
+          },
+        }),
+        prisma.customer.findMany({
+          take: 8,
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            mobile: true,
+            membershipId: true,
+            status: true,
+            createdAt: true,
+          },
+        }),
+      ]);
 
+      return NextResponse.json({
+        role: "RECEPTIONIST",
+        activeCustomers: toKpiNumber(activeCustomers),
+        invoicesToday: toKpiNumber(invoicesToday),
+        pendingPayments: toKpiNumber(pendingPayments),
+        recentInvoices: recentInvoices ?? [],
+        recentCustomers: recentCustomers ?? [],
+      });
+    }
 
     const [invoiceCount, activeStudents, pendingPayments, recentInvoices] = await Promise.all([
-
       prisma.invoice.count({ where: invoiceWhere }),
-
       prisma.customer.count({ where: { status: "ACTIVE" } }),
-
       prisma.invoice.count({
-
         where: {
-
           ...invoiceWhere,
-
           paymentStatus: { in: ["PARTIALLY_PAID", "PENDING"] },
-
         },
-
       }),
-
       prisma.invoice.findMany({
-
         where: invoiceWhere,
-
         take: 10,
-
         orderBy: { invoiceDate: "desc" },
-
         select: {
-
           id: true,
-
           invoiceNumber: true,
-
           customerName: true,
-
           grandTotal: true,
-
           paymentStatus: true,
-
           invoiceDate: true,
-
           createdBy: { select: { name: true } },
-
         },
-
       }),
-
     ]);
 
-
-
     return NextResponse.json({
-
-      role: user!.role,
-
+      role: "ADMIN",
       invoicesGenerated: toKpiNumber(invoiceCount),
-
       activeStudents: toKpiNumber(activeStudents),
-
       pendingPayments: toKpiNumber(pendingPayments),
-
       recentInvoices: recentInvoices ?? [],
-
     });
-
   } catch (error) {
-
     return apiErrorResponse(error, "Failed to load dashboard");
-
   }
-
 }
-
