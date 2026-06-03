@@ -14,6 +14,15 @@ export type StockFilterState = {
   to: string;
 };
 
+export const defaultStockFilters: StockFilterState = {
+  q: "",
+  category: "all",
+  supplier: "all",
+  createdBy: "all",
+  from: "",
+  to: "",
+};
+
 export function StockFilters({
   filters,
   onChange,
@@ -21,6 +30,8 @@ export function StockFilters({
   categories,
   suppliers,
   creators,
+  onClose,
+  onClear,
 }: {
   filters: StockFilterState;
   onChange: (patch: Partial<StockFilterState>) => void;
@@ -28,6 +39,8 @@ export function StockFilters({
   categories: string[];
   suppliers: string[];
   creators: Array<{ id: string; username: string; name: string }>;
+  onClose?: () => void;
+  onClear?: () => void;
 }) {
   const selectClass = cn(
     "h-10 w-full rounded-xl border border-input bg-background/80 px-3 text-sm",
@@ -35,7 +48,35 @@ export function StockFilters({
   );
 
   return (
-    <div className="glass-panel space-y-4 p-4">
+    <div className="glass-panel space-y-4 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-4">
+        <div>
+          <h3 className="text-base font-semibold text-foreground">Search Stock Entry</h3>
+          <p className="text-xs text-muted-foreground">
+            Filter by item, supplier, category, or date range
+          </p>
+        </div>
+        <div className="flex gap-2">
+          {onClear && (
+            <button
+              type="button"
+              onClick={onClear}
+              className="text-xs font-medium text-muted-foreground hover:text-foreground"
+            >
+              Clear all
+            </button>
+          )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              Close
+            </button>
+          )}
+        </div>
+      </div>
       <div className="relative">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
