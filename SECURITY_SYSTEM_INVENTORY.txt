@@ -1,0 +1,807 @@
+# MRA Billing System — Security System Inventory
+# Generated from codebase analysis. Last aligned to: prisma/schema.prisma, src/app/api/*, src/middleware.ts
+# Do not commit real secret values; this file documents variable names and purposes only.
+
+================================================================================
+# 1. Authentication
+================================================================================
+
+## Login flow
+1. User opens /login (public page).
+2. Client submits username + password via react-hook-form (loginSchema validation).
+3. Client calls signIn("credentials", { username, password, redirect: false }) from next-auth/react.
+4. Request hits NextAuth catch-all route: /api/auth/[...nextauth] (handlers from src/lib/auth.ts).
+5. Credentials provider authorize():
+   - Validates input with Zod (username min 3, no spaces; password min 6).
+   - Loads User by username (lowercased).
+   - Rejects if user missing, status DISABLED, or bcrypt password mismatch (returns null).
+   - On success: records UserActivity LOGIN (best-effort), returns { id, username, role }.
+6. JWT callback stores id, role, username on token; session callback exposes them on session.user.
+7. Client shows toast and navigates to /dashboard (or user may have been redirected via callbackUrl from middleware).
+8. Home route (/): server-side auth() → redirect to /dashboard or /login.
+
+## Authentication library used
+- next-auth v5.0.0-beta.31 (Auth.js) — src/lib/auth.ts
+- @auth/core via NextAuth Credentials provider
+- Client: next-auth/react (signIn, signOut, useSession)
+- Route export: src/app/api/auth/[...nextauth]/route.ts → { GET, POST } handlers
+
+## Session strategy
+- strategy: "jwt" (stateless; no Session table in database)
+- Session read on server: auth() from @/lib/auth
+- Session read on client: useSession() from next-auth/react
+
+## JWT/session configuration
+- secret: process.env.AUTH_SECRET (required for signing/verifying JWT)
+- Custom sign-in page: pages.signIn = "/login"
+- JWT payload (on sign-in): id, role, username
+- Session user fields: id, role, username, name (set to username)
+- Type extensions: src/types/next-auth.d.ts
+- No AUTH_URL / NEXTAUTH_URL referenced in codebase (platform may set implicitly)
+- No server-side session revocation list; disabled users blocked at login only
+
+## Password hashing method
+- Library: bcryptjs ^3.0.3
+- Algorithm: bcrypt with salt rounds = 10
+- Applied on: user create (POST /api/admin/users), user update with new password (PUT /api/admin/users/[id]), admin password reset (PATCH /api/admin/users/[id]), prisma seed
+- Storage: User.password column (never returned in API JSON)
+
+## Password reset flow
+- No self-service "forgot password" or email reset flow exists.
+- Admin-initiated reset only:
+  - PATCH /api/admin/users/[id] — body validated by resetPasswordSchema; bcrypt hash; UserActivity PASSWORD_RESET logged.
+- Password change on user create/edit:
+  - POST /api/admin/users — password required on create.
+  - PUT /api/admin/users/[id] — optional password in updateUserSchema (min 6 if provided).
+- Guards: admin cannot disable own account; cannot delete self or last active admin.
+
+================================================================================
+# 2. Authorization
+================================================================================
+
+## Roles available
+- ADMIN (Prisma enum Role.ADMIN)
+- RECEPTIONIST (Prisma enum Role.RECEPTIONIST, default on User create)
+- User status: ACTIVE | DISABLED (UserStatus); disabled users fail login
+
+## Middleware used
+- File: src/middleware.ts
+- Wrapper: export default auth((req) => { ... }) — NextAuth middleware integration
+- Matcher: all paths EXCEPT api, _next/static, _next/image, favicon.ico, backgrounds, and static files with extensions
+- API routes are NOT protected by this middleware (authorization is per-handler)
+
+## Protected routes (pages — login required)
+Prefixes (exact or subpath):
+  /dashboard
+  /customers
+  /invoices
+  /stock
+  /reports
+  /admin
+  /settings
+  /profile
+
+Unauthenticated access → redirect to /login?callbackUrl=<pathname>
+
+## Admin-only routes (pages — receptionist redirected)
+Prefixes:
+  /reports (includes /reports/revenue)
+  /admin
+  /settings
+
+Receptionist + admin-only path → redirect to /dashboard
+
+## Public routes (pages)
+  /
+  /login
+  Static assets under /public (e.g. /branding/*) — served without app auth
+
+## Additional server layout guard
+- src/app/(dashboard)/layout.tsx: auth() → redirect /login if no session (RSC pages)
+
+## Protected API endpoints
+See Section 4 for full list. Summary:
+- requireAuth(): any authenticated ACTIVE session (401 if missing)
+- requireAdmin(): role must be ADMIN (403 if receptionist)
+
+## Role-based permissions matrix
+
+| Capability | RECEPTIONIST | ADMIN |
+|------------|:------------:|:-----:|
+| Login | Yes | Yes |
+| Dashboard KPIs | Yes | Yes |
+| Invoices list/create/view/duplicate/delete/PDF | Yes | Yes |
+| Customers list/create/edit/view | Yes | Yes |
+| Delete customer | No | Yes |
+| Stock inventory (all stock APIs) | Yes | Yes |
+| Catalog read (invoice wizard) | Yes | Yes |
+| Billing defaults (GST rates) read | Yes | Yes |
+| Academy settings read/write | No | Yes |
+| Reports (revenue/GST/customers) | No | Yes |
+| Admin revenue analytics + CSV export | No | Yes |
+| Subscription/product catalog admin | No | Yes |
+| User management | No | Yes |
+| Own profile + UI font prefs | Yes | Yes |
+| Admin user password reset | No | Yes |
+
+Note: Nav menu hides admin items for receptionist (nav-config.ts); API enforcement is authoritative.
+
+================================================================================
+# 3. Database
+================================================================================
+
+## Database provider
+- PostgreSQL via Prisma ORM 6.19.3
+- Connection: DATABASE_URL (runtime), DIRECT_URL (migrations)
+
+## Complete Prisma schema
+(Source: prisma/schema.prisma)
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum CustomerActivityType {
+  CUSTOMER_ADDED
+  INVOICE_CREATED
+  PAYMENT_MADE
+  PACKAGE_PURCHASED
+}
+
+enum Role {
+  ADMIN
+  RECEPTIONIST
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum UserActivityType {
+  LOGIN
+  INVOICE_CREATED
+  INVOICE_DELETED
+  CUSTOMER_CREATED
+  PASSWORD_RESET
+  USER_DISABLED
+  USER_ENABLED
+  USER_CREATED
+  USER_DELETED
+}
+
+enum StockActivityType {
+  STOCK_CREATED
+  STOCK_VIEWED
+  BILL_VIEWED
+  BILL_DOWNLOADED
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum InvoicePaymentStatus {
+  FULLY_PAID
+  PARTIALLY_PAID
+  PENDING
+}
+
+enum InvoicePaymentMethod {
+  CASH
+  CARD
+  UPI
+  OTHER
+}
+
+enum CatalogItemStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id           String          @id @default(cuid())
+  username     String          @unique
+  email        String?         @unique
+  password     String
+  name         String
+  role         Role            @default(RECEPTIONIST)
+  status       UserStatus      @default(ACTIVE)
+  uiFontFamily String          @default("sans")
+  uiFontSize   String          @default("medium")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  invoices     Invoice[]
+  activities   UserActivity[]
+  stockEntries StockEntry[]
+  stockLogs    StockActivity[]
+}
+
+model UserActivity {
+  id          String           @id @default(cuid())
+  userId      String
+  type        UserActivityType
+  description String
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Customer {
+  id               String         @id @default(cuid())
+  name             String
+  mobile           String?
+  email            String?
+  address          String?
+  emergencyContact String?
+  parentName       String?
+  gstNumber        String?
+  membershipId     String         @unique
+  dateJoined       DateTime       @default(now())
+  status           CustomerStatus @default(ACTIVE)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  invoices         Invoice[]
+  activities       CustomerActivity[]
+
+  @@index([name])
+  @@index([mobile])
+  @@index([membershipId])
+}
+
+model CustomerActivity {
+  id          String               @id @default(cuid())
+  customerId  String
+  type        CustomerActivityType
+  description String
+  createdAt   DateTime             @default(now())
+  customer    Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([createdAt])
+}
+
+model Invoice {
+  id               String               @id @default(cuid())
+  invoiceNumber    String               @unique
+  invoiceDate      DateTime             @default(now())
+  dueDate          DateTime
+  customerId       String?
+  customerName     String
+  customerMobile   String?
+  customerAddress  String?
+  customerGst      String?
+  subtotal         Decimal              @db.Decimal(12, 2)
+  cgstRate         Decimal              @default(9) @db.Decimal(5, 2)
+  sgstRate         Decimal              @default(9) @db.Decimal(5, 2)
+  cgstAmount       Decimal              @db.Decimal(12, 2)
+  sgstAmount       Decimal              @db.Decimal(12, 2)
+  totalGst         Decimal              @db.Decimal(12, 2)
+  grandTotal       Decimal              @db.Decimal(12, 2)
+  amountInWords    String
+  paymentStatus    InvoicePaymentStatus @default(FULLY_PAID)
+  paymentMethod    InvoicePaymentMethod @default(CASH)
+  amountPaid       Decimal              @db.Decimal(12, 2)
+  amountRemaining  Decimal              @db.Decimal(12, 2)
+  gstEnabled       Boolean              @default(true)
+  notes            String?
+  createdById      String
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  deletedAt        DateTime?
+  customer         Customer?            @relation(fields: [customerId], references: [id])
+  createdBy        User                 @relation(fields: [createdById], references: [id])
+  items            InvoiceItem[]
+
+  @@index([invoiceDate])
+  @@index([invoiceNumber])
+  @@index([paymentStatus])
+  @@index([deletedAt])
+}
+
+model InvoiceItem {
+  id               String    @id @default(cuid())
+  invoiceId        String
+  slNo             Int
+  itemType         String
+  description      String
+  quantity         Int       @default(1)
+  unitPrice        Decimal   @db.Decimal(10, 2)
+  amount           Decimal   @db.Decimal(12, 2)
+  packageStartDate DateTime?
+  packageEndDate   DateTime?
+  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceSequence {
+  id         String @id @default(cuid())
+  year       Int    @unique
+  lastNumber Int    @default(0)
+}
+
+model Settings {
+  id                 String   @id @default("default")
+  academyName        String   @default("MR Academy")
+  address            String   @default("")
+  phonePrimary       String   @default("")
+  phoneSecondary     String?
+  email              String   @default("")
+  website            String?
+  gstNumber          String   @default("")
+  gstEnabled         Boolean  @default(true)
+  defaultCgstRate    Decimal  @default(9) @db.Decimal(5, 2)
+  defaultSgstRate    Decimal  @default(9) @db.Decimal(5, 2)
+  bankName           String?
+  bankAccount        String?
+  bankIfsc           String?
+  bankBranch         String?
+  upiId              String?
+  upiQrCode          String?
+  logoUrl            String   @default("/branding/logo.png")
+  signatureUrl       String?
+  footerImageUrl     String   @default("/branding/footer-curves.jpeg")
+  headerImageUrl     String   @default("/branding/address-panel.jpeg")
+  brandColor         String   @default("#0070C0")
+  termsAndConditions String   @default("...")
+  updatedAt          DateTime @updatedAt
+}
+
+model Subscription {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  duration    String
+  price       Decimal           @db.Decimal(10, 2)
+  status      CatalogItemStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
+  @@index([name])
+}
+
+model AcademyProduct {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  price       Decimal           @db.Decimal(10, 2)
+  status      CatalogItemStatus @default(ACTIVE)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([status])
+  @@index([name])
+}
+
+model StockSequence {
+  id         String @id @default(cuid())
+  year       Int    @unique
+  lastNumber Int    @default(0)
+}
+
+model StockEntry {
+  id                String          @id @default(cuid())
+  stockNumber       String          @unique
+  itemName          String
+  category          String
+  quantityPurchased Int
+  totalCost         Decimal         @db.Decimal(12, 2)
+  supplierName      String
+  purchaseDate      DateTime
+  billPdfUrl        String?
+  billFileName      String?
+  remarks           String?
+  createdById       String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  createdBy         User            @relation(fields: [createdById], references: [id])
+  activities        StockActivity[]
+
+  @@index([purchaseDate])
+  @@index([category])
+  @@index([supplierName])
+  @@index([createdById])
+  @@index([itemName])
+}
+
+model StockActivity {
+  id           String            @id @default(cuid())
+  stockEntryId String
+  userId       String
+  type         StockActivityType
+  description  String
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime          @default(now())
+  stockEntry   StockEntry        @relation(fields: [stockEntryId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([stockEntryId])
+  @@index([userId])
+  @@index([createdAt])
+}
+```
+
+## Sensitive tables
+| Table | Sensitivity rationale |
+|-------|----------------------|
+| User | Credentials (password hash), role, PII (email, name) |
+| UserActivity | Staff action audit trail |
+| Customer | PII (name, mobile, email, address, emergency contact) |
+| CustomerActivity | CRM / financial event descriptions |
+| Invoice | Financial data, customer snapshots, payment details |
+| InvoiceItem | Line-level pricing and packages |
+| Settings | Academy financial config (bank, UPI, GST), branding |
+| Subscription / AcademyProduct | Commercial pricing catalog |
+| StockEntry | Purchase costs, supplier data |
+| StockActivity | Access audit with IP/user-agent |
+| InvoiceSequence / StockSequence | Business counters (low direct PII) |
+
+## Sensitive fields
+| Model | Field | Classification |
+|-------|-------|----------------|
+| User | password | Credential (hashed) |
+| User | username, email, name | Identity / PII |
+| User | role, status | Authorization |
+| Customer | mobile, email, address, emergencyContact, parentName, gstNumber | PII |
+| Invoice | customerName, customerMobile, customerAddress, customerGst | PII snapshot |
+| Invoice | subtotal, *Gst*, grandTotal, amountPaid, amountRemaining | Financial |
+| Settings | bankAccount, bankIfsc, upiId, upiQrCode, gstNumber | Financial / operational |
+| StockEntry | totalCost, supplierName, billPdfUrl | Financial / supplier |
+| StockActivity | ipAddress, userAgent | Technical PII |
+
+## Relationships
+- User 1 — * Invoice (createdById, required; no onDelete cascade on Invoice)
+- User 1 — * UserActivity (cascade delete)
+- User 1 — * StockEntry (createdById)
+- User 1 — * StockActivity (cascade delete)
+- Customer 1 — * Invoice (optional customerId)
+- Customer 1 — * CustomerActivity (cascade delete)
+- Invoice 1 — * InvoiceItem (cascade delete)
+- StockEntry 1 — * StockActivity (cascade delete)
+- Subscription / AcademyProduct: no FK to InvoiceItem (price snapshot only at invoice time)
+- Settings: singleton row id = "default"
+- InvoiceSequence / StockSequence: per-year counters
+
+================================================================================
+# 4. API Surface
+================================================================================
+
+Legend:
+  Auth = session required (requireAuth) — both ADMIN and RECEPTIONIST unless noted
+  Admin = requireAdmin — ADMIN only
+  Public = no session required
+
+| Endpoint | Method | Auth | Admin only | Receptionist |
+|----------|--------|------|------------|--------------|
+| /api/auth/[...nextauth] | GET, POST | Public* | No | Yes (login) |
+| /api/dashboard | GET | Yes | No | Yes |
+| /api/profile | GET | Yes | No | Yes |
+| /api/profile | PATCH | Yes | No | Yes (own user only) |
+| /api/settings | GET | Yes | Yes | No |
+| /api/settings | PUT | Yes | Yes | No |
+| /api/settings/billing-defaults | GET | Yes | No | Yes |
+| /api/customers | GET | Yes | No | Yes |
+| /api/customers | POST | Yes | No | Yes |
+| /api/customers/[id] | GET | Yes | No | Yes |
+| /api/customers/[id] | PUT | Yes | No | Yes |
+| /api/customers/[id] | DELETE | Yes | Yes | No |
+| /api/invoices | GET | Yes | No | Yes |
+| /api/invoices | POST | Yes | No | Yes |
+| /api/invoices/[id] | GET | Yes | No | Yes |
+| /api/invoices/[id] | DELETE | Yes | No | Yes (soft delete) |
+| /api/invoices/[id]/duplicate | POST | Yes | No | Yes |
+| /api/invoices/[id]/pdf | GET | Yes | No | Yes |
+| /api/catalog/subscriptions | GET | Yes | No | Yes |
+| /api/catalog/products | GET | Yes | No | Yes |
+| /api/reports | GET | Yes | Yes | No |
+| /api/admin/revenue | GET | Yes | Yes | No |
+| /api/admin/revenue/summary | GET | Yes | Yes | No |
+| /api/admin/revenue/transactions | GET | Yes | Yes | No |
+| /api/admin/revenue/export | GET | Yes | Yes | No |
+| /api/admin/users | GET | Yes | Yes | No |
+| /api/admin/users | POST | Yes | Yes | No |
+| /api/admin/users/[id] | GET | Yes | Yes | No |
+| /api/admin/users/[id] | PUT | Yes | Yes | No |
+| /api/admin/users/[id] | PATCH | Yes | Yes | No (password reset) |
+| /api/admin/users/[id] | DELETE | Yes | Yes | No |
+| /api/admin/subscriptions | GET | Yes | Yes | No |
+| /api/admin/subscriptions | POST | Yes | Yes | No |
+| /api/admin/subscriptions/[id] | PATCH | Yes | Yes | No |
+| /api/admin/subscriptions/[id] | DELETE | Yes | Yes | No |
+| /api/admin/products | GET | Yes | Yes | No |
+| /api/admin/products | POST | Yes | Yes | No |
+| /api/admin/products/[id] | PATCH | Yes | Yes | No |
+| /api/admin/products/[id] | DELETE | Yes | Yes | No |
+| /api/stock | GET | Yes | No | Yes |
+| /api/stock | POST | Yes | No | Yes |
+| /api/stock/summary | GET | Yes | No | Yes |
+| /api/stock/filters | GET | Yes | No | Yes |
+| /api/stock/upload | POST | Yes | No | Yes |
+| /api/stock/[id] | GET | Yes | No | Yes |
+| /api/stock/[id]/bill | GET | Yes | No | Yes |
+
+* /api/auth/*: Public for sign-in/session/csrf endpoints; issues session cookie on successful login.
+
+================================================================================
+# 5. File Handling
+================================================================================
+
+## Upload endpoints
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| /api/stock/upload | POST | requireAuth | Supplier bill PDF (multipart form field: file) |
+
+No other server upload endpoints in codebase.
+
+## Allowed file types
+- Stock bills: PDF only
+  - Extension: .pdf (case-insensitive)
+  - MIME: application/pdf or empty type
+  - Max size: 10 MB (10 * 1024 * 1024 bytes)
+- Filename sanitization: [a-zA-Z0-9._-] only, max 120 chars (src/lib/stock-storage.ts)
+
+## Storage location
+| Asset type | Location | Gitignored |
+|------------|----------|------------|
+| Stock bill PDFs (pending) | {cwd}/uploads/stock-bills/pending/{userId}-{timestamp}-{token}.pdf | Yes (/uploads/) |
+| Stock bill PDFs (final) | {cwd}/uploads/stock-bills/{stockEntryId}/bill.pdf | Yes |
+| Academy branding (invoice PDF) | public/branding/ (logo, header, footer) | No (committed static) |
+| Settings image URLs | Paths stored in DB (logoUrl, etc.) — may point to /branding or external URLs |
+
+Path traversal protection: resolveStockBillPath() rejects ".." and ensures resolved path stays under UPLOAD_ROOT.
+
+## Download endpoints
+| Endpoint | Auth | Content |
+|----------|------|---------|
+| /api/invoices/[id]/pdf | requireAuth | Generated invoice PDF (inline; not stored on disk) |
+| /api/stock/[id]/bill | requireAuth | Stored supplier bill PDF (inline or attachment via ?disposition=attachment) |
+| /public/branding/* | Public | Static images via Next static file server |
+
+Cache-Control on stock bill: private, no-store
+
+================================================================================
+# 6. Invoice System
+================================================================================
+
+## Invoice creation flow
+1. UI: /invoices/new — invoice wizard (Zustand store + InvoiceWizard component).
+2. Prefetch: GET /api/settings/billing-defaults (GST defaults).
+3. Optional: GET /api/customers/[id], GET /api/catalog/subscriptions|products.
+4. Customer step may POST /api/customers or search GET /api/customers?q=.
+5. Submit: POST /api/invoices with invoiceSchema-validated JSON.
+6. Server (requireAuth):
+   - calculateInvoiceTotals from items + GST settings.
+   - calculatePaymentAmounts; validate partial payment rules.
+   - Transaction:
+     * Resolve/link/create Customer (by customerId or mobile).
+     * InvoiceSequence upsert for year → formatInvoiceNumber (MRA-YYYY-#####).
+     * Create Invoice + InvoiceItem rows; set createdById = session user.
+   - Post-commit: CustomerActivity (if linked), UserActivity INVOICE_CREATED.
+7. Response 201 → client navigates to invoice detail.
+
+## PDF generation flow
+1. User opens link: GET /api/invoices/[id]/pdf (requireAuth).
+2. Load active invoice + items; load Settings id="default" (or defaults).
+3. resolvePdfBrandingSettings() — resolve logo/footer/signature URLs using request origin.
+4. generateInvoicePdfBuffer() — @react-pdf/renderer renderToBuffer(InvoicePDFDocument).
+5. Return application/pdf inline (filename = invoiceNumber.pdf).
+6. runtime = "nodejs"; dynamic = "force-dynamic".
+
+## PDF storage method
+- Invoice PDFs are NOT persisted to disk or database.
+- Generated on every request (ephemeral buffer stream).
+- Branding source files live in public/branding/ (static).
+- Invoice business data stored in PostgreSQL (Invoice, InvoiceItem).
+
+## Related operations
+- Soft delete: DELETE /api/invoices/[id] sets deletedAt (excluded from active queries).
+- Duplicate: POST /api/invoices/[id]/duplicate creates new invoice with new number/date.
+
+================================================================================
+# 7. Audit Logging
+================================================================================
+
+## Tables used
+| Table | Model | Primary use |
+|-------|-------|-------------|
+| UserActivity | UserActivity | Staff security/ops audit |
+| CustomerActivity | CustomerActivity | CRM customer timeline |
+| StockActivity | StockActivity | Stock entry and bill access audit |
+
+## Events logged
+
+### UserActivity (UserActivityType)
+| Event | Trigger |
+|-------|---------|
+| LOGIN | Successful credentials authorize() |
+| INVOICE_CREATED | POST /api/invoices success |
+| INVOICE_DELETED | DELETE /api/invoices/[id] |
+| CUSTOMER_CREATED | POST /api/customers |
+| USER_CREATED | POST /api/admin/users |
+| USER_DELETED | DELETE /api/admin/users/[id] (before delete) |
+| USER_DISABLED | PUT user status → DISABLED |
+| USER_ENABLED | PUT user status → ACTIVE |
+| PASSWORD_RESET | PATCH /api/admin/users/[id] password reset |
+
+Fields: userId, type, description, createdAt (no IP/user-agent)
+
+### CustomerActivity (CustomerActivityType)
+| Event | Trigger |
+|-------|---------|
+| CUSTOMER_ADDED | POST /api/customers or customer created in invoice txn |
+| INVOICE_CREATED | Invoice linked to customer |
+| PAYMENT_MADE | amountPaid > 0 on invoice create |
+| PACKAGE_PURCHASED | Coaching package line on invoice |
+
+Fields: customerId, type, description, createdAt
+Failure mode: best-effort — does not fail parent operation
+
+### StockActivity (StockActivityType)
+| Event | Trigger |
+|-------|---------|
+| STOCK_CREATED | POST /api/stock |
+| STOCK_VIEWED | GET /api/stock/[id] |
+| BILL_VIEWED | GET bill inline |
+| BILL_DOWNLOADED | GET bill attachment |
+
+Fields: stockEntryId, userId, type, description, ipAddress?, userAgent?, createdAt
+
+## Retention strategy
+- No application-level TTL or archival job.
+- UserActivity: cascade deleted when User is deleted.
+- CustomerActivity: cascade deleted when Customer is deleted.
+- StockActivity: cascade deleted when StockEntry is deleted.
+- Long-term retention depends on database backups and operational policy (not defined in code).
+
+## Not audited (gaps)
+- Failed logins, 401/403 responses, settings changes, revenue report views, invoice PDF access, profile PATCH, customer PUT
+
+================================================================================
+# 8. Security Controls Currently Implemented
+================================================================================
+
+## Authentication controls
+- Username/password credentials via NextAuth
+- Zod validation on login input
+- bcrypt password hashing (10 rounds)
+- Disabled user accounts blocked at login (UserStatus.DISABLED)
+- Generic client error on failed login (no user enumeration detail)
+- JWT signed with AUTH_SECRET
+- Fail-closed authorize (null → invalid session)
+
+## Authorization controls
+- requireAuth() on all business APIs (401)
+- requireAdmin() on admin/reports/settings APIs (403)
+- Page middleware: login required for dashboard paths
+- Page middleware: receptionist blocked from /reports, /admin, /settings
+- RSC dashboard layout auth() redirect
+- Admin-only customer DELETE
+- Profile PATCH scoped to session user id only
+- User delete guards (not self, not last admin, FK on invoices)
+- Admin cannot disable own account
+
+## Validation controls
+- Zod schemas: login, customer, invoice, settings, user CRUD, stock entry, catalog, UI preferences (src/lib/validations/, src/lib/ui-preferences.ts)
+- Prisma parameterized queries (ORM)
+- Invoice payment amount vs grand total checks
+- Stock PDF type and size validation
+- JSON body parse error handling on APIs
+
+## Logging controls
+- UserActivity, CustomerActivity, StockActivity (see Section 7)
+- Prisma logging: error (+ warn in development)
+- console.error on API failures; console.warn on skipped activity logs
+- Stock bill access logs IP (x-forwarded-for / x-real-ip) and user-agent
+
+## File upload controls
+- PDF-only for stock bills
+- 10 MB max size
+- Filename sanitization
+- Path traversal prevention on read
+- Uploads directory gitignored
+- Bills served only through authenticated API (not public URL)
+
+## Session controls
+- JWT strategy (no DB session table)
+- Session cookie managed by Auth.js / NextAuth
+- signOut() on client
+- Middleware redirects unauthenticated users from protected pages
+- No explicit idle timeout or token rotation in application code
+
+## Not implemented
+- MFA, OAuth/SSO, CAPTCHA, rate limiting, API gateway middleware auth, CSRF tokens on custom APIs (NextAuth handles its own), field-level encryption, WAF, automated security scanning in repo
+
+================================================================================
+# 9. Environment Variables
+================================================================================
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| AUTH_SECRET | Yes (production) | Secret key for signing/encrypting NextAuth JWT session tokens |
+| DATABASE_URL | Yes | PostgreSQL connection string for Prisma runtime queries (often pooled) |
+| DIRECT_URL | Yes (migrations) | Direct PostgreSQL URL for Prisma migrate (non-pooler; README references Neon) |
+| NODE_ENV | Auto | "development" or "production" — controls Prisma log level and dev singleton |
+
+Variables NOT referenced in application source (may still be used by hosting/platform):
+- NEXTAUTH_URL / AUTH_URL — not found in src/ (may be required by deployment host for NextAuth)
+- Any SMTP keys — no email flows in codebase
+
+Local setup: copy .env.example to .env (per README); .env* is gitignored.
+
+================================================================================
+# 10. Deployment Architecture
+================================================================================
+
+## Hosting provider
+- Not specified in repository (no Dockerfile, vercel.json, or IaC).
+- Application is a standard Next.js 16 Node app: npm run build && npm run start.
+- Typical deployment: Node VM, container platform, or serverless Node host (PDF route requires Node runtime).
+
+## Database provider
+- PostgreSQL (Prisma datasource).
+- README documents Neon-style setup (DATABASE_URL pooled + DIRECT_URL for migrations).
+- Migrations: prisma/migrations/* deployed via npm run db:deploy.
+
+## Storage provider
+- Invoice PDFs: none (generated in memory).
+- Stock bills: local filesystem uploads/stock-bills/ on application server (not cloud object storage in code).
+- Static branding: public/ directory served by Next.js.
+- Implication: multi-instance deployments need shared volume or external object storage (not implemented).
+
+## HTTPS configuration
+- Not configured in application code.
+- Expected: TLS termination at reverse proxy / hosting platform (production).
+- Development: commonly http://localhost:3000.
+
+## Backup strategy
+- Not defined in application codebase.
+- Operational expectation: PostgreSQL provider backups/snapshots (e.g. Neon automated backups).
+- uploads/stock-bills/ backups are operator responsibility (directory gitignored).
+
+## Build & run
+- Node.js 18+ (README)
+- Build: prisma generate && next build
+- Start: next start
+- Seed: npx prisma db seed (default users — change passwords in production)
+
+================================================================================
+# 11. External Dependencies
+================================================================================
+
+Security-relevant packages (from package.json, versions as declared):
+
+| Package | Version | Security relevance |
+|---------|---------|-------------------|
+| next | 16.2.6 | Application framework, middleware, API routes |
+| next-auth | 5.0.0-beta.31 | Authentication, JWT sessions, credentials provider |
+| @prisma/client | 6.19.3 | Database access, ORM injection mitigation |
+| prisma | 6.19.3 (dev) | Schema migrations CLI |
+| bcryptjs | 3.0.3 | Password hashing |
+| zod | 4.4.3 | Input validation |
+| react / react-dom | 19.2.4 | UI |
+| @react-pdf/renderer | 4.5.1 | Server-side PDF generation |
+| @hookform/resolvers | 5.4.0 | Form validation wiring |
+| react-hook-form | 7.76.1 | Forms |
+| xlsx | 0.18.5 | Spreadsheet export (reports — review if parsing untrusted files) |
+| next-themes | 0.4.6 | Client theme (localStorage only) |
+| zustand | 5.0.14 | Client state (invoice wizard) |
+| dotenv | 17.4.2 (dev) | Local env loading |
+| eslint / eslint-config-next | 9 / 16.2.6 (dev) | Linting |
+| typescript | 5 (dev) | Type safety |
+
+Transitive dependencies (e.g. @auth/core) are pulled via next-auth — pin/audit via npm audit in operations.
+
+================================================================================
+End of SECURITY_SYSTEM_INVENTORY.txt
