@@ -14,6 +14,7 @@ import { recordUserActivity } from "@/lib/user-activity";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { apiErrorResponse, prismaErrorMessage } from "@/lib/api-error";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
+import { assertAccessibleCustomer } from "@/lib/invoices/access";
 
 async function getGstSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
@@ -94,6 +95,17 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+
+    if (data.customerId) {
+      const customerAccess = await assertAccessibleCustomer(data.customerId);
+      if (!customerAccess.ok) {
+        return NextResponse.json(
+          { success: false, error: "Customer not found" },
+          { status: 404 }
+        );
+      }
+    }
+
     const gstSettings = await getGstSettings();
     const totals = calculateInvoiceTotals(data.items, {
       gstEnabled: data.gstEnabled ?? gstSettings.gstEnabled,

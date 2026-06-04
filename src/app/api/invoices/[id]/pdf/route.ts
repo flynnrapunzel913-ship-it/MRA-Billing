@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
-import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { generateInvoicePdfBuffer } from "@/lib/generate-invoice-pdf";
 import {
   ACADEMY_FOOTER_PATH,
   ACADEMY_LOGO_PATH,
 } from "@/lib/branding-assets";
 import { resolvePdfBrandingSettings } from "@/lib/pdf-image";
+import {
+  findAccessibleInvoice,
+  invoiceForbiddenResponse,
+  invoiceNotFoundResponse,
+} from "@/lib/invoices/access";
+import { safeContentDispositionFilename } from "@/lib/storage/paths";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,24 +39,29 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireAuth();
+    const { error, user } = await requireAuth();
     if (error) return error;
 
     const { id } = await params;
-    const invoiceWhere = await getActiveInvoiceWhere();
 
-    const [invoice, settingsRow] = await Promise.all([
-      prisma.invoice.findFirst({
-        where: { id, ...invoiceWhere },
-        include: { items: { orderBy: { slNo: "asc" } } },
-      }),
-      prisma.settings.findUnique({ where: { id: "default" } }),
-    ]);
+    type InvoiceWithItems = Prisma.InvoiceGetPayload<{
+      include: { items: { orderBy: { slNo: "asc" } } };
+    }>;
 
-    if (!invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    const access = await findAccessibleInvoice<InvoiceWithItems>(id, {
+      id: user!.id!,
+      role: user!.role as Role,
+    }, {
+      include: { items: { orderBy: { slNo: "asc" } } },
+    });
+
+    if (!access.ok) {
+      return access.status === 403 ? invoiceForbiddenResponse() : invoiceNotFoundResponse();
     }
 
+    const invoice = access.invoice;
+
+    const settingsRow = await prisma.settings.findUnique({ where: { id: "default" } });
     const settings = settingsRow ?? DEFAULT_PDF_SETTINGS;
     const origin = request.nextUrl.origin;
 
@@ -97,10 +108,16 @@ export async function GET(
 
     const buffer = await generateInvoicePdfBuffer(pdfInvoice, pdfSettings);
 
+    const safeFilename = safeContentDispositionFilename(
+      `${invoice.invoiceNumber}.pdf`,
+      "invoice.pdf"
+    );
+
     return new NextResponse(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="${invoice.invoiceNumber}.pdf"`,
+        "Content-Disposition": `inline; filename="${safeFilename}"`,
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

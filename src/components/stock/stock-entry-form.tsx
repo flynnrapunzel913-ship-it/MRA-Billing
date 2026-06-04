@@ -48,7 +48,7 @@ export function StockEntryForm() {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/stock/upload", { method: "POST", body: fd });
+      const res = await fetch("/api/uploads", { method: "POST", body: fd });
       const result = await readApiResponse<{ billPdfUrl: string; billFileName: string }>(
         res,
         "Upload failed"

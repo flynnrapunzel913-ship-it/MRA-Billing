@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
-import { getActiveInvoiceWhere, isSchemaDriftError } from "@/lib/invoice-filters";
-import { canDeleteInvoice } from "@/lib/invoice-permissions";
+import { isSchemaDriftError } from "@/lib/invoice-filters";
+import {
+  canDeleteInvoice,
+  findAccessibleInvoice,
+  invoiceForbiddenResponse,
+  invoiceNotFoundResponse,
+} from "@/lib/invoices/access";
 import { recordUserActivity } from "@/lib/user-activity";
 
 export async function GET(
@@ -12,14 +17,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireAuth();
+    const { error, user } = await requireAuth();
     if (error) return error;
 
     const { id } = await params;
-    const invoiceWhere = await getActiveInvoiceWhere();
 
-    const invoice = await prisma.invoice.findFirst({
-      where: { id, ...invoiceWhere },
+    type InvoiceDetail = Prisma.InvoiceGetPayload<{
+      include: {
+        items: { orderBy: { slNo: "asc" } };
+        customer: true;
+        createdBy: { select: { name: true } };
+      };
+    }>;
+
+    const result = await findAccessibleInvoice<InvoiceDetail>(id, {
+      id: user!.id!,
+      role: user!.role as Role,
+    }, {
       include: {
         items: { orderBy: { slNo: "asc" } },
         customer: true,
@@ -27,11 +41,11 @@ export async function GET(
       },
     });
 
-    if (!invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (!result.ok) {
+      return result.status === 403 ? invoiceForbiddenResponse() : invoiceNotFoundResponse();
     }
 
-    return NextResponse.json(invoice);
+    return NextResponse.json(result.invoice);
   } catch (error) {
     return apiErrorResponse(error, "Failed to load invoice");
   }
@@ -46,35 +60,33 @@ export async function DELETE(
     if (error) return error;
 
     const { id } = await params;
-    const invoiceWhere = await getActiveInvoiceWhere();
-
-    const invoice = await prisma.invoice.findFirst({
-      where: { id, ...invoiceWhere },
+    const result = await findAccessibleInvoice(id, {
+      id: user!.id!,
+      role: user!.role as Role,
     });
 
-    if (!invoice) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (!result.ok) {
+      return result.status === 403 ? invoiceForbiddenResponse() : invoiceNotFoundResponse();
     }
+
+    const invoice = result.invoice;
 
     if (
       !canDeleteInvoice(user!.role as Role, user!.id, {
         createdById: invoice.createdById,
       })
     ) {
-      return NextResponse.json(
-        { error: "You do not have permission to delete this invoice" },
-        { status: 403 }
-      );
+      return invoiceForbiddenResponse();
     }
 
     try {
       await prisma.invoice.update({
-        where: { id },
+        where: { id: invoice.id },
         data: { deletedAt: new Date() },
       });
     } catch (updateError) {
       if (isSchemaDriftError(updateError)) {
-        await prisma.invoice.delete({ where: { id } });
+        await prisma.invoice.delete({ where: { id: invoice.id } });
       } else {
         throw updateError;
       }

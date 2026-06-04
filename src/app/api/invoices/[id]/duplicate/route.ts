@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
@@ -7,6 +8,12 @@ import {
   calculatePaymentAmounts,
   formatInvoiceNumber,
 } from "@/lib/invoice-utils";
+import {
+  canDuplicateInvoice,
+  findAccessibleInvoice,
+  invoiceForbiddenResponse,
+  invoiceNotFoundResponse,
+} from "@/lib/invoices/access";
 
 export async function POST(
   _request: NextRequest,
@@ -18,13 +25,23 @@ export async function POST(
 
     const { id } = await params;
 
-    const original = await prisma.invoice.findUnique({
-      where: { id },
+    type InvoiceWithItems = Prisma.InvoiceGetPayload<{ include: { items: true } }>;
+
+    const access = await findAccessibleInvoice<InvoiceWithItems>(id, {
+      id: user!.id!,
+      role: user!.role as Role,
+    }, {
       include: { items: true },
     });
 
-    if (!original) {
-      return NextResponse.json({ error: "Invoice not found" }, { status: 404 });
+    if (!access.ok) {
+      return access.status === 403 ? invoiceForbiddenResponse() : invoiceNotFoundResponse();
+    }
+
+    const original = access.invoice;
+
+    if (!canDuplicateInvoice({ id: user!.id!, role: user!.role as Role }, original)) {
+      return invoiceForbiddenResponse();
     }
 
     const items = original.items.map((item) => ({
@@ -84,7 +101,7 @@ export async function POST(
           amountPaid: paymentAmounts.amountPaid,
           amountRemaining: paymentAmounts.amountRemaining,
           notes: original.notes,
-          createdById: user!.id,
+          createdById: user!.id!,
           items: {
             create: original.items.map((item, index) => ({
               slNo: index + 1,
