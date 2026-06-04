@@ -3,7 +3,6 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { loadActiveAccount } from "@/lib/auth/session";
 import { isUserDisabled } from "@/lib/user-queries";
 
 const loginSchema = z.object({
@@ -53,32 +52,15 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   callbacks: {
     async jwt({ token, user }) {
+      // Edge-safe: no Prisma. DB re-validation runs in Node (guards, dashboard layout).
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.username = (user as { username?: string }).username ?? user.name ?? "";
       }
-
-      // Re-validate account on each session/JWT refresh (disabled users lose access immediately).
-      const userId = token.id as string | undefined;
-      if (userId) {
-        const account = await loadActiveAccount(userId);
-        if (!account || account.disabled) {
-          token.revoked = true;
-        } else {
-          token.revoked = false;
-          token.role = account.role;
-          token.username = account.username;
-        }
-      }
-
       return token;
     },
     async session({ session, token }) {
-      if (token.revoked) {
-        return { ...session, user: undefined, expires: new Date(0).toISOString() };
-      }
-
       if (session.user && token.id) {
         session.user.id = token.id as string;
         session.user.role = token.role as "ADMIN" | "RECEPTIONIST";

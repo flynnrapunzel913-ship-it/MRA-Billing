@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { Role } from "@prisma/client";
 import { applyApiRateLimits } from "@/lib/security/request-rate-limit";
-import { isAccountActive } from "@/lib/auth/session";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -27,7 +26,6 @@ export default auth(async (req) => {
   const isLoggedIn = !!req.auth?.user?.id;
   const role = req.auth?.user?.role;
   const userId = req.auth?.user?.id;
-
   // --- Rate limiting (login, search, PDF, revenue export) ---
   const rateLimitRequest = req as unknown as NextRequest;
   if (isApiPath(pathname)) {
@@ -35,28 +33,8 @@ export default auth(async (req) => {
     if (rateLimited) return rateLimited;
   }
 
-  // --- Session invalidation: disabled/deleted users ---
-  if (isLoggedIn && userId) {
-    const token = req.auth as { revoked?: boolean } | null;
-    if (token?.revoked) {
-      const login = new URL("/login", req.nextUrl);
-      login.searchParams.set("error", "session_invalid");
-      return NextResponse.redirect(login);
-    }
-
-    // API routes: enforce active account (JWT may be stale on edge before jwt callback DB refresh).
-    if (isApiPath(pathname) && !pathname.startsWith("/api/auth")) {
-      const active = await isAccountActive(userId);
-      if (!active) {
-        return NextResponse.json(
-          { error: "Unauthorized or session expired", code: "SESSION_INVALID" },
-          { status: 401, headers: { "X-Session-Invalid": "1" } }
-        );
-      }
-    }
-  }
-
   // --- Page routes (not API) ---
+  // Session invalidation for disabled/deleted users: Node only (requireAuth, dashboard layout).
   if (!isApiPath(pathname)) {
     const isProtected = protectedPrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -66,15 +44,6 @@ export default auth(async (req) => {
       const login = new URL("/login", req.nextUrl);
       login.searchParams.set("callbackUrl", pathname);
       return NextResponse.redirect(login);
-    }
-
-    if (isLoggedIn && userId) {
-      const active = await isAccountActive(userId);
-      if (!active) {
-        const login = new URL("/login", req.nextUrl);
-        login.searchParams.set("error", "session_invalid");
-        return NextResponse.redirect(login);
-      }
     }
 
     if (

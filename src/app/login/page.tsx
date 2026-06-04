@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -13,8 +13,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export default function LoginPage() {
+/** Only allow same-origin relative paths (middleware callbackUrl). */
+function resolvePostLoginUrl(raw: string | null): string {
+  if (!raw) return "/dashboard";
+  if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
+  if (raw.startsWith("/login")) return "/dashboard";
+  return raw;
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const {
     register,
@@ -25,8 +34,17 @@ export default function LoginPage() {
     defaultValues: { username: "admin", password: "admin123" },
   });
 
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error === "session_invalid") {
+      toast.error("Your session has ended. Please sign in again.");
+    }
+  }, [searchParams]);
+
   const onSubmit = async (data: LoginInput) => {
     setLoading(true);
+    const callbackUrl = resolvePostLoginUrl(searchParams.get("callbackUrl"));
+
     const result = await signIn("credentials", {
       username: data.username,
       password: data.password,
@@ -34,14 +52,16 @@ export default function LoginPage() {
     });
     setLoading(false);
 
-    if (result?.error) {
+    if (!result || result.error || result.ok === false) {
       toast.error("Invalid username or password");
       return;
     }
 
     toast.success("Welcome back!");
-    router.push("/dashboard");
+    // Full navigation so the Set-Cookie from sign-in is on the request middleware sees.
+    // router.push() alone can race the session cookie and leave the user on /login.
     router.refresh();
+    window.location.assign(callbackUrl);
   };
 
   return (
@@ -80,5 +100,19 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-muted-foreground">
+          Loading…
+        </div>
+      }
+    >
+      <LoginForm />
+    </Suspense>
   );
 }

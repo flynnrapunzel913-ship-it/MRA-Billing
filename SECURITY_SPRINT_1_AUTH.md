@@ -7,7 +7,7 @@ Branch: `security-auth`
 | File | Change |
 |------|--------|
 | `src/middleware.ts` | Rate limits on sensitive API paths; session invalidation for pages/APIs; admin page redirects |
-| `src/lib/auth/config.ts` | NextAuth config; JWT/session callbacks re-validate user status from DB |
+| `src/lib/auth/config.ts` | NextAuth config; Edge-safe JWT/session callbacks (no Prisma on middleware path) |
 | `src/lib/auth/session.ts` | `loadActiveAccount`, `isAccountActive` |
 | `src/lib/auth/guards.ts` | `requireAuth`, `requireAdmin` with DB-backed session validation |
 | `src/lib/auth/admin-api.ts` | Canonical admin API guard import |
@@ -17,7 +17,7 @@ Branch: `security-auth`
 | `src/lib/security/rate-limit.ts` | Fixed-window limiter, 429 + Retry-After, violation logging, bucket pruning |
 | `src/lib/security/request-rate-limit.ts` | Login, search, PDF, revenue export policies |
 | `src/lib/security/security-log.ts` | Structured `[security]` stdout logging |
-| `src/types/next-auth.d.ts` | `JWT.revoked` flag |
+| `src/types/next-auth.d.ts` | JWT user fields (`id`, `role`, `username`) |
 | `src/app/api/auth/[...nextauth]/route.ts` | Handlers from `auth/config` |
 | `src/app/api/admin/**` (10 routes) | `requireAdmin` from `@/lib/auth/admin-api` |
 | `src/app/api/admin/revenue/export/route.ts` | Route-level export rate limit |
@@ -51,11 +51,11 @@ Violations logged: `[security] {"event":"rate_limit_exceeded",...}`
 
 ### Session invalidation
 
-- `loadActiveAccount()` on every `requireAuth()` / `requireAdmin()` (all API handlers using `api-auth`).
-- JWT callback re-reads user from DB; sets `token.revoked` when missing or `DISABLED`.
-- Session callback clears `session.user` when revoked.
-- Middleware: disabled users → `401` on APIs (`X-Session-Invalid: 1`); redirect to `/login?error=session_invalid` on pages.
-- Dashboard layout: `isAccountActive()` before render.
+- `loadActiveAccount()` on every `requireAuth()` / `requireAdmin()` (all API handlers using `api-auth`) — **Node runtime only**.
+- Login `authorize()` rejects `DISABLED` users before a JWT is issued.
+- Middleware checks JWT/session presence and role only (no Prisma on Edge).
+- Dashboard layout: `isAccountActive()` before render (Node).
+- Disabled/deleted users lose API access on the next `requireAuth()` call; pages redirect via dashboard layout.
 
 ### Admin authorization
 

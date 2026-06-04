@@ -12,7 +12,7 @@ export type ActiveAccount = {
 
 /**
  * Loads the user row and determines if the account may use the application.
- * Used on every authenticated API request and when refreshing JWT/session.
+ * Node runtime only — used by requireAuth/requireAdmin and dashboard layout (not middleware/JWT).
  */
 export async function loadActiveAccount(userId: string): Promise<ActiveAccount | null> {
   if (!userId) return null;

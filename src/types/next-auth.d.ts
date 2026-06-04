@@ -21,7 +21,5 @@ declare module "next-auth/jwt" {
     id: string;
     role: Role;
     username: string;
-    /** Set when account is disabled or removed — session callback clears user. */
-    revoked?: boolean;
   }
 }
