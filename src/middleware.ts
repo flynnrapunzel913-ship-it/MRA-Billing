@@ -57,6 +57,10 @@ export default auth(async (req) => {
     }
 
     if (pathname === "/login" && isLoggedIn) {
+      // Dashboard layout redirects disabled users here; do not bounce back to /dashboard (S1-07).
+      if (req.nextUrl.searchParams.get("error") === "session_invalid") {
+        return NextResponse.next();
+      }
       return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
     }
   }

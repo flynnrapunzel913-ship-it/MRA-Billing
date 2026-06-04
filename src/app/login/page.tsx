@@ -14,11 +14,15 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 /** Only allow same-origin relative paths (middleware callbackUrl). */
-function resolvePostLoginUrl(raw: string | null): string {
+function resolvePostLoginPath(raw: string | null): string {
   if (!raw) return "/dashboard";
   if (!raw.startsWith("/") || raw.startsWith("//")) return "/dashboard";
   if (raw.startsWith("/login")) return "/dashboard";
   return raw;
+}
+
+function absoluteCallbackUrl(path: string): string {
+  return new URL(path, window.location.origin).href;
 }
 
 function LoginForm() {
@@ -43,12 +47,16 @@ function LoginForm() {
 
   const onSubmit = async (data: LoginInput) => {
     setLoading(true);
-    const callbackUrl = resolvePostLoginUrl(searchParams.get("callbackUrl"));
+    const postLoginPath = resolvePostLoginPath(searchParams.get("callbackUrl"));
+    // NextAuth signIn(redirect:false) does `new URL(data.url)` — must not use the login
+    // page href (e.g. /login?error=session_invalid) as redirectTo or a relative data.url throws.
+    const callbackUrl = absoluteCallbackUrl(postLoginPath);
 
     const result = await signIn("credentials", {
       username: data.username,
       password: data.password,
       redirect: false,
+      callbackUrl,
     });
     setLoading(false);
 
@@ -61,7 +69,7 @@ function LoginForm() {
     // Full navigation so the Set-Cookie from sign-in is on the request middleware sees.
     // router.push() alone can race the session cookie and leave the user on /login.
     router.refresh();
-    window.location.assign(callbackUrl);
+    window.location.assign(postLoginPath);
   };
 
   return (

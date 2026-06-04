@@ -16,7 +16,9 @@ export default async function DashboardLayout({
   const session = await getSession();
   if (!session?.user?.id) redirect("/login");
   const active = await isAccountActive(session.user.id);
-  if (!active) redirect("/login?error=session_invalid");
+  if (!active) {
+    redirect("/login?error=session_invalid");
+  }
 
   if (session.user.role === Role.ADMIN) {
     return <AdminDashboardShell user={session.user}>{children}</AdminDashboardShell>;
