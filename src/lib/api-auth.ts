@@ -1,29 +1,16 @@
+/**
+ * API auth guards — delegates to @/lib/auth/guards for session validation + RBAC.
+ * Every requireAuth() call verifies the user is not DISABLED in the database.
+ */
+export {
+  requireAuth,
+  requireAdmin,
+  getValidatedSessionUser as getSessionUser,
+  unauthorizedResponse,
+  forbiddenResponse,
+} from "@/lib/auth/guards";
+
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { Role } from "@prisma/client";
-
-export async function getSessionUser() {
-  const session = await auth();
-  if (!session?.user) return null;
-  return session.user;
-}
-
-export async function requireAuth() {
-  const user = await getSessionUser();
-  if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }), user: null };
-  }
-  return { error: null, user };
-}
-
-export async function requireAdmin() {
-  const { error, user } = await requireAuth();
-  if (error) return { error, user: null };
-  if (user!.role !== Role.ADMIN) {
-    return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }), user: null };
-  }
-  return { error: null, user };
-}
 
 export function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });

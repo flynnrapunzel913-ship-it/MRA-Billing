@@ -1,0 +1,553 @@
+# MRA-Billing — Security Architecture Documentation
+# Purpose: Input for generating security-focused diagrams (trust boundaries, auth,
+# authorization, audit logging, deployment). Aligns with implementation in src/.
+#
+# Generate ONE diagram per section below unless noted.
+
+================================================================================
+INDEX
+================================================================================
+  S1  Trust Boundary Diagram
+  S2  Authentication & Session Architecture
+  S3  Authorization Architecture
+  S4  Audit Logging Architecture
+  S5  Deployment Architecture
+
+================================================================================
+GLOBAL SECURITY CONTEXT
+================================================================================
+Application: MR Academy Billing (Next.js monolith, private internal staff tool)
+Threat model (implicit): Trusted staff on academy networks; primary risks are
+  unauthorized access to billing/revenue data, credential abuse, and data leakage
+  via APIs or uploaded files — not public multi-tenant SaaS scale.
+
+Security primitives in use:
+  - NextAuth v5 (Auth.js) with Credentials provider
+  - JWT session strategy (no server-side session table)
+  - bcrypt password hashing (cost factor 10 on create/reset)
+  - Zod validation on login and API bodies
+  - Role enum: ADMIN | RECEPTIONIST
+  - Layered authorization: middleware (pages) + requireAuth/requireAdmin (API)
+  - Append-only activity tables (User, Customer, Stock)
+
+Secrets & configuration (environment):
+  - AUTH_SECRET          — signs/encrypts JWT session tokens (required)
+  - DATABASE_URL         — PostgreSQL connection (often pooled, e.g. Neon)
+  - DIRECT_URL           — Direct DB URL for migrations (Prisma)
+  - NODE_ENV             — development vs production logging behavior
+
+Not implemented (document as gaps where relevant):
+  - MFA / SSO / OAuth
+  - Rate limiting / CAPTCHA on login
+  - API middleware auth (matcher excludes /api/*)
+  - Centralized SIEM or immutable audit warehouse
+  - Field-level encryption at rest (passwords hashed only)
+  - WAF / CDN rules (deployment-specific)
+
+================================================================================
+S1 — TRUST BOUNDARY DIAGRAM
+================================================================================
+DIAGRAM_ID: S1-trust-boundaries
+TYPE: Trust boundary / zone diagram (nested rectangles or dashed perimeters)
+DESCRIPTION:
+  Show where trust level changes and what crosses each boundary. Label data
+  sensitivity at rest and in transit. Highlight that API routes sit inside the
+  app trust zone but are NOT wrapped by page middleware.
+
+TRUST ZONES (inner = higher trust)
+
+  Zone A — UNTRUSTED (External)
+  --------------------------------
+  Entities:
+    - Staff browser (Chrome/Edge/Safari on desktop or mobile)
+    - Unauthenticated visitors (only /, /login effectively public)
+  Trust level: None — all input hostile
+  Crosses boundary with:
+    - HTTPS requests (assumed in production; dev may use http://localhost)
+    - Cookies: NextAuth session JWT (HttpOnly when set by Auth.js)
+    - Form posts: username/password at login; JSON/form bodies to /api/*
+    - Uploaded files: PDF stock bills (max 10 MB, application/pdf)
+
+  Zone B — APPLICATION TRUST BOUNDARY (Next.js server)
+  ------------------------------------------------------
+  Perimeter: Node.js process running Next.js (dev: next dev | prod: next start)
+  Components inside:
+    - Edge/Node Middleware (src/middleware.ts) — page routes only
+    - React Server Components + Client Components
+    - Route Handlers (src/app/api/**)
+    - Libraries: auth.ts, api-auth.ts, Prisma client, PDF generator, stock-storage
+  Trust assumptions:
+    - AUTH_SECRET known only to server
+    - Server-side code is integrity-protected via deployment pipeline
+    - Staff session JWT verified before requireAuth() succeeds
+  Sensitive processing:
+    - Password verify (bcrypt.compare) — never returns password to client
+    - Role checks — role from JWT, not from client-supplied headers
+    - Invoice/revenue queries — full financial data
+    - Admin user password reset (admin sets new hash for target user)
+
+  Zone C — DATA TRUST BOUNDARY (PostgreSQL)
+  -----------------------------------------
+  Perimeter: Database server / managed Postgres (e.g. Neon)
+  Access: Only Prisma from Zone B (DATABASE_URL)
+  Stores:
+    - User.password (bcrypt hash)
+    - PII: Customer name, mobile, email, address; Invoice customer snapshots
+    - Financial: Invoice totals, payment status, revenue aggregates
+    - Audit: UserActivity, CustomerActivity, StockActivity
+    - Catalog, Settings, StockEntry metadata
+  Trust: DB credentials must not reach browser; TLS depends on provider connection string
+
+  Zone D — LOCAL FILE TRUST BOUNDARY (Server filesystem)
+  -----------------------------------------------------
+  Paths:
+    - uploads/stock-bills/     — supplier bill PDFs (pending + per-entry folders)
+    - public/branding/         — static letterhead assets (world-readable via HTTP)
+  Access rules:
+    - Stock bills: served only via GET /api/stock/[id]/bill after requireAuth()
+    - Path traversal blocked: resolveStockBillPath() rejects ".."
+  Deployment note: Zone D is LOCAL DISK — not shared across replicas unless mounted
+  (see S5 — scaling gap)
+
+DATA CLASSIFICATION (for diagram labels)
+
+  | Class        | Examples                          | Zones        |
+  |--------------|-----------------------------------|--------------|
+  | Public       | Branding images, login page UI    | A ← static   |
+  | Internal     | Invoice lists, customer CRM       | B, C         |
+  | Confidential | Revenue reports, GST settings     | B, C (admin) |
+  | Credential   | Passwords, AUTH_SECRET, DB URL    | B, C only    |
+  | Audit        | Activity log rows                 | C (read UI)  |
+
+BOUNDARY CROSSINGS (numbered flows for diagram arrows)
+
+  1. [A→B] Login POST → /api/auth/[...nextauth] → authorize() → Zone C lookup
+  2. [B→A] Set-Cookie session JWT → browser stores (subsequent requests)
+  3. [A→B] Authenticated fetch /api/* with session cookie
+  4. [B→C] Prisma queries (parameterized ORM — no raw SQL in auth path)
+  5. [B→D] Stock PDF write/read; invoice PDF reads public/branding
+  6. [A→B] Middleware checks req.auth before serving dashboard pages
+  7. [A→B] Direct API call without cookie → 401 Unauthorized (Zone B rejects)
+
+CRITICAL TRUST GAP (label on diagram)
+  - Middleware matcher EXCLUDES /api/* → Zone A can hit any API URL directly.
+    Authorization depends entirely on requireAuth()/requireAdmin() per handler.
+  - JWT carries role claim — tampering prevented by AUTH_SECRET signature; do not
+    trust client-sent role headers or body fields for authorization.
+
+================================================================================
+S2 — AUTHENTICATION & SESSION ARCHITECTURE
+================================================================================
+DIAGRAM_ID: S2-authentication-session
+TYPE: Sequence diagram or component diagram (login + session lifecycle)
+DESCRIPTION:
+  Username/password authentication via NextAuth Credentials provider. Stateless
+  JWT sessions — no Session table in database. Disabled users cannot authenticate.
+
+COMPONENTS
+  - Login UI: src/app/login/page.tsx (react-hook-form + loginSchema)
+  - Client: signIn("credentials", { username, password, redirect: false })
+  - NextAuth route: src/app/api/auth/[...nextauth]/route.ts → handlers from auth.ts
+  - Core config: src/lib/auth.ts
+  - Session consumer: auth() in middleware, layouts, api-auth.ts
+  - Types: src/types/next-auth.d.ts (id, role, username on Session/JWT)
+
+CREDENTIAL VALIDATION (authorize callback)
+  1. Zod loginSchema: username min 3, no whitespace; password min 6
+  2. Lookup User by username.toLowerCase()
+  3. Fail closed (return null → generic login error) if:
+       - User not found
+       - User status DISABLED (isUserDisabled)
+       - bcrypt.compare fails
+  4. On success:
+       - recordUserActivity(LOGIN) — best-effort, async void
+       - Return { id, name: username, username, role } — NO password in token
+
+PASSWORD STORAGE
+  - Algorithm: bcryptjs, salt rounds 10 on user create and admin PATCH password reset
+  - Stored column: User.password (never sent to client in API responses)
+
+SESSION MODEL
+  Strategy: JWT (session: { strategy: "jwt" })
+  Signing: process.env.AUTH_SECRET
+  Server-side session store: NONE
+  Token contents (JWT callback on sign-in):
+    - token.id, token.role, token.username
+  Session callback exposes to app:
+    - session.user.id, .role, .username, .name (= username)
+
+SESSION LIFECYCLE FLOWS
+
+  [Login]
+  Browser → signIn(credentials) → POST /api/auth/callback/credentials
+         → authorize() → JWT issued → Set-Cookie (Auth.js session token)
+         → Client router.push("/dashboard") + router.refresh()
+
+  [Authenticated page - RSC]
+  Request → middleware (pages): req.auth present?
+         → Dashboard layout: auth() → redirect /login if missing
+         → Render shell with session.user
+
+  [Authenticated API]
+  Request → /api/* (no middleware auth)
+         → requireAuth() → auth() reads cookie/JWT
+         → 401 if no session
+
+  [Logout]
+  signOut() → clears client session cookie → middleware treats as guest
+
+  [Disabled mid-session]
+  Existing JWT remains valid until expiry/rotation — no server revocation list.
+  Disabled user blocked on next login only (gap: label on diagram).
+
+PAGES & ROUTES
+  Custom sign-in page: /login (pages.signIn in NextAuth config)
+  Home /: Server redirect → /dashboard if session else /login
+  Logged-in user visiting /login → middleware redirect /dashboard
+
+SECURITY PROPERTIES
+  + Fail-closed authorize (null = invalid credentials)
+  + Uniform error message client-side ("Invalid username or password")
+  + Password never in JWT/session object
+  - No account lockout after N failures
+  - No MFA
+  - JWT revocation not tied to disable/delete until token expires
+
+DIAGRAM ANNOTATIONS
+  - Draw dashed box "JWT in HttpOnly cookie" between browser and NextAuth
+  - Show PostgreSQL only in authorize path, not on each API call for session lookup
+
+================================================================================
+S3 — AUTHORIZATION ARCHITECTURE
+================================================================================
+DIAGRAM_ID: S3-authorization
+TYPE: Layered architecture / decision flowchart (role checks)
+DESCRIPTION:
+  Defense in depth for ADMIN vs RECEPTIONIST. Three enforcement layers for UI
+  (middleware, RSC layout, nav filter) plus mandatory API guards. Revenue and
+  admin settings are admin-only at API level.
+
+ROLES & CAPABILITIES MATRIX
+
+  Capability                          | RECEPTIONIST | ADMIN
+  ------------------------------------|--------------|-------
+  Dashboard, invoices, customers      | Yes          | Yes
+  Stock inventory                     | Yes          | Yes
+  Create/edit customers               | Yes          | Yes
+  Delete customers                    | No (403)     | Yes
+  Invoice PDF / duplicate / delete    | Yes          | Yes
+  Billing defaults (GST rates)        | Yes (read)   | Yes (read)
+  Full academy settings               | No           | Yes
+  Reports & revenue analytics         | No           | Yes
+  Catalog admin (subscriptions/products)| No         | Yes
+  Catalog read (invoice wizard)       | Yes          | Yes
+  User management                     | No           | Yes
+  Profile / UI font prefs (own user)  | Yes          | Yes
+
+LAYER 1 — PAGE MIDDLEWARE (src/middleware.ts)
+  Wrapped by: auth() middleware export
+  Scope: All paths EXCEPT api, _next/static, _next/image, favicon, backgrounds, static files
+
+  Rules:
+    protectedPrefixes → require isLoggedIn:
+      /dashboard, /customers, /invoices, /stock, /reports, /admin, /settings, /profile
+    adminOnlyPrefixes + role RECEPTIONIST → redirect /dashboard:
+      /reports, /admin, /settings
+    /login + isLoggedIn → redirect /dashboard
+
+  Effect: Receptionist cannot VIEW admin pages in browser navigation.
+  Limitation: Does not block /api/admin/* or /api/reports.
+
+LAYER 2 — SERVER LAYOUT (src/app/(dashboard)/layout.tsx)
+  auth() → if !session redirect /login
+  Chooses AdminDashboardShell vs DashboardShell by role (UI only, not security boundary)
+
+LAYER 3 — CLIENT NAV (src/components/layout/nav-config.ts)
+  getNavGroupsForRole(role) filters menu items
+  Pure UX — not a security control
+
+LAYER 4 — API AUTHORIZATION (src/lib/api-auth.ts) — AUTHORITATIVE FOR DATA
+
+  requireAuth():
+    session = await auth()
+    missing → 401 { error: "Unauthorized" }
+
+  requireAdmin():
+    requireAuth() then role !== ADMIN → 403 { error: "Forbidden" }
+
+API ENDPOINT POLICY SUMMARY
+
+  requireAdmin only:
+    /api/settings (GET, PUT)
+    /api/reports
+    /api/admin/revenue, /summary, /transactions, /export
+    /api/admin/users, /api/admin/users/[id]
+    /api/admin/subscriptions, /api/admin/subscriptions/[id]
+    /api/admin/products, /api/admin/products/[id]
+    DELETE /api/customers/[id]
+
+  requireAuth (any active staff):
+    /api/dashboard, /api/invoices*, /api/customers (except DELETE),
+    /api/catalog/*, /api/settings/billing-defaults,
+    /api/stock*, /api/profile (GET, PATCH)
+
+BUSINESS RULE AUTHORIZATION (inside handlers)
+
+  Profile PATCH /api/profile:
+    Updates only session user id (user!.id) — cannot change another user's prefs
+
+  Admin user DELETE:
+    - Cannot delete self
+    - Cannot delete last active ADMIN
+    - Blocked if invoices reference user (FK on createdById)
+
+  Admin user PUT:
+    - Cannot disable own account
+
+  Stock bill download:
+    requireAuth + entry must exist; any authenticated staff can access any entry's bill
+    (no per-entry ownership check — document if hardening needed)
+
+DECISION FLOW (for flowchart diagram)
+
+  START → Request to /api/X
+       → requireAuth?
+            NO session → 401 END
+       → Route requires admin?
+            YES → role === ADMIN?
+                 NO → 403 END
+            NO → handler business rules → 200/4xx END
+
+  START → Request to page /Y
+       → middleware: protected?
+            NO → allow (e.g. /login)
+       → logged in?
+            NO → redirect /login
+       → admin-only path + receptionist?
+            YES → redirect /dashboard
+       → allow → RSC layout auth() double-check
+
+KNOWN GAPS (honest diagram notes)
+  - Receptionist can invoke admin APIs with tools if session cookie stolen
+  - Role in JWT — if AUTH_SECRET leaked, forged admin tokens possible
+  - canAccessRoute() in permissions.ts unused — do not diagram as enforced
+  - Invoice/revenue data returned to all staff on shared endpoints (/api/invoices)
+
+================================================================================
+S4 — AUDIT LOGGING ARCHITECTURE
+================================================================================
+DIAGRAM_ID: S4-audit-logging
+TYPE: Data-flow / event taxonomy diagram (sources → stores → consumers)
+DESCRIPTION:
+  Three parallel audit subsystems with different richness and failure modes.
+  Not a unified security audit platform — operational/CRM tracing plus stock access log.
+
+AUDIT STORE OVERVIEW
+
+  | Store            | Model           | Scope              | PII in description |
+  |------------------|-----------------|--------------------|--------------------|
+  | UserActivity     | UserActivity    | Staff actions      | User names         |
+  | CustomerActivity | CustomerActivity| CRM timeline       | Customer/invoice   |
+  | StockActivity    | StockActivity   | Stock + bill access| Stock numbers      |
+
+USER ACTIVITY (src/lib/user-activity.ts)
+  Table: UserActivity
+  Fields: userId, type (enum), description, createdAt
+  Retention: Until User deleted (cascade on User delete)
+  Failure mode: Swallows schema drift — logs warning, continues (non-blocking)
+
+  Events recorded:
+    LOGIN              — auth.ts authorize() success
+    INVOICE_CREATED    — POST /api/invoices
+    INVOICE_DELETED    — DELETE /api/invoices/[id]
+    CUSTOMER_CREATED   — POST /api/customers
+    USER_CREATED       — POST /api/admin/users
+    USER_DELETED       — DELETE /api/admin/users/[id] (logged before delete)
+    USER_DISABLED      — PUT user status
+    USER_ENABLED       — PUT user status
+    PASSWORD_RESET     — PATCH /api/admin/users/[id] (admin reset)
+
+  Consumers:
+    - Admin user list (listUsers — last activity display)
+    - Not exported to external SIEM
+
+CUSTOMER ACTIVITY (src/lib/customer-activity.ts)
+  Table: CustomerActivity
+  Fields: customerId, type, description, createdAt
+  Failure mode: Best-effort — NEVER fails parent transaction (invoice/customer create)
+  Design intent: CRM timeline on customer detail page
+
+  Events:
+    CUSTOMER_ADDED     — POST /api/customers or inline create on invoice
+    INVOICE_CREATED    — invoice linked to customer
+    PAYMENT_MADE       — amountPaid > 0 on invoice create
+    PACKAGE_PURCHASED  — coaching package line item on invoice
+
+  Consumers:
+    - GET /api/customers/[id] → activities[] in response
+
+STOCK ACTIVITY (src/lib/stock-activity.ts)
+  Table: StockActivity
+  Fields: stockEntryId, userId, type, description, ipAddress?, userAgent?, createdAt
+  Richest audit: captures request metadata via getRequestMeta(request)
+    - x-forwarded-for (first hop) or x-real-ip
+    - user-agent header
+
+  Events:
+    STOCK_CREATED      — POST /api/stock (in DB transaction)
+    STOCK_VIEWED       — GET /api/stock/[id]
+    BILL_VIEWED        — GET bill inline disposition
+    BILL_DOWNLOADED    — GET bill attachment disposition
+
+  Consumers:
+    - GET /api/stock/[id] includes last 20 activities with user username/name
+
+FLOW DIAGRAM ELEMENTS
+
+  [Auth] LOGIN → UserActivity
+  [Invoice API] → UserActivity + CustomerActivity (conditional)
+  [Customer API] → UserActivity + CustomerActivity
+  [Admin Users API] → UserActivity
+  [Stock API] → StockActivity (+ IP/UA when request available)
+
+NOT LOGGED (gaps for security reviewers)
+  - Failed login attempts
+  - 401/403 API denials
+  - Settings changes (academy/GST) — no SettingsActivity table
+  - Revenue report views / CSV exports
+  - Invoice PDF views/downloads
+  - Profile UI preference changes
+  - Customer updates (PUT) or receptionist-accessed admin URLs
+  - Catalog CRUD details (only implicit via admin session)
+
+INTEGRITY & COMPLIANCE NOTES
+  - Append-only in application logic (no update/delete UI for activity rows)
+  - DB admin could tamper — no cryptographic integrity chain
+  - Descriptions are free-text — not structured for automated alerting
+  - Customer activity skipped silently on errors — audit completeness not guaranteed
+
+DIAGRAM LEGEND SUGGESTION
+  - Solid arrow: synchronous create in request path
+  - Dashed arrow: fire-and-forget (void recordUserActivity on login)
+  - Red callout: "best-effort" on CustomerActivity path
+
+================================================================================
+S5 — DEPLOYMENT ARCHITECTURE
+================================================================================
+DIAGRAM_ID: S5-deployment
+TYPE: Deployment / infrastructure diagram (nodes, networks, secrets)
+DESCRIPTION:
+  Single deployable Next.js application unit connecting to managed PostgreSQL.
+  Typical: Node host (VM, container, or Vercel-like platform) + Neon Postgres.
+  No Terraform/Docker files in repo — diagram reflects documented/npm scripts pattern.
+
+RUNTIME UNIT
+  Name: mra-billing-app
+  Process: Node.js 18+ running Next.js 16
+  Build: npm run build  →  prisma generate && next build
+  Start: npm run start   →  next start (production server)
+  Dev:   npm run dev     →  next dev
+
+  Serverless notes:
+    - PDF route sets runtime = "nodejs" (src/app/api/invoices/[id]/pdf/route.ts)
+    - next.config outputFileTracingIncludes branding assets for PDF route bundle
+
+COMPONENTS ON DIAGRAM
+
+  [Client Browser]
+        | HTTPS
+        v
+  [Load Balancer / Host]  (optional — deployment-specific)
+        |
+        v
+  [Next.js Application Node(s)]
+    - Middleware (edge/node per platform)
+    - App routes + API routes in one process
+    - In-memory client cache is BROWSER-side only (not server cluster state)
+        |
+        +------------------+------------------+
+        v                  v                  v
+  [PostgreSQL]      [Local volume]      [Public static]
+  DATABASE_URL      uploads/stock-bills  public/branding/*
+  DIRECT_URL        (bill PDFs)         (CDN/static via Next)
+
+DATABASE TIER
+  Engine: PostgreSQL via Prisma 6
+  Connection:
+    - DATABASE_URL — runtime queries (pooler-friendly)
+    - DIRECT_URL — migrations (prisma migrate deploy)
+  Migrations: prisma/migrations/* — deploy via npm run db:deploy
+  Seed: npm run db:seed (non-production typical)
+
+SECRETS INJECTION
+  | Secret        | Used by              | Must not appear in |
+  |---------------|----------------------|--------------------|
+  | AUTH_SECRET   | NextAuth JWT         | Client bundle, git |
+  | DATABASE_URL  | Prisma               | Client, logs       |
+  | DIRECT_URL    | Prisma CLI migrate   | Client             |
+
+  .env file local only — not committed (.env.example referenced in README)
+
+FILE STORAGE DEPLOYMENT CONSIDERATION
+  Stock bills path: {cwd}/uploads/stock-bills/
+  - Created at runtime by stock-storage.ts
+  - NOT in public/ — not directly URL-accessible without API
+  - Single-node assumption: multiple replicas without shared volume → uploads on
+    wrong instance (CRITICAL for horizontal scale — label on diagram)
+
+STATIC ASSETS
+  public/branding/ — logo, footer, address panel (invoice PDF embedding)
+  Served by Next static file handler — no auth required for /branding/*
+
+NETWORK PORTS (typical)
+  Dev:  localhost:3000
+  Prod: PLATFORM_PORT or 3000 behind reverse proxy
+
+CI/CD (inferred — not in repo)
+  Suggested pipeline: install → prisma generate → lint → build → migrate deploy → start
+  No container definition in repository — diagram should show "deployment TBD" box
+  if exact cloud unknown
+
+ENVIRONMENT SPLIT
+
+  Development:
+    - prisma log: error, warn
+    - Hot reload, local Postgres or Neon dev branch
+    - uploads/ on developer machine
+
+  Production:
+    - prisma log: error only
+    - AUTH_SECRET strong random
+    - HTTPS termination at proxy
+    - Backup: Postgres provider snapshots (operational, not app code)
+
+OBSERVABILITY (current)
+  - console.error on API failures
+  - console.warn on skipped activity logs / schema drift
+  - No OpenTelemetry / structured audit sink in codebase
+
+SECURITY-RELEVANT DEPLOYMENT CHECKLIST (annotation box on diagram)
+  [ ] Rotate AUTH_SECRET per environment
+  [ ] TLS to database (provider default)
+  [ ] Restrict DB network to app subnet
+  [ ] Persistent volume or object storage for uploads/stock-bills if multi-instance
+  [ ] Do not expose Prisma Studio publicly
+  [ ] Remove default seed passwords in production
+  [ ] Set secure cookie flags via Auth.js in HTTPS production
+
+BOUNDARY RECAP FOR DEPLOYMENT DIAGRAM
+  Draw Internet → TLS terminator → App tier (trust Zone B) → Private network →
+  Postgres (Zone C) and attach Volume for uploads (Zone D).
+
+================================================================================
+DIAGRAM GENERATION HINTS
+================================================================================
+  S1: Use red dashed line for "API bypasses page middleware"
+  S2: Sequence with alt blocks for failed vs successful login
+  S3: Layer cake: Middleware → Layout → API → DB policies
+  S4: Hub-and-spoke: API handlers as sources, three DB tables as sinks
+  S5: 3-tier deployment; mark uploads volume as single-point for scale-out
+
+Cross-reference: operational data flows in dataflows.txt (D2, D3, D12, E1, E3).
+
+End of security_diags.txt

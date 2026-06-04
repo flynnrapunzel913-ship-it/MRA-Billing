@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getTodayRevenue, getWeekRevenue, getMonthRevenue } from "@/lib/revenue-analytics";
 import { toKpiNumber } from "@/lib/dashboard-kpis";

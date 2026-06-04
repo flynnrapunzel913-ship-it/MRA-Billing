@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getExportRows, rowsToCsv } from "@/lib/revenue-analytics";
 import { paymentStatusLabel, paymentMethodLabel } from "@/lib/constants";
+import { rateLimitRevenueExport } from "@/lib/security/request-rate-limit";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, user } = await requireAdmin();
     if (error) return error;
+
+    // Belt-and-suspenders with middleware rate limit (admin export abuse protection).
+    const limited = rateLimitRevenueExport(request, user!.id);
+    if (limited) return limited;
 
     const params = request.nextUrl.searchParams;
     const from = params.get("from");

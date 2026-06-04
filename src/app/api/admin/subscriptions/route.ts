@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/api-auth";
+import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { searchSubscriptions, serializeSubscription } from "@/lib/catalog";
 import { subscriptionSchema } from "@/lib/validations";

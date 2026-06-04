@@ -1,0 +1,843 @@
+# MRA-Billing — Data Flow Documentation
+# Purpose: Input for generating data-flow diagrams (DFD / sequence / architecture).
+# App: Next.js (App Router) + NextAuth (JWT) + Prisma + PostgreSQL
+# Roles: ADMIN | RECEPTIONIST
+#
+# Recommended: produce ONE diagram per section below (10 diagrams total).
+# Use DIAGRAM_ID as the diagram filename or title in your diagram tool.
+
+================================================================================
+INDEX — RECOMMENDED DIAGRAMS
+================================================================================
+  D1  System context & deployment
+  D2  Authentication & session (username + password)
+  D3  Role-based access & navigation
+  D4  Dashboard & operational KPIs
+  D5  Customer management (CRM)
+  D6  Invoice lifecycle (create → list → detail → duplicate → delete)
+  D7  Invoice PDF generation & download
+  D8  Subscription & product catalog
+  D9  Academy settings & billing defaults
+  D10 Admin revenue analytics, reports & CSV export
+  D11 User management (admin)
+  D12 Activity & audit logging (cross-cutting)
+
+================================================================================
+GLOBAL REFERENCE
+================================================================================
+
+ACTORS
+  - Guest (unauthenticated visitor)
+  - Staff User (authenticated; role ADMIN or RECEPTIONIST)
+  - Administrator (Staff User with role ADMIN)
+  - Receptionist (Staff User with role RECEPTIONIST)
+
+EXTERNAL / INFRASTRUCTURE
+  - Web Browser (React client components + server components)
+  - Next.js Server (Route Handlers under src/app/api/*, RSC pages under src/app)
+  - NextAuth (/api/auth/[...nextauth]) — JWT session strategy
+  - PostgreSQL — accessed only via Prisma (src/lib/prisma.ts)
+
+PRIMARY DATA STORES (Prisma models)
+  - User, UserActivity
+  - Customer, CustomerActivity
+  - Invoice, InvoiceItem, InvoiceSequence
+  - Settings (singleton id = "default")
+  - Subscription, AcademyProduct (catalog; status ACTIVE | INACTIVE)
+
+SHARED SERVER LIBRARIES (business logic, not separate services)
+  - src/lib/auth.ts — credentials authorize, JWT/session callbacks
+  - src/lib/api-auth.ts — requireAuth(), requireAdmin()
+  - src/lib/invoice-utils.ts — totals, payment amounts, invoice number format
+  - src/lib/invoice-filters.ts — active invoices (excludes soft-deleted)
+  - src/lib/revenue-analytics.ts — admin revenue aggregation & CSV rows
+  - src/lib/catalog.ts — catalog search/serialize
+  - src/lib/customer-activity.ts, src/lib/user-activity.ts — audit rows
+  - src/lib/generate-invoice-pdf.ts — PDF buffer from invoice + branding
+
+API SURFACE (all under /api)
+  Auth:     POST/GET  /api/auth/[...nextauth]
+  Core:     GET       /api/dashboard
+            GET/POST  /api/invoices
+            GET/DEL   /api/invoices/[id]
+            POST      /api/invoices/[id]/duplicate
+            GET       /api/invoices/[id]/pdf
+            GET/POST  /api/customers
+            GET/PUT   /api/customers/[id]
+            DELETE    /api/customers/[id]  (admin only)
+            GET       /api/settings/billing-defaults
+  Catalog:  GET       /api/catalog/subscriptions
+            GET       /api/catalog/products
+  Admin:    GET/PUT   /api/settings
+            GET       /api/reports
+            GET       /api/admin/revenue
+            GET       /api/admin/revenue/summary
+            GET       /api/admin/revenue/transactions
+            GET       /api/admin/revenue/export
+            GET/POST  /api/admin/subscriptions, /api/admin/subscriptions/[id]
+            GET/POST  /api/admin/products, /api/admin/products/[id]
+            GET/POST  /api/admin/users, /api/admin/users/[id]
+
+UI ROUTES (pages; middleware requires login for protected prefixes)
+  Public:   /, /login
+  Shared:   /dashboard, /invoices, /invoices/new, /invoices/[id], /invoices/history,
+            /customers, /customers/[id], /profile
+  Admin UI: /reports, /reports/revenue, /settings, /admin/subscriptions, /admin/users
+
+MIDDLEWARE (src/middleware.ts)
+  - Wraps NextAuth; redirects unauthenticated users from protected paths → /login?callbackUrl=
+  - Redirects logged-in users away from /login → /dashboard
+  - Does NOT enforce role on page URLs (role enforced in nav + API requireAdmin)
+
+================================================================================
+DIAGRAM D1 — SYSTEM CONTEXT & DEPLOYMENT
+================================================================================
+DIAGRAM_ID: D1-system-context
+TYPE: Context diagram (C4 Level 1) or deployment diagram
+DESCRIPTION:
+  High-level view of MRA-Billing as a single web application. Show how staff
+  interact through the browser, how the Next.js app serves UI and API routes,
+  and how all persistent data lives in PostgreSQL. No internal module detail.
+
+ACTORS
+  - Staff User (browser)
+  - Guest (browser, login only)
+
+SYSTEM BOUNDARY
+  - MRA-Billing Application (Next.js monolith: UI + API + auth)
+
+EXTERNAL SYSTEMS
+  - PostgreSQL Database
+  - Static files (/branding/*) used in PDF generation
+
+FLOWS
+  1. Staff User → Browser → HTTPS → Next.js App (pages + /api/*)
+  2. Next.js App → Prisma Client → PostgreSQL (read/write all domain data)
+  3. Guest → /login → NextAuth credentials → PostgreSQL User lookup
+  4. Staff User → opens PDF URL → Next.js generates PDF stream → Browser download/view
+  5. Next.js → reads branding asset paths from filesystem/public for PDF images
+
+DATA ENTITIES (at boundary)
+  Users, Customers, Invoices, Catalog, Settings, Activity logs
+
+NOTES
+  - No separate microservices; revenue analytics and PDF are in-process libraries.
+  - Session stored as JWT (not server-side session table).
+
+================================================================================
+DIAGRAM D2 — AUTHENTICATION & SESSION
+================================================================================
+DIAGRAM_ID: D2-authentication-session
+TYPE: Sequence diagram or Level-1 DFD (login path only)
+DESCRIPTION:
+  End-to-end login using username and password. Covers middleware protection,
+  JWT issuance, and activity logging on successful login. Profile page reads
+  session only (no profile API).
+
+ACTORS
+  - Guest / Staff User
+  - Login Page (src/app/login/page.tsx)
+  - NextAuth Handler (/api/auth/[...nextauth])
+  - auth.ts authorize()
+  - PostgreSQL: User, UserActivity
+
+FLOWS
+  1. User submits username + password on /login
+  2. Client calls signIn("credentials", { username, password, redirect: false })
+  3. NextAuth → authorize():
+       a. Validate username (min 3, no spaces) + password (min 6) via Zod
+       b. SELECT User WHERE username = lowercased input
+       c. Reject if user missing, disabled (UserStatus.DISABLED), or bcrypt mismatch
+       d. recordUserActivity(LOGIN, description)
+       e. Return { id, username, role } to JWT callback
+  4. jwt callback stores id, role, username on token
+  5. session callback exposes id, role, username on session.user
+  6. Client navigates to /dashboard (or callbackUrl from query)
+  7. Middleware on subsequent requests: req.auth present → allow protected routes
+  8. If unauthenticated user hits /dashboard|/customers|/invoices|/reports|/admin|/settings|/profile
+     → redirect /login?callbackUrl=<path>
+  9. Logged-in user hits /login → redirect /dashboard
+  10. Profile page (/profile): Server Component auth() → ProfileView (read-only session fields)
+  11. Sign out: signOut() → clears JWT client-side → middleware treats as guest
+
+DATA STORES
+  - User (username unique, password bcrypt hash, role, status)
+  - UserActivity (type LOGIN)
+
+SECURITY NOTES
+  - AUTH_SECRET env required for JWT signing
+  - API routes use requireAuth() reading same session (not middleware on /api)
+
+================================================================================
+DIAGRAM D3 — ROLE-BASED ACCESS & NAVIGATION
+================================================================================
+DIAGRAM_ID: D3-rbac-navigation
+TYPE: Security / access diagram or swimlane (Admin vs Receptionist)
+DESCRIPTION:
+  How roles change UI shell and which APIs succeed. Receptionists must not see
+  revenue or admin screens in navigation; admins get sidebar layout. API is the
+  real enforcement layer for sensitive operations.
+
+ACTORS
+  - Administrator
+  - Receptionist
+
+ROLE RULES
+  ADMIN:
+    - Nav: Dashboard, Invoices, Customers, Revenue, Subscription Management,
+      Reports, User Management (src/components/layout/nav-config.ts)
+    - Layout: AdminDashboardShell (permanent sidebar + compact top bar)
+    - APIs: all requireAuth endpoints + all requireAdmin endpoints
+  RECEPTIONIST:
+    - Nav: Dashboard, Invoices, Customers only
+    - Layout: DashboardShell (floating header, nav dock, mobile tab bar)
+    - APIs: requireAuth only; requireAdmin → 403 Forbidden
+
+ADMIN-ONLY UI PATHS (nav hidden for receptionist)
+  /reports, /reports/revenue, /settings, /admin/subscriptions, /admin/users
+
+ADMIN-ONLY API OPERATIONS (requireAdmin)
+  /api/settings GET|PUT
+  /api/reports GET
+  /api/admin/* (revenue, users, subscriptions, products)
+  DELETE /api/customers/[id]
+
+SHARED (requireAuth — both roles)
+  /api/dashboard, /api/invoices*, /api/customers GET|POST|PUT, /api/catalog/*,
+  /api/settings/billing-defaults
+
+FLOWS
+  1. Dashboard layout (src/app/(dashboard)/layout.tsx): auth() → if no session redirect /login
+  2. role === ADMIN → render AdminDashboardShell; else DashboardShell
+  3. Nav items filtered by getNavGroupsForRole(role)
+  4. Active nav highlight: getActiveNavHref(pathname) — longest prefix match
+  5. Receptionist manually opens /reports → page may load but fetch /api/reports → 403
+  6. canAccessRoute() in permissions.ts exists but is NOT wired to middleware (document as future/gap)
+
+NOTES
+  - Global invoice search (header): loads GET /api/invoices — both roles
+  - Revenue KPIs and CSV: admin API only; receptionist dashboard has no revenue numbers
+
+================================================================================
+DIAGRAM D4 — DASHBOARD & OPERATIONAL KPIs
+================================================================================
+DIAGRAM_ID: D4-dashboard-kpis
+TYPE: Data-flow diagram (read path)
+DESCRIPTION:
+  Single dashboard page for both roles. One API aggregates invoice and customer
+  counts; admin UI adds links to revenue reports but uses the same KPI payload.
+
+ACTORS
+  - Staff User
+  - Dashboard Page (/dashboard)
+  - GET /api/dashboard
+
+DATA READ
+  - Invoice (filtered: active only via getActiveInvoiceWhere — deletedAt null)
+  - Customer (status ACTIVE count)
+
+FLOWS
+  1. Client useCachedFetch("/api/dashboard")
+  2. requireAuth() → obtain user.role
+  3. Parallel Prisma queries:
+       a. invoice.count(active)
+       b. customer.count({ status: ACTIVE })
+       c. invoice.count(active AND paymentStatus IN PARTIALLY_PAID, PENDING)
+       d. invoice.findMany(active, take 10, orderBy invoiceDate desc, select summary fields)
+  4. Response JSON:
+       { role, invoicesGenerated, activeStudents, pendingPayments, recentInvoices }
+  5. Client normalizeDashboardPayload() → display KPI cards + recent invoices table
+  6. ADMIN: AdminDashboardView + link to /reports/revenue
+  7. RECEPTIONIST: receptionist layout + quick actions (new invoice, customers)
+
+OUTPUT FIELDS (recentInvoices)
+  id, invoiceNumber, customerName, grandTotal, paymentStatus, invoiceDate, createdBy.name
+
+NOTES
+  - Admin dashboard does NOT call /api/admin/revenue on load (revenue is separate page).
+  - KPIs are counts, not currency totals (except grandTotal shown per row in table).
+
+================================================================================
+DIAGRAM D5 — CUSTOMER MANAGEMENT (CRM)
+================================================================================
+DIAGRAM_ID: D5-customer-crm
+TYPE: DFD Level 1–2 or sequence (list, create, edit, detail, delete)
+DESCRIPTION:
+  Customer CRUD, list filtering (client-side enrichment with invoices), detail page
+  with stats and activity timeline. Invoice wizard can also create/link customers.
+
+ACTORS
+  - Staff User
+  - Customers Page (/customers)
+  - Customer Detail Page (/customers/[id])
+  - Invoice Wizard customer step
+  - APIs: /api/customers, /api/customers/[id]
+
+DATA STORES
+  - Customer
+  - CustomerActivity
+  - Invoice (for counts, stats, client-side filters)
+
+FLOWS — LIST & SEARCH
+  1. GET /api/customers?q=&status= → requireAuth
+  2. listCustomersWithInvoiceCounts(where, take 20 if search)
+  3. Customers page also GET /api/invoices (cached) → buildCustomerInvoiceIndex for
+     quick filters: renewal_due, pending_payment, recent, service type
+  4. Client-side filterCustomers() on debounced search + quick/service filters
+  5. CustomerDrawer / table selection — no extra API until detail navigation
+
+FLOWS — CREATE / UPDATE (dialog)
+  1. POST /api/customers — body: name, mobile, email, address, etc.
+  2. generateMembershipId() → unique membershipId
+  3. INSERT Customer
+  4. recordCustomerActivity(CUSTOMER_ADDED)
+  5. recordUserActivity(CUSTOMER_CREATED) for acting user
+  6. PUT /api/customers/[id] — update fields; requireAuth
+
+FLOWS — DETAIL
+  1. GET /api/customers/[id]
+  2. getCustomerWithDetails(id) — customer + activities + invoices relation
+  3. Aggregate invoice stats (active invoices only): counts, sums paid/remaining, last date
+  4. Return merged JSON { ...customer, activities, stats }
+
+FLOWS — DELETE (admin only)
+  1. DELETE /api/customers/[id] — requireAdmin
+  2. Hard delete customer (cascade CustomerActivity)
+  3. Blocked if invoices reference customer (FK — no cascade on Invoice)
+
+FLOWS — INVOICE WIZARD CUSTOMER STEP
+  1. Search: GET /api/customers?q=<mobile or name>
+  2. Optional create: POST /api/customers before invoice submit
+  3. On invoice POST: may link existing customerId, match by mobile, or create inline
+     in same transaction (see D6)
+
+CUSTOMER ACTIVITY TYPES
+  CUSTOMER_ADDED | INVOICE_CREATED | PAYMENT_MADE | PACKAGE_PURCHASED
+
+================================================================================
+DIAGRAM D6 — INVOICE LIFECYCLE
+================================================================================
+DIAGRAM_ID: D6-invoice-lifecycle
+TYPE: End-to-end process diagram (swimlane: UI → API → DB)
+DESCRIPTION:
+  Complete invoice domain: wizard creation with catalog/custom lines, numbering,
+  GST totals, payment status, soft delete, duplicate, list/search/history, detail.
+
+ACTORS
+  - Staff User
+  - Pages: /invoices, /invoices/new, /invoices/[id], /invoices/history
+  - GlobalInvoiceSearch (header)
+  - APIs: /api/invoices, /api/invoices/[id], /api/invoices/[id]/duplicate
+
+DATA STORES
+  - Invoice, InvoiceItem, InvoiceSequence, Customer, Settings, User
+
+FLOWS — WIZARD INIT
+  1. GET /api/settings/billing-defaults → gstEnabled, defaultCgstRate, defaultSgstRate
+  2. Optional prefill: GET /api/customers/[id] when ?customerId= in URL
+  3. Catalog picker: GET /api/catalog/subscriptions?q= | /api/catalog/products?q=
+     (ACTIVE catalog only; prices copied into line items as snapshot, not FK)
+
+FLOWS — CREATE INVOICE (POST /api/invoices)
+  1. requireAuth → createdById = session user id
+  2. Validate body with invoiceSchema (items, customer, payment, GST flags)
+  3. getGstSettings() from Settings if not overridden
+  4. calculateInvoiceTotals(items) → subtotal, CGST/SGST, grandTotal, amountInWords
+  5. calculatePaymentAmounts(grandTotal, paymentStatus, optional amountPaid)
+  6. BEGIN TRANSACTION:
+       a. Resolve customer:
+          - If customerId: load Customer, snapshot name/mobile/address/gst on invoice
+          - Else if mobile: find by mobile → link or update name; or CREATE Customer + membershipId
+       b. InvoiceSequence upsert for invoice year → increment lastNumber
+       c. formatInvoiceNumber(year, seq) → unique invoiceNumber
+       d. INSERT Invoice + InvoiceItem rows (unitPrice × qty = amount; optional package dates)
+  7. END TRANSACTION
+  8. POST-COMMIT activity (if customer linked):
+       - CUSTOMER_ADDED if new customer in txn
+       - INVOICE_CREATED, PAYMENT_MADE (if amountPaid > 0), PACKAGE_PURCHASED (coaching item type)
+  9. recordUserActivity(INVOICE_CREATED, invoiceNumber)
+  10. Response 201 serialized invoice JSON → redirect to /invoices/[id]
+
+FLOWS — LIST & SEARCH
+  1. GET /api/invoices?q=&paymentStatus= → active invoices, include customer, items, createdBy
+  2. Invoices page / history page: client table, delete confirmation
+  3. GlobalInvoiceSearch: prefetch full list once → client filterInvoicesByQuery → link /invoices/[id]
+
+FLOWS — DETAIL & DUPLICATE
+  1. GET /api/invoices/[id] — full invoice + items + customer
+  2. POST /api/invoices/[id]/duplicate:
+       - Load original + items
+       - Recalculate totals/payments for new invoiceDate (today)
+       - New sequence number + INSERT new invoice (same customer link, new createdById)
+  3. No activity log on duplicate unless implemented separately (current: create only via POST /api/invoices)
+
+FLOWS — SOFT DELETE
+  1. DELETE /api/invoices/[id]
+  2. SET deletedAt = now() (fallback hard delete if schema drift)
+  3. recordUserActivity(INVOICE_DELETED, invoiceNumber)
+  4. Excluded from getActiveInvoiceWhere() on all list/report queries
+
+INVOICE PAYMENT STATUSES
+  FULLY_PAID | PARTIALLY_PAID | PENDING
+
+INVOICE PAYMENT METHODS
+  CASH | CARD | UPI | OTHER
+
+KEY BUSINESS RULES
+  - dueDate = invoiceDate + 7 days
+  - Partial payment: amountPaid cannot exceed grandTotal
+  - Catalog prices are snapshots on InvoiceItem (catalog edits do not affect past invoices)
+
+================================================================================
+DIAGRAM D7 — INVOICE PDF GENERATION & DOWNLOAD
+================================================================================
+DIAGRAM_ID: D7-invoice-pdf
+TYPE: Sequence diagram (read-only export path)
+DESCRIPTION:
+  On-demand PDF generation when user opens PDF link. Combines invoice line items,
+  academy branding from Settings, and static assets resolved to absolute URLs.
+
+ACTORS
+  - Staff User
+  - Invoice Detail / History table (anchor link)
+  - GET /api/invoices/[id]/pdf
+
+PROCESSING STEPS
+  1. requireAuth()
+  2. Parallel load:
+       a. Invoice + items (active filter) ordered by slNo
+       b. Settings row id="default" (or DEFAULT_PDF_SETTINGS fallback)
+  3. resolvePdfBrandingSettings(settings, request.origin):
+       - Resolve logo, footer, signature URLs for PDF renderer
+  4. generateInvoicePdfBuffer(pdfInvoice, pdfSettings) → binary PDF
+  5. Response: application/pdf attachment (Content-Disposition filename)
+
+DATA INPUTS
+  - Invoice financial fields (Decimal → Number)
+  - Settings: academyName, phones, email, website, gstNumber, gstEnabled, brandColor,
+    termsAndConditions, logoUrl, footerImageUrl, signatureUrl
+  - Static defaults: ACADEMY_LOGO_PATH, ACADEMY_FOOTER_PATH
+
+NOTES
+  - runtime = nodejs (PDF library needs Node)
+  - No PDF stored in database; generated per request
+  - Receptionist and admin both authorized (requireAuth only)
+
+================================================================================
+DIAGRAM D8 — SUBSCRIPTION & PRODUCT CATALOG
+================================================================================
+DIAGRAM_ID: D8-catalog
+TYPE: DFD with two lanes: Admin write path | Staff read path in invoice wizard
+DESCRIPTION:
+  Admins maintain subscription packages and academy products. Receptionists consume
+  active catalog entries when building invoices; line items store copied price/description.
+
+ACTORS
+  - Administrator
+  - Staff User (invoice wizard)
+  - Subscription Management UI (/admin/subscriptions)
+  - CatalogItemPicker component
+
+DATA STORES
+  - Subscription (name, description, duration, price, status)
+  - AcademyProduct (name, description, price, status)
+
+FLOWS — ADMIN CRUD
+  1. List: GET /api/admin/subscriptions?status= | GET /api/admin/products?status=
+  2. Create: POST /api/admin/subscriptions | POST /api/admin/products (validated body)
+  3. Update: PUT /api/admin/subscriptions/[id] | PUT /api/admin/products/[id]
+  4. Delete: DELETE admin routes (remove or deactivate per implementation)
+  5. All requireAdmin → 403 for receptionist
+
+FLOWS — STAFF READ (invoice wizard)
+  1. GET /api/catalog/subscriptions?q= → requireAuth, searchSubscriptions(q, activeOnly=true)
+  2. GET /api/catalog/products?q= → requireAuth, active products only
+  3. User selects item → wizard adds line with itemType, description, unitPrice from catalog
+  4. User may still add fully custom line items (no catalog id on InvoiceItem)
+
+CATALOG STATUS
+  ACTIVE → visible in /api/catalog/*
+  INACTIVE → hidden from wizard; still in admin list when filtered
+
+NOTES
+  - No foreign key from InvoiceItem to Subscription/AcademyProduct (price snapshot model).
+
+================================================================================
+DIAGRAM D9 — ACADEMY SETTINGS & BILLING DEFAULTS
+================================================================================
+DIAGRAM_ID: D9-settings
+TYPE: DFD (split read: all staff vs admin write)
+DESCRIPTION:
+  Singleton Settings record drives academy branding, GST defaults, bank/UPI, and
+  PDF appearance. Two API endpoints separate full settings (admin) from minimal
+  defaults needed during invoice creation (all authenticated staff).
+
+DATA STORE
+  - Settings (id = "default")
+
+FLOWS — BILLING DEFAULTS (invoice creation)
+  1. GET /api/settings/billing-defaults — requireAuth
+  2. SELECT gstEnabled, defaultCgstRate, defaultSgstRate
+  3. Invoice wizard seeds GST toggles/rates
+  4. POST /api/invoices may override; else getGstSettings() in API uses same row
+
+FLOWS — FULL SETTINGS (admin)
+  1. Settings page GET /api/settings — requireAdmin → full Settings JSON
+  2. Settings page PUT /api/settings — settingsSchema validation → upsert Settings
+  3. Fields include: academy identity, address, GST, bank details, UPI, logo/signature/
+     footer/header images, brandColor, termsAndConditions
+  4. Changes affect future PDF generation (D7) immediately
+
+FLOWS — CONSUMPTION WITHOUT ADMIN API
+  - Invoice POST: getGstSettings() internal read
+  - PDF route: full settings read inside PDF handler
+
+NOTES
+  - Receptionist cannot open /settings in nav; API returns 403 if called directly.
+
+================================================================================
+DIAGRAM D10 — ADMIN REVENUE, REPORTS & CSV EXPORT
+================================================================================
+DIAGRAM_ID: D10-admin-reporting
+TYPE: DFD (admin-only analytics plane)
+DESCRIPTION:
+  Financial reporting separated from receptionist UI. Revenue page uses dedicated
+  analytics APIs (tables + CSV, no charts). General Reports page supports revenue,
+  GST breakdown, and customer acquisition by period.
+
+ACTORS
+  - Administrator
+  - /reports/revenue (RevenueReportsPanel)
+  - /reports (Reports page)
+  - revenue-analytics.ts
+
+DATA SOURCE
+  - Invoice (active only) — primarily amountPaid for revenue; full row for GST report
+
+FLOWS — REVENUE DASHBOARD (/reports/revenue)
+  1. GET /api/admin/revenue/summary
+       → getTodayRevenue(), getWeekRevenue(), getMonthRevenue() → KPI numbers
+  2. GET /api/admin/revenue/transactions?recent=20 → latest payment rows
+  3. GET /api/admin/revenue?period=daily|weekly|monthly&from=&to=
+       → getRevenueAnalytics() → time-bucketed rows for table
+  4. GET /api/admin/revenue/transactions?date=YYYY-MM-DD → drill-down for one day
+  5. GET /api/admin/revenue/export?from=&to= (required)
+       → getExportRows() → rowsToCsv() → text/csv download
+       Columns: Invoice Number, Date, Customer Name, Amount, Payment Status,
+                Created By, Payment Method
+
+FLOWS — GENERAL REPORTS (/reports)
+  1. GET /api/reports?type=&period=&startDate=&endDate=
+  2. type=revenue:
+       - Invoices in date range → sum amountPaid → { total, rows }
+  3. type=gst:
+       - Aggregate subtotal, cgst, sgst, totalGst, grandTotal across invoices in range
+  4. type=customers:
+       - Customers where dateJoined in range + invoice counts
+  5. period: daily | weekly | monthly | custom (date-fns range helpers)
+
+ACCESS CONTROL
+  - All endpoints requireAdmin
+  - Receptionist has no nav entry; APIs return 403
+
+NOTES
+  - Revenue metrics use amountPaid (cash collected), not grandTotal, unless noted in GST report.
+  - No graph/chart dataflow; UI is numeric tables and CSV file download only.
+
+================================================================================
+DIAGRAM D11 — USER MANAGEMENT (ADMIN)
+================================================================================
+DIAGRAM_ID: D11-user-admin
+TYPE: Sequence / process diagram
+DESCRIPTION:
+  Administrators create, edit, disable, reset passwords, and delete staff accounts.
+  Username is the login identifier (unique, lowercased). Deletion guarded when user
+  created invoices or is last active admin.
+
+ACTORS
+  - Administrator
+  - User Management UI (/admin/users)
+  - APIs: /api/admin/users, /api/admin/users/[id]
+
+DATA STORES
+  - User (username, password hash, name, role, status, optional email)
+  - UserActivity
+  - Invoice.createdById → FK blocks user delete
+
+FLOWS — LIST & CREATE
+  1. GET /api/admin/users → listUsers() with activity metadata
+  2. POST /api/admin/users — createUserSchema, bcrypt hash password
+  3. Check username uniqueness → 409 if taken
+  4. createUserRecord in transaction + recordUserActivity(USER_CREATED)
+
+FLOWS — UPDATE / DISABLE / PASSWORD
+  1. PUT /api/admin/users/[id] — updateUserSchema
+  2. Guards: cannot disable own account; username uniqueness
+  3. Optional password hash update → recordUserActivity(PASSWORD_RESET) when password changes
+  4. Status change DISABLED/ACTIVE → USER_DISABLED / USER_ENABLED activities
+
+FLOWS — DELETE
+  1. DELETE /api/admin/users/[id]
+  2. Guards:
+       - Cannot delete self
+       - Cannot delete last active ADMIN
+       - Fails if Invoice rows reference createdById (DB constraint)
+  3. Hard delete user + cascade UserActivity
+  4. recordUserActivity(USER_DELETED) attributed to acting admin
+
+RELATION TO AUTH (D2)
+  - Disabled users rejected in authorize() before password check
+  - Login identifier is username only (not email)
+
+================================================================================
+DIAGRAM D12 — ACTIVITY & AUDIT LOGGING (CROSS-CUTTING)
+================================================================================
+DIAGRAM_ID: D12-activity-audit
+TYPE: Supporting DFD overlay (show triggers across domains)
+DESCRIPTION:
+  Secondary data flows that record who did what and customer-facing timeline events.
+  Not user-facing reports on their own; feed customer detail and optional admin views.
+
+DATA STORES
+  - UserActivity (userId, type, description, createdAt)
+  - CustomerActivity (customerId, type, description, createdAt)
+
+TRIGGERS → UserActivity
+  LOGIN              — successful credentials login (auth.ts)
+  INVOICE_CREATED    — POST /api/invoices success
+  INVOICE_DELETED    — DELETE /api/invoices/[id]
+  CUSTOMER_CREATED   — POST /api/customers
+  USER_CREATED       — POST /api/admin/users
+  USER_DELETED       — DELETE /api/admin/users/[id]
+  USER_DISABLED      — PUT user status → DISABLED
+  USER_ENABLED       — PUT user status → ACTIVE
+  PASSWORD_RESET     — PUT user with new password
+
+TRIGGERS → CustomerActivity
+  CUSTOMER_ADDED     — POST /api/customers OR new customer inside invoice txn
+  INVOICE_CREATED    — invoice linked to customer
+  PAYMENT_MADE       — invoice with amountPaid > 0
+  PACKAGE_PURCHASED  — invoice line itemType = coaching package constant
+
+READ PATHS
+  - GET /api/customers/[id] includes activities[] chronologically
+  - Admin user list may surface recent user activities via listUsers()
+
+NOTES
+  - Activities are append-only logs (no edit/delete flow in UI).
+  - Invoice duplicate does not duplicate activity entries automatically.
+
+================================================================================
+DIAGRAM GENERATION HINTS (for tools)
+================================================================================
+Suggested notation per diagram type:
+  - D1: boxes — Browser | Next.js App | PostgreSQL | Branding Files
+  - D2,D6,D7,D11: sequence arrows with numbered steps
+  - D3: swimlanes Admin | Receptionist | API Gateway | Database
+  - D4,D5,D8,D9,D10: Level-1 DFD circles/processes + data stores (cylinders)
+  - D12: overlay dashed arrows from primary flows to activity tables
+
+Entity relationship (for ER companion diagram, optional):
+  User 1—* Invoice (* createdById)
+  Customer 1—* Invoice (* customerId optional)
+  Invoice 1—* InvoiceItem
+  Customer 1—* CustomerActivity
+  User 1—* UserActivity
+  Subscription / AcademyProduct — no FK to InvoiceItem (snapshot only)
+
+End of dataflows.txt
+
+================================================================================
+EXTRA ADDITIONS — Supplemental DFDs (not in D1–D12)
+================================================================================
+These domains were added after the main document was written, or are cross-cutting
+layers worth a separate diagram. They do not replace D1–D12; reference them alongside.
+
+--------------------------------------------------------------------------------
+EXTRA E1 — Stock inventory & supplier purchase bills
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E1-stock-inventory
+TYPE: Process / sequence diagram (purchase logging + bill PDF)
+DESCRIPTION:
+  Track physical stock purchases (item, category, qty, cost, supplier, date).
+  Optional supplier bill PDF: upload to temp storage, attach on create, view/download
+  later. Separate numbering (StockSequence) from invoices. Both ADMIN and
+  RECEPTIONIST can use /stock; admin gets extra list filters (createdBy).
+
+ACTORS
+  - Staff User (Admin | Receptionist)
+  - Pages: /stock, /stock/[id]
+  - Stock entry form component
+
+DATA STORES
+  - StockEntry, StockSequence, StockActivity
+  - User (createdById)
+  - Filesystem: pending + finalized bill PDFs (src/lib/stock-storage.ts)
+
+APIS
+  GET/POST     /api/stock              — list (filtered) | create entry
+  GET          /api/stock/[id]         — detail + recent activities
+  GET          /api/stock/summary       — KPI aggregates (counts, costs, month)
+  GET          /api/stock/filters       — distinct categories, suppliers; creators (admin)
+  POST         /api/stock/upload        — multipart PDF → pending path + token
+  GET          /api/stock/[id]/bill     — stream PDF inline or attachment
+
+FLOWS — LIST
+  1. GET /api/stock?q=&category=&supplier=&from=&to=&createdBy= (admin only for createdBy)
+  2. buildStockWhere() → findMany StockEntry (max 500), include createdBy
+  3. Parallel GET /api/stock/summary for dashboard cards on stock page
+
+FLOWS — CREATE
+  1. Optional: POST /api/stock/upload { file } → savePendingStockBill(userId) → { billPdfUrl, billFileName }
+  2. POST /api/stock JSON — stockEntrySchema validation
+  3. Transaction: StockSequence upsert by purchase year → formatStockNumber → INSERT StockEntry
+  4. recordStockActivity(STOCK_CREATED) inside transaction
+  5. If billPdfUrl present: finalizeStockBill(pending → entry folder) → UPDATE StockEntry paths
+     (file move outside transaction to avoid pool timeout)
+  6. invalidateCachePrefix("/api/stock") on client
+
+FLOWS — DETAIL & BILL
+  1. GET /api/stock/[id] → include activities; recordStockActivity(STOCK_VIEWED)
+  2. User opens bill link → GET /api/stock/[id]/bill?disposition=inline|attachment
+  3. readStockBill(path) → PDF bytes; log BILL_VIEWED or BILL_DOWNLOADED (+ ip/userAgent when available)
+
+STOCK ACTIVITY TYPES
+  STOCK_CREATED | STOCK_VIEWED | BILL_VIEWED | BILL_DOWNLOADED
+
+NOTES
+  - No stock consumption/depletion model yet (purchase-only quantity on entry).
+  - Nav: "Stock Inventory" under Main for both roles (nav-config.ts).
+  - Middleware: /stock is a protected prefix (login required).
+
+--------------------------------------------------------------------------------
+EXTRA E2 — User profile & UI appearance preferences
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E2-profile-ui-preferences
+TYPE: DFD (read/write user-specific presentation settings)
+DESCRIPTION:
+  Extends auth identity with per-user font family/size stored on User row.
+  Profile page loads account fields; appearance settings PATCH preferences.
+  UiPreferencesProvider hydrates document CSS on app load (server + local cache).
+
+ACTORS
+  - Staff User
+  - Profile Page (/profile)
+  - AppearanceSettings component
+  - UiPreferencesProvider (root providers)
+
+DATA STORES
+  - User.uiFontFamily, User.uiFontSize (plus username, name, email, role)
+  - Browser localStorage: UI prefs cache (per userId), separate from theme key
+
+APIS
+  GET   /api/profile   — requireAuth; select profile fields; normalizeUiPreferences()
+  PATCH /api/profile   — uiPreferencesSchema; update own row only
+
+FLOWS
+  1. On authenticate: UiPreferencesProvider reads localStorage cache → apply to document
+  2. GET /api/profile → merge server prefs → cacheUiPreferences(userId) → CSS variables
+  3. Profile page: useCachedFetch("/api/profile") for display + AppearanceSettings seed
+  4. User changes font → PATCH /api/profile → invalidateCache("/api/profile") → apply + re-cache
+  5. Sign out: clearCachedUiPreferences(); revert DEFAULT_UI_PREFERENCES
+
+RELATION TO D2
+  - D2 covers login/session only; profile data is NOT in JWT — always fetched via /api/profile.
+
+--------------------------------------------------------------------------------
+EXTRA E3 — Middleware page-level role enforcement (supplements D3)
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E3-middleware-rbac
+TYPE: Security flow (page routes only; APIs unchanged)
+DESCRIPTION:
+  D3 described nav hiding + API requireAdmin. Middleware now also redirects
+  RECEPTIONIST away from admin UI paths before pages render.
+
+RULES (src/middleware.ts)
+  - Protected prefixes (login required): /dashboard, /customers, /invoices, /stock,
+    /reports, /admin, /settings, /profile
+  - Admin-only prefixes (receptionist → redirect /dashboard): /reports, /admin, /settings
+  - Logged-in user on /login → redirect /dashboard
+
+FLOWS
+  1. Request → NextAuth middleware → req.auth + req.auth.user.role
+  2. Unauthenticated + protected path → /login?callbackUrl=
+  3. RECEPTIONIST + admin-only prefix → 302 /dashboard
+  4. Otherwise → NextResponse.next()
+  5. API routes excluded from matcher — still rely on requireAdmin() (403, not redirect)
+
+NOTES
+  - Receptionist can still call admin APIs directly (curl); only UI paths are blocked.
+  - Stock (/stock) is shared — not in adminOnlyPrefixes.
+
+--------------------------------------------------------------------------------
+EXTRA E4 — Client-side API cache & stale-while-revalidate
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E4-client-fetch-cache
+TYPE: Supporting infrastructure DFD (browser-only, no server store)
+DESCRIPTION:
+  Many pages use useCachedFetch instead of raw fetch. In-memory Map caches JSON
+  responses (~120s TTL); mutations call invalidateCache / invalidateCachePrefix.
+
+COMPONENTS
+  - src/lib/client-cache.ts — getCached, setCached, fetchJsonCached, invalidate*
+  - src/lib/hooks/use-cached-fetch.ts — loading states, refetch, stale display
+
+TYPICAL FLOWS
+  1. Page mount → useCachedFetch(url) → cache hit? return stale + background refetch
+  2. Miss → fetch(url) → setCached → render
+  3. Mutation success → invalidateCache("/api/invoices") and/or invalidateCachePrefix("/api/customers")
+  4. Dependent pages refresh on next mount or explicit refetch()
+
+AFFECTED READ PATHS (examples)
+  /api/dashboard, /api/invoices, /api/customers?q=, /api/settings, /api/profile,
+  /api/stock, /api/stock/summary, /api/admin/users
+
+NOTES
+  - GlobalInvoiceSearch uses raw fetch (not useCachedFetch) — separate one-shot load.
+  - Diagram useful when explaining why UI updates lag until invalidation or TTL expiry.
+
+--------------------------------------------------------------------------------
+EXTRA E5 — Color theme (dark / light / system) — client-only
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E5-theme-toggle
+TYPE: Context diagram fragment (no backend)
+DESCRIPTION:
+  Dark mode is independent of /api/profile. next-themes + inline layout script
+  read/write localStorage key "mra-billing-theme" before hydration.
+
+FLOWS
+  1. layout.tsx inline script: read mra-billing-theme → set documentElement.dark class
+  2. ThemeProvider (providers.tsx) wraps app; storageKey mra-billing-theme
+  3. Header / SessionControlPill: setTheme(light|dark|system) → localStorage only
+  4. No Prisma / API involvement
+
+RELATION
+  - Pair with E2 on one "Personalization" sheet, or keep separate from E2 (font prefs are server-backed).
+
+--------------------------------------------------------------------------------
+EXTRA E6 — Customer list enrichment (supplements D5)
+--------------------------------------------------------------------------------
+DIAGRAM_ID: E6-customer-list-composite
+TYPE: DFD Level 1 (dual read, client merge)
+DESCRIPTION:
+  Customers page does not rely on GET /api/customers alone. It joins invoice data
+  client-side for quick filters (renewal due, pending payment, service type).
+
+FLOWS
+  1. useCachedFetch("/api/customers?q=") — list with invoice counts from server
+  2. useCachedFetch("/api/invoices") — full active invoice list (cached)
+  3. buildCustomerInvoiceIndex(invoices) + filterCustomers() in browser
+  4. On customer create/delete: invalidateCachePrefix("/api/customers") + invalidateCache("/api/invoices")
+
+NOTES
+  - Trade-off: extra payload vs. dedicated composite API; document for performance reviews.
+
+--------------------------------------------------------------------------------
+EXTRA INDEX (add to diagram set if needed)
+--------------------------------------------------------------------------------
+  E1  Stock inventory & supplier bills
+  E2  Profile & UI font preferences (API-backed)
+  E3  Middleware page RBAC (supplements D3)
+  E4  Client-side API response cache
+  E5  Color theme (localStorage only)
+  E6  Customer list + invoice join (supplements D5)
