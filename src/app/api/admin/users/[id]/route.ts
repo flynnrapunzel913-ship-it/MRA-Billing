@@ -6,6 +6,7 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { updateUserSchema, resetPasswordSchema } from "@/lib/validations";
 import { recordUserActivity } from "@/lib/user-activity";
 import {
+  bumpSessionVersion,
   listUsers,
   supportsUserStatus,
   updateUserRecord,
@@ -201,6 +202,7 @@ export async function PATCH(
         where: { id },
         data: { password: hashed },
       });
+      await bumpSessionVersion(id, tx);
       await recordUserActivity(
         tx,
         admin!.id!,

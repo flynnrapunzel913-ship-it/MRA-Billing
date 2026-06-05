@@ -1,7 +1,7 @@
 "use client";
 
 import { PrefetchLink } from "@/components/ui/prefetch-link";
-import { Eye, FileDown, FileText } from "lucide-react";
+import { Eye, FileDown, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -32,10 +32,12 @@ export function StockTable({
   rows,
   loading,
   showCreatedBy,
+  onDelete,
 }: {
   rows: StockListRow[];
   loading?: boolean;
   showCreatedBy?: boolean;
+  onDelete?: (row: StockListRow) => void;
 }) {
   if (loading) {
     return <TableSkeleton rows={6} cols={showCreatedBy ? 7 : 6} />;
@@ -105,6 +107,18 @@ export function StockTable({
                       >
                         <FileDown className="h-4 w-4" />
                       </a>
+                    </Button>
+                  )}
+                  {onDelete && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Delete stock entry"
+                      onClick={() => onDelete(row)}
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
                 </div>

@@ -5,6 +5,8 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { stockListInclude } from "@/lib/stock-queries";
 import { serializeStockForJson } from "@/lib/stock-utils";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
+import { normalizeCuid } from "@/lib/storage/ids";
+import { deleteStockBillStorage } from "@/lib/storage/stock-bills";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -42,5 +44,51 @@ export async function GET(request: NextRequest, context: RouteContext) {
     return NextResponse.json(serializeStockForJson(entry));
   } catch (error) {
     return apiErrorResponse(error, "Failed to load stock entry");
+  }
+}
+
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  try {
+    const { error, user } = await requireAuth();
+    if (error) return error;
+
+    const { id: rawId } = await context.params;
+    const id = normalizeCuid(rawId);
+    if (!id) {
+      return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
+    }
+
+    const entry = await prisma.stockEntry.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        stockNumber: true,
+        itemName: true,
+        billPdfUrl: true,
+      },
+    });
+
+    if (!entry) {
+      return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
+    }
+
+    const meta = getRequestMeta(request);
+
+    await prisma.$transaction(async (tx) => {
+      await recordStockActivity(tx, {
+        stockEntryId: entry.id,
+        userId: user!.id!,
+        type: "STOCK_DELETED",
+        description: `Deleted ${entry.stockNumber} — ${entry.itemName}`,
+        ...meta,
+      });
+      await tx.stockEntry.delete({ where: { id: entry.id } });
+    });
+
+    await deleteStockBillStorage(entry.id, entry.billPdfUrl);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    return apiErrorResponse(error, "Failed to delete stock entry");
   }
 }

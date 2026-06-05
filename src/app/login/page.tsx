@@ -40,7 +40,10 @@ function LoginForm() {
 
   useEffect(() => {
     const error = searchParams.get("error");
-    if (error === "session_invalid") {
+    const message = searchParams.get("message");
+    if (error === "account_disabled") {
+      toast.error(message ?? "Your account has been disabled by an administrator.");
+    } else if (error === "session_invalid") {
       toast.error("Your session has ended. Please sign in again.");
     }
   }, [searchParams]);
