@@ -15,6 +15,7 @@ import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { apiErrorResponse, prismaErrorMessage } from "@/lib/api-error";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { assertAccessibleCustomer } from "@/lib/invoices/access";
+import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 
 async function getGstSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
@@ -296,6 +297,19 @@ export async function POST(request: NextRequest) {
     }
 
     await recordUserActivity(prisma, user!.id!, "INVOICE_CREATED", invoiceNumber);
+
+    void logAuditEvent({
+      userId: user!.id,
+      username: user!.username,
+      action: AUDIT_ACTIONS.INVOICE_CREATED,
+      entityType: "INVOICE",
+      entityId: invoice.id,
+      details: {
+        invoiceNumber,
+        customerId: linkedCustomerId,
+        totalAmount: Number(invoice.grandTotal),
+      },
+    });
 
     return NextResponse.json(serializeInvoiceForJson(invoice), { status: 201 });
   } catch (error) {
