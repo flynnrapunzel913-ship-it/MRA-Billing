@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
+import { readApiResponse } from "@/lib/api-error";
+import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
 import { StockPageSkeleton } from "@/components/ui/skeletons";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
@@ -41,6 +45,8 @@ function hasActiveFilters(filters: StockFilterState) {
 
 export default function StockInventoryPage() {
   const [searchOpen, setSearchOpen] = useState(false);
+  const [deleteEntry, setDeleteEntry] = useState<StockListRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [filters, setFilters] = useState<StockFilterState>(defaultStockFilters);
   const debouncedQ = useDebouncedValue(filters.q, 150);
   const filtersActive = hasActiveFilters(filters);
@@ -59,6 +65,7 @@ export default function StockInventoryPage() {
     data: entries,
     isInitialLoading: listLoading,
     isRefreshing: listRefreshing,
+    refetch: refetchList,
   } = useCachedFetch<StockListRow[]>(listUrl);
 
   const {
@@ -77,6 +84,26 @@ export default function StockInventoryPage() {
   }
 
   const rows = entries ?? [];
+
+  const handleDelete = async () => {
+    if (!deleteEntry) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/stock/${deleteEntry.id}`, { method: "DELETE" });
+      const result = await readApiResponse(res, "Failed to delete stock entry");
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Stock entry deleted");
+      setDeleteEntry(null);
+      invalidateCachePrefix("/api/stock");
+      invalidateCache("/api/stock/summary");
+      void refetchList();
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 pb-8">
@@ -155,11 +182,43 @@ export default function StockInventoryPage() {
           rows={rows}
           loading={listLoading && rows.length === 0}
           showCreatedBy={!!isAdmin}
+          onDelete={(row) => setDeleteEntry(row)}
         />
         {listRefreshing && rows.length > 0 && (
           <p className="mt-3 text-center text-xs text-muted-foreground">Updating…</p>
         )}
       </div>
+
+      <Modal
+        open={!!deleteEntry}
+        onClose={() => setDeleteEntry(null)}
+        title="Delete stock entry"
+        description="This action cannot be undone."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setDeleteEntry(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={handleDelete}>
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Delete this stock entry?
+          <br />
+          This action cannot be undone.
+          {deleteEntry && (
+            <>
+              <br />
+              <strong className="text-foreground">
+                {deleteEntry.stockNumber} — {deleteEntry.itemName}
+              </strong>
+            </>
+          )}
+        </p>
+      </Modal>
     </div>
   );
 }

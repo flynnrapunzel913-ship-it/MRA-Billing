@@ -1,4 +1,4 @@
-import { mkdir, rename, writeFile, readFile, access } from "fs/promises";
+import { mkdir, rename, writeFile, readFile, access, rm } from "fs/promises";
 import path from "path";
 import { validatePdfUpload, UploadValidationError } from "@/lib/uploads/validate-pdf";
 import { PDF_UPLOAD_MAX_BYTES } from "@/lib/uploads/constants";
@@ -106,4 +106,27 @@ export async function readStockBill(relativeUrl: string) {
   const absolute = resolveStockBillPath(key);
   await access(absolute);
   return readFile(absolute);
+}
+
+/** Remove finalized bill directory for a stock entry (idempotent). */
+export async function deleteStockBillStorage(entryId: string, billPdfUrl?: string | null) {
+  const entryKey = normalizeCuid(entryId);
+  if (!entryKey) return;
+
+  try {
+    const dirPath = resolveStockBillPath(entryKey);
+    await rm(dirPath, { recursive: true, force: true });
+  } catch {
+    /* directory may not exist */
+  }
+
+  if (billPdfUrl?.trim()) {
+    try {
+      const key = assertStockBillStorageKey(billPdfUrl);
+      const absolute = resolveStockBillPath(key);
+      await rm(absolute, { force: true });
+    } catch {
+      /* invalid key or already removed */
+    }
+  }
 }

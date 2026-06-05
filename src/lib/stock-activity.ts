@@ -37,4 +37,5 @@ export const stockActivityTypeLabel: Record<StockActivityType, string> = {
   STOCK_VIEWED: "Stock Viewed",
   BILL_VIEWED: "Bill Viewed",
   BILL_DOWNLOADED: "Bill Downloaded",
+  STOCK_DELETED: "Stock Deleted",
 };

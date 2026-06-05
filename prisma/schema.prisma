@@ -42,6 +42,7 @@ enum StockActivityType {
   STOCK_VIEWED
   BILL_VIEWED
   BILL_DOWNLOADED
+  STOCK_DELETED
 }
 
 enum CustomerStatus {
@@ -75,7 +76,8 @@ model User {
   password     String
   name         String
   role         Role            @default(RECEPTIONIST)
-  status       UserStatus      @default(ACTIVE)
+  status         UserStatus      @default(ACTIVE)
+  sessionVersion Int             @default(0)
   uiFontFamily String          @default("sans")
   uiFontSize   String          @default("medium")
   createdAt    DateTime        @default(now())

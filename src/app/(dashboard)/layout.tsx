@@ -2,6 +2,7 @@ import { cache } from "react";
 import { redirect } from "next/navigation";
 import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth";
+import { ACCOUNT_DISABLED_MESSAGE } from "@/lib/auth/guards";
 import { isAccountActive } from "@/lib/auth/session";
 import { AdminDashboardShell } from "@/components/layout/admin-dashboard-shell";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
@@ -17,7 +18,9 @@ export default async function DashboardLayout({
   if (!session?.user?.id) redirect("/login");
   const active = await isAccountActive(session.user.id);
   if (!active) {
-    redirect("/login?error=session_invalid");
+    redirect(
+      `/login?error=account_disabled&message=${encodeURIComponent(ACCOUNT_DISABLED_MESSAGE)}`
+    );
   }
 
   if (session.user.role === Role.ADMIN) {
