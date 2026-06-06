@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
-import { savePendingStockBill, UploadValidationError } from "@/lib/storage/stock-bills";
+import { savePendingStockBill, UploadValidationError } from "@/lib/stock-storage";
 
 /**
  * Hardened PDF upload endpoint (stock bill pending files).
