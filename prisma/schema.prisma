@@ -42,6 +42,7 @@ enum StockActivityType {
   STOCK_VIEWED
   BILL_VIEWED
   BILL_DOWNLOADED
+  STOCK_DELETED
 }
 
 enum CustomerStatus {
@@ -75,7 +76,8 @@ model User {
   password     String
   name         String
   role         Role            @default(RECEPTIONIST)
-  status       UserStatus      @default(ACTIVE)
+  status         UserStatus      @default(ACTIVE)
+  sessionVersion Int             @default(0)
   uiFontFamily String          @default("sans")
   uiFontSize   String          @default("medium")
   createdAt    DateTime        @default(now())
@@ -84,6 +86,7 @@ model User {
   activities   UserActivity[]
   stockEntries StockEntry[]
   stockLogs    StockActivity[]
+  auditLogs    AuditLog[]
 }
 
 model UserActivity {
@@ -291,5 +294,24 @@ model StockActivity {
 
   @@index([stockEntryId])
   @@index([userId])
+  @@index([createdAt])
+}
+
+/// Central security and business audit trail (S2-01).
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  username   String?
+  action     String
+  entityType String?
+  entityId   String?
+  details    Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType, entityId])
   @@index([createdAt])
 }

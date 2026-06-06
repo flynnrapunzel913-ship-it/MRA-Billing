@@ -32,6 +32,7 @@ export function hasUserActivityDelegate(): boolean {
 }
 
 let userStatusSupported: boolean | undefined;
+let sessionVersionSupported: boolean | undefined;
 
 /** True when User.status column exists in DB and client supports it */
 export async function supportsUserStatus(): Promise<boolean> {
@@ -151,11 +152,27 @@ export async function updateUserRecord(
     ? { id: true, username: true, role: true, status: true, createdAt: true }
     : { id: true, username: true, role: true, createdAt: true };
 
+  const existing = await db.user.findUnique({
+    where: { id },
+    select: withStatus
+      ? { status: true, password: true }
+      : { password: true },
+  });
+
   const updated = await db.user.update({
     where: { id },
     data: updateData,
     select,
   });
+
+  const statusChanged =
+    withStatus &&
+    existing &&
+    "status" in existing &&
+    existing.status !== data.status;
+  if (statusChanged || data.password) {
+    await bumpSessionVersion(id, db);
+  }
 
   if (withStatus) {
     return updated as SafeUserListItem;
@@ -214,4 +231,34 @@ export async function listRecentUserActivity(take = 20) {
 
 export function isUserDisabled(user: { status?: string | null }): boolean {
   return user.status === "DISABLED";
+}
+
+/** True when User.sessionVersion column exists (Sprint 2 force-logout). */
+export async function supportsSessionVersion(): Promise<boolean> {
+  if (sessionVersionSupported !== undefined) return sessionVersionSupported;
+
+  try {
+    await prisma.user.findFirst({ select: { sessionVersion: true } });
+    sessionVersionSupported = true;
+  } catch (error) {
+    if (isUserSchemaDriftError(error)) {
+      sessionVersionSupported = false;
+    } else {
+      throw error;
+    }
+  }
+
+  return sessionVersionSupported;
+}
+
+/** Invalidates all existing JWTs for this user (disable, enable, password change). */
+export async function bumpSessionVersion(
+  userId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma
+) {
+  if (!(await supportsSessionVersion())) return;
+  await db.user.update({
+    where: { id: userId },
+    data: { sessionVersion: { increment: 1 } },
+  });
 }

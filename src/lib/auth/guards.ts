@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth/config";
 import { loadActiveAccount } from "@/lib/auth/session";
+import { supportsSessionVersion } from "@/lib/user-queries";
 import { logSecurityEvent } from "@/lib/security/security-log";
 
 export type SessionUser = {
@@ -11,15 +12,25 @@ export type SessionUser = {
   name?: string | null;
 };
 
+export const ACCOUNT_DISABLED_MESSAGE =
+  "Your account has been disabled by an administrator.";
+
 /** Standard 401 when session is missing, revoked, or user disabled. */
-export function unauthorizedResponse(message = "Unauthorized") {
+export function unauthorizedResponse(
+  message = "Unauthorized",
+  code: "SESSION_INVALID" | "ACCOUNT_DISABLED" = "SESSION_INVALID"
+) {
   return NextResponse.json(
-    { error: message, code: "SESSION_INVALID" },
+    { error: message, code },
     {
       status: 401,
       headers: { "X-Session-Invalid": "1" },
     }
   );
+}
+
+export function accountDisabledResponse() {
+  return unauthorizedResponse(ACCOUNT_DISABLED_MESSAGE, "ACCOUNT_DISABLED");
 }
 
 export function forbiddenResponse(message = "Forbidden") {
@@ -35,7 +46,13 @@ export async function getValidatedSessionUser(): Promise<SessionUser | null> {
   if (!session?.user?.id) return null;
 
   const account = await loadActiveAccount(session.user.id);
-  if (!account || account.disabled) return null;
+  if (!account) return null;
+  if (account.disabled) return null;
+
+  if (await supportsSessionVersion()) {
+    const jwtVersion = session.user.sessionVersion ?? 0;
+    if (jwtVersion !== account.sessionVersion) return null;
+  }
 
   return {
     id: account.id,
@@ -46,10 +63,31 @@ export async function getValidatedSessionUser(): Promise<SessionUser | null> {
 }
 
 export async function requireAuth() {
-  const user = await getValidatedSessionUser();
-  if (!user) {
+  const session = await auth();
+  if (!session?.user?.id) {
     return { error: unauthorizedResponse("Unauthorized or session expired"), user: null };
   }
+
+  const account = await loadActiveAccount(session.user.id);
+  if (!account) {
+    return { error: unauthorizedResponse("Unauthorized or session expired"), user: null };
+  }
+  if (account.disabled) {
+    return { error: accountDisabledResponse(), user: null };
+  }
+  if (await supportsSessionVersion()) {
+    const jwtVersion = session.user.sessionVersion ?? 0;
+    if (jwtVersion !== account.sessionVersion) {
+      return { error: unauthorizedResponse("Unauthorized or session expired"), user: null };
+    }
+  }
+
+  const user: SessionUser = {
+    id: account.id,
+    role: account.role,
+    username: account.username,
+    name: session.user.name,
+  };
   return { error: null, user };
 }
 
