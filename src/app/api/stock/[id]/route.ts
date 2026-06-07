@@ -7,6 +7,7 @@ import { serializeStockForJson } from "@/lib/stock-utils";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
 import { normalizeCuid } from "@/lib/storage/ids";
 import { deleteStockBillStorage } from "@/lib/storage/stock-bills";
+import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -86,6 +87,19 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     });
 
     await deleteStockBillStorage(entry.id, entry.billPdfUrl);
+
+    void logAuditEvent({
+      userId: user!.id,
+      username: user!.username,
+      action: AUDIT_ACTIONS.STOCK_DELETED,
+      entityType: "STOCK",
+      entityId: entry.id,
+      details: {
+        stockNumber: entry.stockNumber,
+        itemName: entry.itemName,
+        billPdfUrl: entry.billPdfUrl,
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

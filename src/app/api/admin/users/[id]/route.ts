@@ -11,6 +11,7 @@ import {
   supportsUserStatus,
   updateUserRecord,
 } from "@/lib/user-queries";
+import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 
 export async function GET(
   _request: NextRequest,
@@ -113,6 +114,25 @@ export async function PUT(
 
       return user;
     });
+
+    if (previousStatus !== data.status) {
+      void logAuditEvent({
+        userId: admin!.id,
+        username: admin!.username,
+        action:
+          data.status === "DISABLED"
+            ? AUDIT_ACTIONS.USER_DISABLED
+            : AUDIT_ACTIONS.USER_ENABLED,
+        entityType: "USER",
+        entityId: updated.id,
+        details: {
+          targetUsername: updated.username,
+          previousStatus,
+          newStatus: data.status,
+          role: updated.role,
+        },
+      });
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
