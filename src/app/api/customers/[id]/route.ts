@@ -99,7 +99,23 @@ export async function DELETE(
     if (error) return error;
 
     const { id } = await params;
-    await prisma.customer.delete({ where: { id } });
+
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      select: { id: true, deletedAt: true },
+    });
+
+    if (!customer || customer.deletedAt) {
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    await prisma.customer.update({
+      where: { id },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return apiErrorResponse(error, "Failed to delete customer");

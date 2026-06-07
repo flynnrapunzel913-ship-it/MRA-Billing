@@ -3,6 +3,7 @@ import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { toKpiNumber } from "@/lib/dashboard-kpis";
 import { getTodayRange } from "@/lib/stock-utils";
@@ -12,12 +13,15 @@ export async function GET() {
     const { error, user } = await requireAuth();
     if (error) return error;
 
-    const invoiceWhere = await getActiveInvoiceWhere();
+    const [invoiceWhere, customerWhere] = await Promise.all([
+      getActiveInvoiceWhere(),
+      getActiveCustomerWhere(),
+    ]);
     const { start: todayStart, end: todayEnd } = getTodayRange();
 
     if (user!.role === Role.RECEPTIONIST) {
       const [activeCustomers, invoicesToday, pendingPayments, recentInvoices] = await Promise.all([
-        prisma.customer.count({ where: { status: "ACTIVE" } }),
+        prisma.customer.count({ where: { status: "ACTIVE", ...customerWhere } }),
         prisma.invoice.count({
           where: {
             ...invoiceWhere,
@@ -55,7 +59,7 @@ export async function GET() {
 
     const [invoiceCount, activeStudents, pendingPayments, recentInvoices] = await Promise.all([
       prisma.invoice.count({ where: invoiceWhere }),
-      prisma.customer.count({ where: { status: "ACTIVE" } }),
+      prisma.customer.count({ where: { status: "ACTIVE", ...customerWhere } }),
       prisma.invoice.count({
         where: {
           ...invoiceWhere,

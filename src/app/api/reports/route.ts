@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import {
   startOfDay,
@@ -42,7 +43,10 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const { start, end } = getDateRange(period, startDate, endDate);
-    const invoiceWhere = await getActiveInvoiceWhere();
+    const [invoiceWhere, customerWhere] = await Promise.all([
+      getActiveInvoiceWhere(),
+      getActiveCustomerWhere(),
+    ]);
 
     if (type === "revenue") {
       const invoices = await prisma.invoice.findMany({
@@ -76,7 +80,7 @@ export async function GET(request: NextRequest) {
 
     if (type === "customers") {
       const customers = await prisma.customer.findMany({
-        where: { dateJoined: { gte: start, lte: end } },
+        where: { dateJoined: { gte: start, lte: end }, ...customerWhere },
         include: { _count: { select: { invoices: true } } },
         orderBy: { dateJoined: "desc" },
       });

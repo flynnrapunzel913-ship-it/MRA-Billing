@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere, isSchemaDriftError } from "@/lib/invoice-filters";
 import type { Prisma } from "@prisma/client";
 
@@ -9,9 +10,12 @@ export async function listCustomersWithInvoiceCounts(
   where: CustomerListWhere,
   options?: { take?: number }
 ) {
-  const invoiceWhere = await getActiveInvoiceWhere();
+  const [invoiceWhere, customerWhere] = await Promise.all([
+    getActiveInvoiceWhere(),
+    getActiveCustomerWhere(),
+  ]);
   const baseArgs = {
-    where,
+    where: { AND: [where, customerWhere] },
     orderBy: { createdAt: "desc" as const },
     ...(options?.take !== undefined ? { take: options.take } : {}),
   };
@@ -31,16 +35,20 @@ export async function listCustomersWithInvoiceCounts(
 
 /** Load customer profile; omits activities if CRM migration is pending. */
 export async function getCustomerWithDetails(id: string) {
-  const invoiceWhere = await getActiveInvoiceWhere();
+  const [invoiceWhere, customerWhere] = await Promise.all([
+    getActiveInvoiceWhere(),
+    getActiveCustomerWhere(),
+  ]);
   const invoiceInclude = {
     where: invoiceWhere,
     orderBy: { invoiceDate: "desc" as const },
     include: { items: true },
   };
+  const detailWhere = { id, ...customerWhere };
 
   try {
-    return await prisma.customer.findUnique({
-      where: { id },
+    return await prisma.customer.findFirst({
+      where: detailWhere,
       include: {
         invoices: invoiceInclude,
         activities: { orderBy: { createdAt: "desc" as const } },
@@ -53,8 +61,8 @@ export async function getCustomerWithDetails(id: string) {
       "[getCustomerWithDetails] CRM tables missing — run: npx prisma migrate deploy"
     );
 
-    return prisma.customer.findUnique({
-      where: { id },
+    return prisma.customer.findFirst({
+      where: detailWhere,
       include: { invoices: invoiceInclude },
     });
   }
