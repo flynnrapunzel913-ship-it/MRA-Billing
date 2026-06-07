@@ -1,6 +1,6 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,12 +18,16 @@ import {
   type InvoiceIndexEntry,
 } from "@/lib/customer-list-utils";
 
+export type CustomersTableView = "active" | "deleted";
+
 interface CustomersTableProps {
   customers: CustomerListRow[];
   invoiceIndex: Map<string, InvoiceIndexEntry>;
   onViewDetails: (customer: CustomerListRow) => void;
   isAdmin?: boolean;
+  view?: CustomersTableView;
   onDelete?: (customer: CustomerListRow) => void;
+  onRestore?: (customer: CustomerListRow) => void;
 }
 
 export function CustomersTable({
@@ -31,8 +35,11 @@ export function CustomersTable({
   invoiceIndex,
   onViewDetails,
   isAdmin = false,
+  view = "active",
   onDelete,
+  onRestore,
 }: CustomersTableProps) {
+  const isDeletedView = view === "deleted";
   return (
     <div className="glass-panel overflow-hidden rounded-[20px]">
       <Table>
@@ -54,7 +61,9 @@ export function CustomersTable({
         </TableHeader>
         <TableBody>
           {customers.map((customer, index) => {
-            const display = getDisplayStatus(customer, invoiceIndex.get(customer.id));
+            const display = isDeletedView
+              ? { label: "Deleted", variant: "secondary" as const }
+              : getDisplayStatus(customer, invoiceIndex.get(customer.id));
             return (
               <TableRow
                 key={customer.id}
@@ -71,16 +80,18 @@ export function CustomersTable({
                 </TableCell>
                 <TableCell className="px-4 py-3 text-right">
                   <div className="flex justify-end gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => onViewDetails(customer)}
-                    >
-                      View Details
-                    </Button>
-                    {isAdmin && onDelete && (
+                    {!isDeletedView && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => onViewDetails(customer)}
+                      >
+                        View Details
+                      </Button>
+                    )}
+                    {isAdmin && !isDeletedView && onDelete && (
                       <Button
                         type="button"
                         variant="outline"
@@ -90,6 +101,18 @@ export function CustomersTable({
                         aria-label={`Delete ${customer.name}`}
                       >
                         <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isAdmin && isDeletedView && onRestore && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => onRestore(customer)}
+                      >
+                        <RotateCcw className="mr-1.5 h-4 w-4" />
+                        Restore
                       </Button>
                     )}
                   </div>

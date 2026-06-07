@@ -1,18 +1,21 @@
 import { prisma } from "@/lib/prisma";
-import { getActiveCustomerWhere } from "@/lib/customer-filters";
+import { getActiveCustomerWhere, getDeletedCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere, isSchemaDriftError } from "@/lib/invoice-filters";
 import type { Prisma } from "@prisma/client";
 
 type CustomerListWhere = Prisma.CustomerWhereInput;
 
+export type CustomerListView = "active" | "deleted";
+
 /** List customers with active (non-deleted) invoice counts. */
 export async function listCustomersWithInvoiceCounts(
   where: CustomerListWhere,
-  options?: { take?: number }
+  options?: { take?: number; view?: CustomerListView }
 ) {
+  const view = options?.view ?? "active";
   const [invoiceWhere, customerWhere] = await Promise.all([
     getActiveInvoiceWhere(),
-    getActiveCustomerWhere(),
+    view === "deleted" ? getDeletedCustomerWhere() : getActiveCustomerWhere(),
   ]);
   const baseArgs = {
     where: { AND: [where, customerWhere] },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
@@ -8,12 +9,17 @@ import { listCustomersWithInvoiceCounts } from "@/lib/customer-queries";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error } = await requireAuth();
+    const { error, user } = await requireAuth();
     if (error) return error;
 
     const searchParams = request.nextUrl.searchParams;
     const q = searchParams.get("q") || "";
     const status = searchParams.get("status");
+    const view = searchParams.get("view") === "deleted" ? "deleted" : "active";
+
+    if (view === "deleted" && user!.role !== Role.ADMIN) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const customers = await listCustomersWithInvoiceCounts(
       {
@@ -30,7 +36,7 @@ export async function GET(request: NextRequest) {
           status ? { status: status as "ACTIVE" | "INACTIVE" | "SUSPENDED" } : {},
         ],
       },
-      { take: q ? 20 : undefined }
+      { take: q ? 20 : undefined, view }
     );
 
     return NextResponse.json(customers);

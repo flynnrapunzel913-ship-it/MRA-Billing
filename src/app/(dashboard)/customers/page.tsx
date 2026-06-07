@@ -24,6 +24,8 @@ import {
   type ServiceFilter,
 } from "@/lib/customer-list-utils";
 
+type CustomerDirectoryView = "active" | "deleted";
+
 const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
   { id: "all", label: "All Customers" },
   { id: "active", label: "Active" },
@@ -33,6 +35,7 @@ const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
 ];
 
 export default function CustomersPage() {
+  const [directoryView, setDirectoryView] = useState<CustomerDirectoryView>("active");
   const [search, setSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
@@ -40,12 +43,19 @@ export default function CustomersPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editCustomer, setEditCustomer] = useState<CustomerListRow | null>(null);
   const [deleteCustomer, setDeleteCustomer] = useState<CustomerListRow | null>(null);
+  const [restoreCustomer, setRestoreCustomer] = useState<CustomerListRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const debouncedSearch = useDebouncedValue(search, 200);
 
+  const customersListUrl =
+    directoryView === "deleted"
+      ? "/api/customers?q=&view=deleted"
+      : "/api/customers?q=&view=active";
+
   const { data: customers, isInitialLoading, isRefreshing, refetch } = useCachedFetch<CustomerListRow[]>(
-    "/api/customers?q=",
+    customersListUrl,
     { pollIntervalMs: 10_000, refetchOnFocus: true, ttlMs: 10_000 }
   );
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
@@ -61,16 +71,25 @@ export default function CustomersPage() {
     [invoices]
   );
 
-  const filtered = useMemo(
-    () =>
-      filterCustomers(customers ?? [], {
-        search: debouncedSearch,
-        quickFilter,
-        serviceFilter,
-        invoiceIndex,
-      }),
-    [customers, debouncedSearch, quickFilter, serviceFilter, invoiceIndex]
-  );
+  const filtered = useMemo(() => {
+    const rows = customers ?? [];
+    if (directoryView === "deleted") {
+      const q = debouncedSearch.trim().toLowerCase();
+      if (!q) return rows;
+      return rows.filter(
+        (customer) =>
+          customer.name.toLowerCase().includes(q) ||
+          (customer.mobile ?? "").includes(q) ||
+          customer.membershipId.toLowerCase().includes(q)
+      );
+    }
+    return filterCustomers(rows, {
+      search: debouncedSearch,
+      quickFilter,
+      serviceFilter,
+      invoiceIndex,
+    });
+  }, [customers, debouncedSearch, quickFilter, serviceFilter, invoiceIndex, directoryView]);
 
   const handleCreated = () => {
     setFormOpen(false);
@@ -107,6 +126,28 @@ export default function CustomersPage() {
     }
   };
 
+  const handleRestore = async () => {
+    if (!restoreCustomer) return;
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/customers/${restoreCustomer.id}/restore`, {
+        method: "POST",
+      });
+      const result = await readApiResponse(res, "Failed to restore customer");
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Customer restored");
+      setRestoreCustomer(null);
+      invalidateCachePrefix("/api/customers");
+      invalidateCache("/api/invoices");
+      void refetch();
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   if (isInitialLoading && !customers?.length) {
     return <ListPageSkeleton />;
   }
@@ -123,15 +164,53 @@ export default function CustomersPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button size="lg" className="shrink-0" onClick={() => {
-          setEditCustomer(null);
-          setFormOpen(true);
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Customer
-        </Button>
+        {directoryView === "active" && (
+          <Button
+            size="lg"
+            className="shrink-0"
+            onClick={() => {
+              setEditCustomer(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Customer
+          </Button>
+        )}
       </div>
 
+      {isAdmin && (
+        <div className="flex justify-center">
+          <div className="inline-flex rounded-full border border-border/60 bg-card/40 p-1">
+            <button
+              type="button"
+              onClick={() => setDirectoryView("active")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-xs font-semibold transition-all",
+                directoryView === "active"
+                  ? "nav-pill-active"
+                  : "text-foreground/80 hover:bg-muted/40"
+              )}
+            >
+              Active Customers
+            </button>
+            <button
+              type="button"
+              onClick={() => setDirectoryView("deleted")}
+              className={cn(
+                "rounded-full px-4 py-1.5 text-xs font-semibold transition-all",
+                directoryView === "deleted"
+                  ? "nav-pill-active"
+                  : "text-foreground/80 hover:bg-muted/40"
+              )}
+            >
+              Deleted Customers
+            </button>
+          </div>
+        </div>
+      )}
+
+      {directoryView === "active" && (
       <div className="flex flex-col items-center gap-3 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
         <div className="flex flex-wrap justify-center gap-2">
           {QUICK_FILTERS.map((pill) => (
@@ -153,15 +232,21 @@ export default function CustomersPage() {
 
         <ServiceFilterSelect value={serviceFilter} onChange={setServiceFilter} />
       </div>
+      )}
 
       <p className="text-center text-xs text-muted-foreground">
         {filtered.length} customer{filtered.length === 1 ? "" : "s"}
+        {directoryView === "deleted" ? " deleted" : ""}
         {isRefreshing ? " · updating…" : ""}
       </p>
 
       {filtered.length === 0 ? (
         <div className="glass-panel rounded-[20px] px-6 py-16 text-center">
-          <p className="text-sm font-medium text-foreground">No customers match your search.</p>
+          <p className="text-sm font-medium text-foreground">
+            {directoryView === "deleted"
+              ? "No deleted customers match your search."
+              : "No customers match your search."}
+          </p>
         </div>
       ) : (
         <CustomersTable
@@ -169,7 +254,9 @@ export default function CustomersPage() {
           invoiceIndex={invoiceIndex}
           onViewDetails={setSelected}
           isAdmin={isAdmin}
+          view={directoryView}
           onDelete={(customer) => setDeleteCustomer(customer)}
+          onRestore={(customer) => setRestoreCustomer(customer)}
         />
       )}
 
@@ -217,6 +304,27 @@ export default function CustomersPage() {
       >
         <p className="text-sm text-muted-foreground">
           Delete <strong>{deleteCustomer?.name}</strong> from customers?
+        </p>
+      </Modal>
+
+      <Modal
+        open={!!restoreCustomer}
+        onClose={() => setRestoreCustomer(null)}
+        title="Restore Customer"
+        description="This customer will reappear in the active directory."
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setRestoreCustomer(null)}>
+              Cancel
+            </Button>
+            <Button disabled={restoring} onClick={handleRestore}>
+              {restoring ? "Restoring…" : "Restore"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          Restore <strong>{restoreCustomer?.name}</strong> to active customers?
         </p>
       </Modal>
     </div>

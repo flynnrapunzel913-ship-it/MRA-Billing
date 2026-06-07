@@ -36,6 +36,15 @@ export async function getActiveCustomerWhere(): Promise<Prisma.CustomerWhereInpu
   return cachedActiveCustomerWhere;
 }
 
+/** Returns `{ deletedAt: { not: null } }` when soft-delete is available, else `{}`. */
+export async function getDeletedCustomerWhere(): Promise<Prisma.CustomerWhereInput> {
+  const activeWhere = await getActiveCustomerWhere();
+  if (Object.keys(activeWhere).length === 0) {
+    return {};
+  }
+  return { deletedAt: { not: null } };
+}
+
 /** @deprecated Use getActiveCustomerWhere() */
 export const activeCustomerWhere = { deletedAt: null } as const;
 
