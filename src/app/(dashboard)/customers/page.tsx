@@ -45,7 +45,8 @@ export default function CustomersPage() {
   const debouncedSearch = useDebouncedValue(search, 200);
 
   const { data: customers, isInitialLoading, isRefreshing, refetch } = useCachedFetch<CustomerListRow[]>(
-    "/api/customers?q="
+    "/api/customers?q=",
+    { pollIntervalMs: 10_000, refetchOnFocus: true, ttlMs: 10_000 }
   );
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
     "/api/invoices"

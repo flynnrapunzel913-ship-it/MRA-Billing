@@ -19,8 +19,11 @@ export const quickCustomerSchema = z.object({
   name: z.string().min(2, "Customer name is required"),
   mobile: z
     .string()
-    .min(10, "Mobile number is required")
-    .max(15, "Enter a valid mobile number"),
+    .min(1, "Mobile number is required")
+    .refine(
+      (val) => /^\d{10}$/.test(val.replace(/\D/g, "")),
+      "Enter a 10-digit mobile number"
+    ),
 });
 
 export const customerSchema = quickCustomerSchema.extend({

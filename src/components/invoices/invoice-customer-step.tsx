@@ -9,10 +9,11 @@ import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { customerToSearchResult, type CustomerSearchResult } from "@/lib/customer-search";
 import { readApiResponse } from "@/lib/api-error";
 import { invalidateCachePrefix } from "@/lib/client-cache";
+import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { useInvoiceStore } from "@/stores/invoice-store";
 
 function normalizeMobile(value: string) {
-  return value.replace(/\D/g, "");
+  return sanitizeMobileInput(value);
 }
 
 function formatMobileDisplay(digits: string) {
@@ -155,9 +156,11 @@ export function InvoiceCustomerStep() {
           <Input
             id="invoice-customer-mobile"
             className="h-11 text-base"
-            inputMode="tel"
+            inputMode="numeric"
+            autoComplete="tel"
             placeholder="10-digit mobile"
             value={customerMobile}
+            maxLength={12}
             onChange={(e) => handleMobileChange(e.target.value)}
           />
           {isExisting ? (

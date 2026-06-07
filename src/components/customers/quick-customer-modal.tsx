@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
 import { invalidateCachePrefix } from "@/lib/client-cache";
+import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { customerToSearchResult, type CustomerSearchResult } from "@/lib/customer-search";
 
 interface QuickCustomerModalProps {
@@ -43,7 +44,7 @@ export function QuickCustomerModal({
       toast.error("Enter customer name");
       return;
     }
-    const mobileDigits = mobile.replace(/\D/g, "");
+    const mobileDigits = sanitizeMobileInput(mobile);
     if (mobileDigits.length < 10) {
       toast.error("Enter a valid mobile number");
       return;
@@ -120,9 +121,11 @@ export function QuickCustomerModal({
           <Input
             id="qc-mobile"
             className="h-11"
-            inputMode="tel"
+            inputMode="numeric"
+            autoComplete="tel"
             value={mobile}
-            onChange={(e) => setMobile(e.target.value)}
+            maxLength={10}
+            onChange={(e) => setMobile(sanitizeMobileInput(e.target.value))}
             placeholder="10-digit mobile"
           />
         </div>

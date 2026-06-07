@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { quickCustomerSchema, type QuickCustomerInput } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
+import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { toast } from "sonner";
 
 interface CustomerFormDialogProps {
@@ -26,6 +27,7 @@ export function CustomerFormDialog({
 }: CustomerFormDialogProps) {
   const {
     register,
+    control,
     handleSubmit,
     reset,
     formState: { errors, isSubmitting },
@@ -52,7 +54,7 @@ export function CustomerFormDialog({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...data,
-        mobile: data.mobile.replace(/\D/g, ""),
+        mobile: sanitizeMobileInput(data.mobile),
         status: initialData?.status || "ACTIVE",
       }),
     });
@@ -96,7 +98,21 @@ export function CustomerFormDialog({
         </div>
         <div className="space-y-2">
           <Label>Mobile Number *</Label>
-          <Input {...register("mobile")} inputMode="tel" placeholder="10-digit mobile" className="h-11" />
+          <Controller
+            name="mobile"
+            control={control}
+            render={({ field }) => (
+              <Input
+                {...field}
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="10-digit mobile"
+                className="h-11"
+                maxLength={10}
+                onChange={(e) => field.onChange(sanitizeMobileInput(e.target.value))}
+              />
+            )}
+          />
           {errors.mobile && (
             <p className="text-sm text-destructive">{errors.mobile.message}</p>
           )}
