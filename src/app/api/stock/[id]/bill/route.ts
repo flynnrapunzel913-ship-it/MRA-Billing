@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { readStockBill } from "@/lib/stock-storage";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
+import { getActiveStockWhere } from "@/lib/stock-filters";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -13,12 +14,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (error) return error;
 
     const { id } = await context.params;
-    const entry = await prisma.stockEntry.findUnique({
-      where: { id },
+    const stockWhere = await getActiveStockWhere();
+    const entry = await prisma.stockEntry.findFirst({
+      where: { id, ...stockWhere },
       select: { id: true, stockNumber: true, billPdfUrl: true, billFileName: true },
     });
 
-    if (!entry?.billPdfUrl) {
+    if (!entry) {
+      return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
+    }
+
+    if (!entry.billPdfUrl) {
       return NextResponse.json({ error: "No bill PDF uploaded for this entry" }, { status: 404 });
     }
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { Role } from "@prisma/client";
+import { getActiveStockWhere } from "@/lib/stock-filters";
 
 /** Distinct filter options for admin stock listing */
 export async function GET() {
@@ -10,13 +11,17 @@ export async function GET() {
     const { error, user } = await requireAuth();
     if (error) return error;
 
+    const stockWhere = await getActiveStockWhere();
+
     const [categories, suppliers, creators] = await Promise.all([
       prisma.stockEntry.findMany({
+        where: stockWhere,
         distinct: ["category"],
         select: { category: true },
         orderBy: { category: "asc" },
       }),
       prisma.stockEntry.findMany({
+        where: stockWhere,
         distinct: ["supplierName"],
         select: { supplierName: true },
         orderBy: { supplierName: "asc" },
@@ -24,7 +29,7 @@ export async function GET() {
       user!.role === Role.ADMIN
         ? prisma.user.findMany({
             where: {
-              stockEntries: { some: {} },
+              stockEntries: { some: stockWhere },
             },
             select: { id: true, username: true, name: true },
             orderBy: { username: "asc" },

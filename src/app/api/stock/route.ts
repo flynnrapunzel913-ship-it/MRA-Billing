@@ -8,16 +8,20 @@ import { buildStockWhere, stockListInclude } from "@/lib/stock-queries";
 import { formatStockNumber, serializeStockForJson } from "@/lib/stock-utils";
 import { finalizeStockBill } from "@/lib/stock-storage";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
+import { getActiveStockWhere } from "@/lib/stock-filters";
 
 export async function GET(request: NextRequest) {
   try {
     const { error, user } = await requireAuth();
     if (error) return error;
 
-    const where = buildStockWhere(request.nextUrl.searchParams, user!.role!);
+    const [where, stockWhere] = await Promise.all([
+      Promise.resolve(buildStockWhere(request.nextUrl.searchParams, user!.role!)),
+      getActiveStockWhere(),
+    ]);
 
     const entries = await prisma.stockEntry.findMany({
-      where,
+      where: { AND: [where, stockWhere] },
       include: stockListInclude,
       orderBy: { purchaseDate: "desc" },
       take: 500,

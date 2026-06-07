@@ -6,8 +6,8 @@ import { stockListInclude } from "@/lib/stock-queries";
 import { serializeStockForJson } from "@/lib/stock-utils";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
 import { normalizeCuid } from "@/lib/storage/ids";
-import { deleteStockBillStorage } from "@/lib/storage/stock-bills";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
+import { getActiveStockWhere } from "@/lib/stock-filters";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -17,8 +17,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (error) return error;
 
     const { id } = await context.params;
-    const entry = await prisma.stockEntry.findUnique({
-      where: { id },
+    const stockWhere = await getActiveStockWhere();
+    const entry = await prisma.stockEntry.findFirst({
+      where: { id, ...stockWhere },
       include: {
         ...stockListInclude,
         activities: {
@@ -66,10 +67,11 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         stockNumber: true,
         itemName: true,
         billPdfUrl: true,
+        deletedAt: true,
       },
     });
 
-    if (!entry) {
+    if (!entry || entry.deletedAt) {
       return NextResponse.json({ error: "Stock entry not found" }, { status: 404 });
     }
 
@@ -83,10 +85,13 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         description: `Deleted ${entry.stockNumber} — ${entry.itemName}`,
         ...meta,
       });
-      await tx.stockEntry.delete({ where: { id: entry.id } });
+      await tx.stockEntry.update({
+        where: { id: entry.id },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
     });
-
-    await deleteStockBillStorage(entry.id, entry.billPdfUrl);
 
     void logAuditEvent({
       userId: user!.id,
