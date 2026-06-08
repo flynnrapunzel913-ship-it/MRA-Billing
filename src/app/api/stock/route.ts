@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
@@ -8,16 +8,23 @@ import { buildStockWhere, stockListInclude } from "@/lib/stock-queries";
 import { formatStockNumber, serializeStockForJson } from "@/lib/stock-utils";
 import { finalizeStockBill } from "@/lib/stock-storage";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
-import { getActiveStockWhere } from "@/lib/stock-filters";
+import { getActiveStockWhere, getDeletedStockWhere } from "@/lib/stock-filters";
 
 export async function GET(request: NextRequest) {
   try {
     const { error, user } = await requireAuth();
     if (error) return error;
 
+    const searchParams = request.nextUrl.searchParams;
+    const view = searchParams.get("view") === "deleted" ? "deleted" : "active";
+
+    if (view === "deleted" && user!.role !== Role.ADMIN) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const [where, stockWhere] = await Promise.all([
-      Promise.resolve(buildStockWhere(request.nextUrl.searchParams, user!.role!)),
-      getActiveStockWhere(),
+      Promise.resolve(buildStockWhere(searchParams, user!.role!)),
+      view === "deleted" ? getDeletedStockWhere() : getActiveStockWhere(),
     ]);
 
     const entries = await prisma.stockEntry.findMany({

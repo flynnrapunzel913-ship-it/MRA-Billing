@@ -1,7 +1,7 @@
 "use client";
 
 import { PrefetchLink } from "@/components/ui/prefetch-link";
-import { Eye, FileDown, FileText, Trash2 } from "lucide-react";
+import { Eye, FileDown, FileText, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -28,17 +28,36 @@ export interface StockListRow {
   createdBy?: { username: string; name: string };
 }
 
+export type StockTableView = "active" | "deleted";
+
 export function StockTable({
   rows,
   loading,
   showCreatedBy,
+  view = "active",
+  selectable = false,
+  selectedIds,
+  allSelected = false,
+  onToggleSelect,
+  onToggleSelectAll,
   onDelete,
+  onRestore,
+  onPurge,
 }: {
   rows: StockListRow[];
   loading?: boolean;
   showCreatedBy?: boolean;
+  view?: StockTableView;
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  allSelected?: boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleSelectAll?: () => void;
   onDelete?: (row: StockListRow) => void;
+  onRestore?: (row: StockListRow) => void;
+  onPurge?: (row: StockListRow) => void;
 }) {
+  const isDeletedView = view === "deleted";
   if (loading) {
     return <TableSkeleton rows={6} cols={showCreatedBy ? 7 : 6} />;
   }
@@ -46,7 +65,9 @@ export function StockTable({
   if (rows.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-muted-foreground">
-        No stock entries match your filters.
+        {isDeletedView
+          ? "No deleted stock entries match your filters."
+          : "No stock entries match your filters."}
       </p>
     );
   }
@@ -56,6 +77,17 @@ export function StockTable({
       <Table>
         <TableHeader>
           <TableRow>
+            {selectable && (
+              <TableHead className="w-10">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-border accent-primary"
+                  checked={allSelected}
+                  onChange={onToggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
+            )}
             <TableHead>Stock No</TableHead>
             <TableHead>Item Name</TableHead>
             <TableHead>Category</TableHead>
@@ -71,6 +103,17 @@ export function StockTable({
         <TableBody>
           {rows.map((row) => (
             <TableRow key={row.id} className="glass-row border-0">
+              {selectable && (
+                <TableCell>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border accent-primary"
+                    checked={selectedIds?.has(row.id) ?? false}
+                    onChange={() => onToggleSelect?.(row.id)}
+                    aria-label={`Select ${row.stockNumber}`}
+                  />
+                </TableCell>
+              )}
               <TableCell className="font-mono text-xs font-semibold">{row.stockNumber}</TableCell>
               <TableCell className="font-medium">{row.itemName}</TableCell>
               <TableCell>{row.category}</TableCell>
@@ -109,7 +152,7 @@ export function StockTable({
                       </a>
                     </Button>
                   )}
-                  {onDelete && (
+                  {!isDeletedView && onDelete && (
                     <Button
                       type="button"
                       variant="destructive"
@@ -119,6 +162,32 @@ export function StockTable({
                       onClick={() => onDelete(row)}
                     >
                       <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {isDeletedView && onRestore && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      title="Restore stock entry"
+                      onClick={() => onRestore(row)}
+                    >
+                      <RotateCcw className="mr-1.5 h-4 w-4" />
+                      Restore
+                    </Button>
+                  )}
+                  {isDeletedView && onPurge && (
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="h-8"
+                      title="Delete permanently"
+                      onClick={() => onPurge(row)}
+                    >
+                      <Trash2 className="mr-1.5 h-4 w-4" />
+                      Delete Permanently
                     </Button>
                   )}
                 </div>

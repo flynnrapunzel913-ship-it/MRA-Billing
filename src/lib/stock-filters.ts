@@ -36,6 +36,15 @@ export async function getActiveStockWhere(): Promise<Prisma.StockEntryWhereInput
   return cachedActiveStockWhere;
 }
 
+/** Returns `{ deletedAt: { not: null } }` when soft-delete is available, else `{}`. */
+export async function getDeletedStockWhere(): Promise<Prisma.StockEntryWhereInput> {
+  const activeWhere = await getActiveStockWhere();
+  if (Object.keys(activeWhere).length === 0) {
+    return {};
+  }
+  return { deletedAt: { not: null } };
+}
+
 /** @deprecated Use getActiveStockWhere() */
 export const activeStockWhere = { deletedAt: null } as const;
 
