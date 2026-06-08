@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
 import {
@@ -11,11 +11,12 @@ import { generateMembershipId } from "@/lib/utils";
 import { serializeInvoiceForJson } from "@/lib/serialize-prisma";
 import { recordCustomerActivity } from "@/lib/customer-activity";
 import { recordUserActivity } from "@/lib/user-activity";
-import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { getActiveInvoiceWhere, getDeletedInvoiceWhere } from "@/lib/invoice-filters";
 import { apiErrorResponse, prismaErrorMessage } from "@/lib/api-error";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { assertAccessibleCustomer } from "@/lib/invoices/access";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
+import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
 
 async function getGstSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
@@ -34,12 +35,25 @@ function parseOptionalDate(value?: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { error } = await requireAuth();
+    const { error, user } = await requireAuth();
     if (error) return error;
 
-    const invoiceWhere = await getActiveInvoiceWhere();
-
     const searchParams = request.nextUrl.searchParams;
+    const view = searchParams.get("view") === "deleted" ? "deleted" : "active";
+
+    if (view === "deleted" && user!.role !== Role.ADMIN) {
+      logAdminAccessViolation({
+        userId: user!.id,
+        username: user!.username,
+        actualRole: user!.role,
+        route: request.nextUrl.pathname,
+      });
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const invoiceWhere =
+      view === "deleted" ? await getDeletedInvoiceWhere() : await getActiveInvoiceWhere();
+
     const q = searchParams.get("q") || "";
     const paymentStatus = searchParams.get("paymentStatus");
 

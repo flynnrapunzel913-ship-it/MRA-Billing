@@ -89,6 +89,10 @@ export default function StockInventoryPage() {
     creators: Array<{ id: string; username: string; name: string }>;
   }>("/api/stock/filters", { enabled: searchOpen });
 
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [directoryView]);
+
   if (roleLoading && !dashboardMeta) {
     return <StockPageSkeleton kpiCount={2} showFinancial={false} />;
   }
@@ -96,10 +100,6 @@ export default function StockInventoryPage() {
   const rows = entries ?? [];
   const isDeletedView = directoryView === "deleted" && isAdmin;
   const allSelected = rows.length > 0 && rows.every((row) => selectedIds.has(row.id));
-
-  useEffect(() => {
-    setSelectedIds(new Set());
-  }, [directoryView]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {

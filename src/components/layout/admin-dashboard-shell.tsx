@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { prefetchJson } from "@/lib/client-cache";
 import { prefetchAppRoutes } from "@/lib/nav-prefetch";
-import { AccountStatusPoller } from "@/components/auth/account-status-poller";
 import { Sidebar } from "./sidebar";
 import { SessionControlPill } from "./session-control-pill";
 
@@ -25,7 +24,6 @@ export function AdminDashboardShell({ user, children }: AdminDashboardShellProps
 
   return (
     <div className="flex min-h-screen">
-      <AccountStatusPoller />
       <Sidebar role="ADMIN" userName={user.name ?? "Admin"} />
       <div className="relative flex min-h-screen min-w-0 flex-1 flex-col">
         <main className="w-full flex-1 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">

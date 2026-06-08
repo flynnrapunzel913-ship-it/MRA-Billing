@@ -3,6 +3,9 @@ import { Role } from "@prisma/client";
 import { auth } from "@/lib/auth/config";
 import { loadActiveAccount } from "@/lib/auth/session";
 import { supportsSessionVersion } from "@/lib/user-queries";
+import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
+import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
+import { getRequestPathname } from "@/lib/auth/request-meta";
 import { logSecurityEvent } from "@/lib/security/security-log";
 
 export type SessionUser = {
@@ -73,6 +76,13 @@ export async function requireAuth() {
     return { error: unauthorizedResponse("Unauthorized or session expired"), user: null };
   }
   if (account.disabled) {
+    const route = await getRequestPathname();
+    logDisabledUserAccessAttempt({
+      userId: account.id,
+      username: account.username,
+      source: "api",
+      route: route ?? undefined,
+    });
     return { error: accountDisabledResponse(), user: null };
   }
   if (await supportsSessionVersion()) {
@@ -101,6 +111,11 @@ export async function requireAdmin() {
       userId: user!.id,
       username: user!.username,
       role: user!.role,
+    });
+    logAdminAccessViolation({
+      userId: user!.id,
+      username: user!.username,
+      actualRole: user!.role,
     });
     return { error: forbiddenResponse(), user: null };
   }

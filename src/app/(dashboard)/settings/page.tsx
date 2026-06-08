@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { Download, Loader2, Upload } from "lucide-react";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import { invalidateCache } from "@/lib/client-cache";
+import { readApiResponse } from "@/lib/api-error";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -14,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Modal } from "@/components/ui/modal";
 
 function parseTermsPreview(text?: string) {
   return (text || "")
@@ -22,7 +27,21 @@ function parseTermsPreview(text?: string) {
     .filter(Boolean);
 }
 
+function filenameFromContentDisposition(header: string | null) {
+  if (!header) return null;
+  const match = header.match(/filename="([^"]+)"/);
+  return match?.[1] ?? null;
+}
+
 export default function SettingsPage() {
+  const router = useRouter();
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "ADMIN";
+  const [downloadingBackup, setDownloadingBackup] = useState(false);
+  const [restoringBackup, setRestoringBackup] = useState(false);
+  const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [backupFile, setBackupFile] = useState<File | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
   const { data: settings, isLoading: loading } = useCachedFetch<SettingsInput>("/api/settings");
 
   const {
@@ -69,6 +88,78 @@ export default function SettingsPage() {
     }
     invalidateCache("/api/settings");
     toast.success("Settings updated");
+  };
+
+  const downloadDatabaseBackup = async () => {
+    setDownloadingBackup(true);
+    try {
+      const res = await fetch("/api/admin/backup/export");
+      if (!res.ok) {
+        const result = await readApiResponse<unknown>(res, "Failed to download database backup");
+        toast.error(result.ok ? "Failed to download database backup" : result.message);
+        return;
+      }
+
+      const blob = await res.blob();
+      const filename =
+        filenameFromContentDisposition(res.headers.get("Content-Disposition")) ??
+        "mra-backup.json";
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      toast.success("Database backup downloaded");
+    } catch {
+      toast.error("Failed to download database backup");
+    } finally {
+      setDownloadingBackup(false);
+    }
+  };
+
+  const onBackupFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    setBackupFile(file);
+  };
+
+  const restoreDatabaseBackup = async () => {
+    if (!backupFile) {
+      toast.error("Select a backup JSON file first");
+      return;
+    }
+
+    setRestoringBackup(true);
+    try {
+      const form = new FormData();
+      form.append("file", backupFile);
+      const res = await fetch("/api/admin/backup/restore", {
+        method: "POST",
+        body: form,
+      });
+      const result = await readApiResponse<{ success: boolean }>(
+        res,
+        "Failed to restore database backup"
+      );
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      setRestoreModalOpen(false);
+      setBackupFile(null);
+      if (backupFileInputRef.current) {
+        backupFileInputRef.current.value = "";
+      }
+      // Full DB replace — clear all client API caches (stock, invoices, customers, dashboard, etc.).
+      invalidateCache();
+      router.refresh();
+      toast.success("Database restored successfully");
+    } catch {
+      toast.error("Failed to restore database backup");
+    } finally {
+      setRestoringBackup(false);
+    }
   };
 
   if (loading && !settings) {
@@ -212,6 +303,121 @@ export default function SettingsPage() {
           {isSubmitting ? "Saving..." : "Save Settings"}
         </Button>
       </form>
+
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Database Backup</CardTitle>
+            <CardDescription>
+              Download a complete database backup for recovery purposes.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={downloadingBackup || restoringBackup}
+              onClick={downloadDatabaseBackup}
+            >
+              {downloadingBackup ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Download Database Backup
+                </>
+              )}
+            </Button>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium">Restore Database Backup</p>
+                <p className="text-sm text-muted-foreground">
+                  Upload an S2-14 backup JSON file to replace all current system data.
+                </p>
+              </div>
+              <input
+                ref={backupFileInputRef}
+                type="file"
+                accept=".json,application/json"
+                className="hidden"
+                onChange={onBackupFileChange}
+              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={downloadingBackup || restoringBackup}
+                  onClick={() => backupFileInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4" />
+                  Choose Backup File
+                </Button>
+                {backupFile ? (
+                  <span className="text-sm text-muted-foreground">{backupFile.name}</span>
+                ) : null}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={!backupFile || downloadingBackup || restoringBackup}
+                  onClick={() => setRestoreModalOpen(true)}
+                >
+                  Restore Database Backup
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Modal
+        open={restoreModalOpen}
+        onClose={() => {
+          if (!restoringBackup) setRestoreModalOpen(false);
+        }}
+        title="Restore Database Backup?"
+        maxWidth="md"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRestoreModalOpen(false)}
+              disabled={restoringBackup}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={restoreDatabaseBackup}
+              disabled={restoringBackup || !backupFile}
+            >
+              {restoringBackup ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Restoring...
+                </>
+              ) : (
+                "Restore"
+              )}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          This will completely replace all current system data with the contents of the backup
+          file. This action cannot be undone.
+        </p>
+        {backupFile ? (
+          <p className="mt-3 text-sm font-medium">{backupFile.name}</p>
+        ) : null}
+      </Modal>
     </div>
   );
 }

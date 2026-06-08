@@ -7,6 +7,8 @@ import {
   UserCog,
   Layers,
   Package,
+  Settings,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -78,6 +80,18 @@ export const navGroups: NavGroup[] = [
         href: "/admin/users",
         label: "User Management",
         icon: UserCog,
+        roles: ["ADMIN"],
+      },
+      {
+        href: "/admin/security",
+        label: "Security Dashboard",
+        icon: Shield,
+        roles: ["ADMIN"],
+      },
+      {
+        href: "/settings",
+        label: "Academy Settings",
+        icon: Settings,
         roles: ["ADMIN"],
       },
     ],

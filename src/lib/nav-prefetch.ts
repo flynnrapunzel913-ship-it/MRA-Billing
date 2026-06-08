@@ -14,6 +14,7 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/reports/revenue": "/api/admin/revenue",
   "/reports": "/api/reports",
   "/admin/users": "/api/admin/users",
+  "/admin/security": "/api/admin/security/events?page=1&pageSize=25",
   "/admin/subscriptions": "/api/admin/subscriptions",
 };
 
@@ -51,6 +52,8 @@ export function prefetchAppRoutes(role: Role) {
           "/stock",
           "/reports/revenue",
           "/admin/users",
+          "/admin/security",
+          "/settings",
         ]
       : ["/dashboard", "/invoices", "/customers", "/stock"];
 

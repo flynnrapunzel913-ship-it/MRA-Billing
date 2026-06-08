@@ -58,6 +58,15 @@ export async function getActiveInvoiceWhere(): Promise<Prisma.InvoiceWhereInput>
   return cachedActiveInvoiceWhere;
 }
 
+/** Returns `{ deletedAt: { not: null } }` when soft-delete is available, else `{}`. */
+export async function getDeletedInvoiceWhere(): Promise<Prisma.InvoiceWhereInput> {
+  const activeWhere = await getActiveInvoiceWhere();
+  if (Object.keys(activeWhere).length === 0) {
+    return {};
+  }
+  return { deletedAt: { not: null } };
+}
+
 /** @deprecated Use getActiveInvoiceWhere() */
 export const activeInvoiceWhere = { deletedAt: null } as const;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Trash2 } from "lucide-react";
+import { RotateCcw, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,17 +16,24 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 import type { InvoiceListRow } from "@/lib/invoice-list-utils";
 
+export type InvoicesHistoryTableView = "active" | "deleted";
+
 interface InvoicesHistoryTableProps {
   invoices: InvoiceListRow[];
+  view?: InvoicesHistoryTableView;
   onDelete?: (invoice: InvoiceListRow) => void;
   canDelete?: (invoice: InvoiceListRow) => boolean;
+  onRestore?: (invoice: InvoiceListRow) => void;
 }
 
 export function InvoicesHistoryTable({
   invoices,
+  view = "active",
   onDelete,
   canDelete,
+  onRestore,
 }: InvoicesHistoryTableProps) {
+  const isDeletedView = view === "deleted";
   return (
     <div className="glass-panel overflow-hidden rounded-[20px]">
       <Table>
@@ -59,12 +66,16 @@ export function InvoicesHistoryTable({
               className={cn("border-border/60", index % 2 === 1 && "bg-muted/15")}
             >
               <TableCell className="px-3 py-2.5">
-                <Link
-                  href={`/invoices/${invoice.id}`}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  {invoice.invoiceNumber}
-                </Link>
+                {isDeletedView ? (
+                  <span className="font-semibold text-foreground">{invoice.invoiceNumber}</span>
+                ) : (
+                  <Link
+                    href={`/invoices/${invoice.id}`}
+                    className="font-semibold text-primary hover:underline"
+                  >
+                    {invoice.invoiceNumber}
+                  </Link>
+                )}
               </TableCell>
               <TableCell className="max-w-[10rem] truncate px-3 py-2.5 text-sm">
                 {invoice.customerName}
@@ -82,12 +93,14 @@ export function InvoicesHistoryTable({
               </TableCell>
               <TableCell className="px-3 py-2.5">
                 <div className="flex justify-end gap-1">
-                  <Button variant="outline" size="sm" className="h-8" asChild>
-                    <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
-                      PDF
-                    </a>
-                  </Button>
-                  {onDelete && (!canDelete || canDelete(invoice)) ? (
+                  {!isDeletedView && (
+                    <Button variant="outline" size="sm" className="h-8" asChild>
+                      <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
+                        PDF
+                      </a>
+                    </Button>
+                  )}
+                  {!isDeletedView && onDelete && (!canDelete || canDelete(invoice)) ? (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -96,6 +109,18 @@ export function InvoicesHistoryTable({
                       aria-label={`Delete ${invoice.invoiceNumber}`}
                     >
                       <Trash2 className="h-4 w-4" />
+                    </Button>
+                  ) : null}
+                  {isDeletedView && onRestore ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => onRestore(invoice)}
+                    >
+                      <RotateCcw className="mr-1.5 h-4 w-4" />
+                      Restore
                     </Button>
                   ) : null}
                 </div>

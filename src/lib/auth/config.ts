@@ -8,6 +8,8 @@ import {
   supportsSessionVersion,
   supportsUserStatus,
 } from "@/lib/user-queries";
+import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
+import { logLoginFailed, usernameFromCredentials } from "@/lib/auth/login-audit";
 
 const loginSchema = z.object({
   username: z.string().min(3).regex(/^\S+$/),
@@ -29,12 +31,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
+        if (!parsed.success) {
+          logLoginFailed({
+            reason: "invalid_input",
+            username: usernameFromCredentials(credentials),
+          });
+          return null;
+        }
 
         const withStatus = await supportsUserStatus();
         const withVersion = await supportsSessionVersion();
+        const username = parsed.data.username.toLowerCase();
         const user = await prisma.user.findUnique({
-          where: { username: parsed.data.username.toLowerCase() },
+          where: { username },
           select: {
             id: true,
             username: true,
@@ -45,12 +54,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           },
         });
 
-        if (!user) return null;
+        if (!user) {
+          logLoginFailed({ reason: "user_not_found", username });
+          return null;
+        }
 
-        if (isUserDisabled(user as { status?: string })) return null;
+        if (isUserDisabled(user as { status?: string })) {
+          logDisabledUserAccessAttempt({
+            userId: user.id,
+            username: user.username,
+            source: "login",
+          });
+          return null;
+        }
 
         const valid = await bcrypt.compare(parsed.data.password, user.password);
-        if (!valid) return null;
+        if (!valid) {
+          logLoginFailed({
+            reason: "invalid_password",
+            username: user.username,
+            userId: user.id,
+          });
+          return null;
+        }
 
         const { recordUserActivity } = await import("@/lib/user-activity");
         void recordUserActivity(prisma, user.id, "LOGIN", `${user.username} logged in`);

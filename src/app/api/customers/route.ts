@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/api-auth";
+import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
 import { apiErrorResponse } from "@/lib/api-error";
 import { recordCustomerActivity } from "@/lib/customer-activity";
 import { recordUserActivity } from "@/lib/user-activity";
@@ -18,6 +19,12 @@ export async function GET(request: NextRequest) {
     const view = searchParams.get("view") === "deleted" ? "deleted" : "active";
 
     if (view === "deleted" && user!.role !== Role.ADMIN) {
+      logAdminAccessViolation({
+        userId: user!.id,
+        username: user!.username,
+        actualRole: user!.role,
+        route: request.nextUrl.pathname,
+      });
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
