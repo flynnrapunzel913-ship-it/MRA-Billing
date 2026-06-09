@@ -43,7 +43,7 @@ export function InvoiceSummaryPanel({ className }: { className?: string }) {
     paymentStatus === "PARTIALLY_PAID" ? amountPaid : undefined
   );
 
-  const itemCount = items.filter((i) => i.description.trim()).length || items.length;
+  const itemCount = items.filter((i) => i.description.trim()).length;
 
   return (
     <aside

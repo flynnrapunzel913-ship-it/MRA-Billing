@@ -7,11 +7,10 @@ import { Sidebar } from "./sidebar";
 import { SessionControlPill } from "./session-control-pill";
 
 interface AdminDashboardShellProps {
-  user: { name?: string | null };
   children: React.ReactNode;
 }
 
-export function AdminDashboardShell({ user, children }: AdminDashboardShellProps) {
+export function AdminDashboardShell({ children }: AdminDashboardShellProps) {
   useEffect(() => {
     prefetchAppRoutes("ADMIN");
     prefetchJson("/api/dashboard");
@@ -24,7 +23,7 @@ export function AdminDashboardShell({ user, children }: AdminDashboardShellProps
 
   return (
     <div className="flex min-h-screen">
-      <Sidebar role="ADMIN" userName={user.name ?? "Admin"} />
+      <Sidebar role="ADMIN" />
       <div className="relative flex min-h-screen min-w-0 flex-1 flex-col">
         <main className="w-full flex-1 px-3 py-4 sm:px-4 lg:px-6 lg:py-6">
           <div className="mb-4 flex justify-end lg:mb-5">

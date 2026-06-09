@@ -143,6 +143,10 @@ export default function InvoiceWizard() {
       return false;
     }
     if (s === 1) {
+      if (items.length === 0) {
+        toast.error("Add at least one item");
+        return false;
+      }
       if (items.some((item) => !item.description.trim())) {
         toast.error("Enter description for all items");
         return false;
@@ -338,7 +342,7 @@ export default function InvoiceWizard() {
             {step === 1 && (
               <StepCard
                 title="Invoice Items"
-                description="Select from catalog or add custom line items"
+                description="Pick a subscription or product first. Use Add Custom Item for each additional line."
               >
                 <div className="mb-4 grid gap-4 sm:grid-cols-2">
                   <CatalogItemPicker
@@ -346,14 +350,17 @@ export default function InvoiceWizard() {
                     label="Add Subscription"
                     placeholder="Select subscription…"
                     onSelect={(item) => {
-                      if ("duration" in item) {
-                        addSubscriptionFromCatalog({
-                          name: item.name,
-                          duration: item.duration,
-                          price: item.price,
-                        });
-                        toast.success(`Added ${item.name}`);
+                      if (!("duration" in item)) return;
+                      const added = addSubscriptionFromCatalog({
+                        name: item.name,
+                        duration: item.duration,
+                        price: item.price,
+                      });
+                      if (!added) {
+                        toast.error("Press Add Custom Item before adding another line");
+                        return;
                       }
+                      toast.success(`Added ${item.name}`);
                     }}
                   />
                   <CatalogItemPicker
@@ -361,20 +368,33 @@ export default function InvoiceWizard() {
                     label="Add Product"
                     placeholder="Select product…"
                     onSelect={(item) => {
-                      addProductFromCatalog({ name: item.name, price: item.price });
+                      const added = addProductFromCatalog({
+                        name: item.name,
+                        price: item.price,
+                      });
+                      if (!added) {
+                        toast.error("Press Add Custom Item before adding another line");
+                        return;
+                      }
                       toast.success(`Added ${item.name}`);
                     }}
                   />
                 </div>
                 <div className="space-y-2">
-                  {items.map((item, index) => (
-                    <InvoiceItemRow
-                      key={index}
-                      index={index}
-                      item={item}
-                      canRemove={items.length > 1}
-                    />
-                  ))}
+                  {items.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-primary/25 bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+                      Select a subscription or product above to add your first line item.
+                    </p>
+                  ) : (
+                    items.map((item, index) => (
+                      <InvoiceItemRow
+                        key={index}
+                        index={index}
+                        item={item}
+                        canRemove
+                      />
+                    ))
+                  )}
                 </div>
                 <Button
                   type="button"

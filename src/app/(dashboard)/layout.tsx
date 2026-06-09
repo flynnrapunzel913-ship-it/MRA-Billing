@@ -35,7 +35,7 @@ export default async function DashboardLayout({
   }
 
   if (session.user.role === Role.ADMIN) {
-    return <AdminDashboardShell user={session.user}>{children}</AdminDashboardShell>;
+    return <AdminDashboardShell>{children}</AdminDashboardShell>;
   }
 
   return <DashboardShell user={session.user}>{children}</DashboardShell>;

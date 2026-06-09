@@ -18,6 +18,9 @@ const loginSchema = z.object({
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
+  // Required in production: Auth.js v5 only auto-trusts host via AUTH_URL / AUTH_TRUST_HOST
+  // (not NEXTAUTH_URL alone). Explicit trustHost is safe behind reverse proxies.
+  trustHost: true,
   session: { strategy: "jwt" },
   pages: {
     signIn: "/login",

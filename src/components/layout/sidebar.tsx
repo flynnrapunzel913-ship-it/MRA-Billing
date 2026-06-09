@@ -12,8 +12,6 @@ import { SidebarNavGroups } from "./sidebar-nav-link";
 
 import { SidebarLogoCard } from "./sidebar-logo-card";
 
-import { SidebarUserCard } from "./sidebar-user-card";
-
 
 
 const sidebarShellClass = cn(
@@ -72,8 +70,6 @@ export function Sidebar({
 
   role,
 
-  userName,
-
   className,
 
   onNavigate,
@@ -81,8 +77,6 @@ export function Sidebar({
 }: {
 
   role: Role;
-
-  userName: string;
 
   className?: string;
 
@@ -110,8 +104,6 @@ export function Sidebar({
 
         </nav>
 
-        <SidebarUserCard userName={userName} role={role} />
-
       </div>
 
     </aside>
@@ -126,15 +118,11 @@ export function MobileSidebar({
 
   role,
 
-  userName,
-
   onNavigate,
 
 }: {
 
   role: Role;
-
-  userName: string;
 
   onNavigate?: () => void;
 
@@ -159,8 +147,6 @@ export function MobileSidebar({
           <SidebarNavGroups groups={groups} onNavigate={onNavigate} />
 
         </nav>
-
-        <SidebarUserCard userName={userName} role={role} />
 
       </div>
 

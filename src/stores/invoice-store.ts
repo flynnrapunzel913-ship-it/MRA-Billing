@@ -51,8 +51,8 @@ interface InvoiceFormState {
     name: string;
     duration: string;
     price: number;
-  }) => void;
-  addProductFromCatalog: (item: { name: string; price: number }) => void;
+  }) => boolean;
+  addProductFromCatalog: (item: { name: string; price: number }) => boolean;
   updateItem: (index: number, item: InvoiceLineItem) => void;
   removeItem: (index: number) => void;
   reset: () => void;
@@ -69,6 +69,24 @@ const defaultItem = (itemType: ItemType = ITEM_TYPES[0]): InvoiceLineItem => ({
   packageEndDate: "",
 });
 
+function isPlaceholderItem(item: InvoiceLineItem): boolean {
+  return !item.description.trim() && item.unitPrice <= 0;
+}
+
+function applyCatalogItem(
+  items: InvoiceLineItem[],
+  newItem: InvoiceLineItem
+): InvoiceLineItem[] | null {
+  if (items.length === 0) {
+    return [newItem];
+  }
+  const placeholderIndex = items.findIndex(isPlaceholderItem);
+  if (placeholderIndex >= 0) {
+    return items.map((item, index) => (index === placeholderIndex ? newItem : item));
+  }
+  return null;
+}
+
 export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   customerId: null,
   customerName: "",
@@ -84,7 +102,7 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   paymentStatus: "FULLY_PAID",
   paymentMethod: null,
   amountPaid: 0,
-  items: [defaultItem()],
+  items: [],
   setSelectedCustomer: (customer) =>
     set({
       customerId: customer.id,
@@ -134,38 +152,42 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   setAmountPaid: (amountPaid) => set({ amountPaid }),
   addItem: (itemType) =>
     set((state) => ({ items: [...state.items, defaultItem(itemType)] })),
-  addSubscriptionFromCatalog: (item) =>
+  addSubscriptionFromCatalog: (item) => {
+    let added = false;
     set((state) => {
       const start = state.invoiceDate;
       const end = packageEndDateFromDuration(start, item.duration);
-      return {
-        items: [
-          ...state.items,
-          {
-            itemType: COACHING_PACKAGE_TYPE,
-            description: subscriptionInvoiceDescription(item.name, item.duration),
-            quantity: 1,
-            unitPrice: item.price,
-            packageStartDate: start,
-            packageEndDate: end,
-          },
-        ],
-      };
-    }),
-  addProductFromCatalog: (item) =>
-    set((state) => ({
-      items: [
-        ...state.items,
-        {
-          itemType: "Accessories / Products" as ItemType,
-          description: item.name,
-          quantity: 1,
-          unitPrice: item.price,
-          packageStartDate: "",
-          packageEndDate: "",
-        },
-      ],
-    })),
+      const next = applyCatalogItem(state.items, {
+        itemType: COACHING_PACKAGE_TYPE,
+        description: subscriptionInvoiceDescription(item.name, item.duration),
+        quantity: 1,
+        unitPrice: item.price,
+        packageStartDate: start,
+        packageEndDate: end,
+      });
+      if (!next) return state;
+      added = true;
+      return { items: next };
+    });
+    return added;
+  },
+  addProductFromCatalog: (item) => {
+    let added = false;
+    set((state) => {
+      const next = applyCatalogItem(state.items, {
+        itemType: "Accessories / Products" as ItemType,
+        description: item.name,
+        quantity: 1,
+        unitPrice: item.price,
+        packageStartDate: "",
+        packageEndDate: "",
+      });
+      if (!next) return state;
+      added = true;
+      return { items: next };
+    });
+    return added;
+  },
   updateItem: (index, item) =>
     set((state) => {
       const next = { ...item };
@@ -179,7 +201,7 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     }),
   removeItem: (index) =>
     set((state) => ({
-      items: state.items.length > 1 ? state.items.filter((_, i) => i !== index) : state.items,
+      items: state.items.filter((_, i) => i !== index),
     })),
   reset: () =>
     set({
@@ -197,7 +219,7 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
       paymentStatus: "FULLY_PAID",
       paymentMethod: null,
       amountPaid: 0,
-      items: [defaultItem()],
+      items: [],
     }),
 }));
 
