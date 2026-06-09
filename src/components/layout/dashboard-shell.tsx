@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { Role } from "@prisma/client";
 import { prefetchJson } from "@/lib/client-cache";
 import { prefetchAppRoutes } from "@/lib/nav-prefetch";
-import { AcademyLogo } from "@/components/branding/academy-logo";
 import { FloatingHeader } from "./floating-header";
 import { NavDock } from "./nav-dock";
 import { MobileTabBar } from "./mobile-tab-bar";
@@ -31,10 +30,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   return (
     <div className="flex min-h-screen flex-col">
       <div className="dashboard-top-chrome w-full px-4 sm:px-6 lg:px-8">
-        <div className="grid w-full grid-cols-[auto_1fr] items-stretch gap-x-3 sm:gap-x-4">
-          <div className="row-span-2 flex items-center self-stretch py-2">
-            <AcademyLogo className="h-12 w-auto sm:h-14 lg:h-16" />
-          </div>
+        <div className="mx-auto w-full max-w-[1400px]">
           <FloatingHeader role={user.role} />
           <NavDock role={user.role} />
         </div>

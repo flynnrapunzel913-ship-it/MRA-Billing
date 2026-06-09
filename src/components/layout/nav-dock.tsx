@@ -18,7 +18,7 @@ export function NavDock({ role }: NavDockProps) {
   return (
     <nav
       className={cn(
-        "hidden w-full flex-wrap items-center justify-center gap-1.5 pb-2 pt-0 lg:flex"
+        "mx-auto hidden w-fit flex-wrap items-center justify-center gap-1.5 pb-2 pt-0 lg:flex"
       )}
       aria-label="Main navigation"
     >
