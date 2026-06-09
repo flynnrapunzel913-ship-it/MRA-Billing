@@ -13,6 +13,8 @@ import { readApiResponse, messageFromApiBody } from "@/lib/api-error";
 import { formatDateInput } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { useEditableInteger } from "@/lib/hooks/use-editable-integer";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { invalidateCachePrefix } from "@/lib/client-cache";
@@ -29,6 +31,8 @@ export function StockEntryForm() {
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<StockEntryInput>({
     resolver: zodResolver(stockEntrySchema),
@@ -64,6 +68,14 @@ export function StockEntryForm() {
       setUploading(false);
     }
   };
+
+  const quantityPurchased = watch("quantityPurchased");
+  const quantityField = useEditableInteger({
+    value: quantityPurchased,
+    onCommit: (next) =>
+      setValue("quantityPurchased", next, { shouldDirty: true, shouldValidate: true }),
+    min: 1,
+  });
 
   const onSubmit = async (data: StockEntryInput) => {
     setSaving(true);
@@ -151,11 +163,11 @@ export function StockEntryForm() {
 
           <div className="space-y-2">
             <Label htmlFor="quantityPurchased">Quantity Purchased</Label>
-            <Input
+            <QuantityInput
               id="quantityPurchased"
-              type="number"
-              min={1}
-              {...register("quantityPurchased", { valueAsNumber: true })}
+              displayValue={quantityField.displayValue}
+              onValueChange={quantityField.handleChange}
+              onBlur={quantityField.handleBlur}
             />
             {errors.quantityPurchased && (
               <p className="text-sm text-destructive">{errors.quantityPurchased.message}</p>

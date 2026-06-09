@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { customerToSearchResult, type CustomerSearchResult } from "@/lib/customer-search";
 import { readApiResponse } from "@/lib/api-error";
-import { invalidateCachePrefix } from "@/lib/client-cache";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { useInvoiceStore } from "@/stores/invoice-store";
 
@@ -125,7 +124,7 @@ export function InvoiceCustomerStep() {
                 <p className="px-4 py-3 text-sm text-muted-foreground">Searching…</p>
               ) : results.length === 0 ? (
                 <p className="px-4 py-3 text-sm text-muted-foreground">
-                  No saved match — enter mobile below; customer will be saved when you continue.
+                  No saved match — enter mobile below. Customer is saved when the invoice is created.
                 </p>
               ) : (
                 <ul className="max-h-48 overflow-y-auto py-1">
@@ -169,7 +168,7 @@ export function InvoiceCustomerStep() {
             </p>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Required for new customers — saved to your directory when you go to the next step.
+              Required for new customers — saved to your directory when the invoice is created.
             </p>
           )}
         </div>
@@ -194,69 +193,4 @@ export function validateCustomerStep(
     return false;
   }
   return true;
-}
-
-/** Ensures customer exists in DB (link, match by mobile, or create). */
-export async function prepareCustomerStep(): Promise<boolean> {
-  const state = useInvoiceStore.getState();
-  const name = state.customerName.trim();
-  const mobile = normalizeMobile(state.customerMobile);
-
-  if (!validateCustomerStep(name, state.customerMobile)) {
-    return false;
-  }
-
-  if (state.customerId) {
-    return true;
-  }
-
-  try {
-    const searchRes = await fetch(`/api/customers?q=${encodeURIComponent(mobile)}`);
-    const searchResult = await readApiResponse<CustomerSearchResult[]>(
-      searchRes,
-      "Could not look up customer"
-    );
-    if (searchResult.ok) {
-      const rows = Array.isArray(searchResult.data) ? searchResult.data : [];
-      const existing = rows.find((row) => normalizeMobile(row.mobile ?? "") === mobile);
-      if (existing) {
-        const linked = customerToSearchResult(existing);
-        state.setSelectedCustomer(linked);
-        state.setCustomerMobile(formatMobileDisplay(mobile));
-        if (linked.name.toLowerCase() !== name.toLowerCase()) {
-          state.setCustomerName(name);
-        }
-        invalidateCachePrefix("/api/customers");
-        return true;
-      }
-    }
-
-    const createRes = await fetch("/api/customers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, mobile, status: "ACTIVE" }),
-    });
-    const createResult = await readApiResponse<{
-      id: string;
-      name: string;
-      mobile: string | null;
-      membershipId: string;
-      dateJoined: string;
-      status: string;
-    }>(createRes, "Failed to save customer");
-
-    if (!createResult.ok) {
-      toast.error(createResult.message);
-      return false;
-    }
-
-    state.setSelectedCustomer(customerToSearchResult(createResult.data));
-    state.setCustomerMobile(formatMobileDisplay(mobile));
-    invalidateCachePrefix("/api/customers");
-    toast.success("Customer saved");
-    return true;
-  } catch {
-    toast.error("Failed to save customer");
-    return false;
-  }
 }

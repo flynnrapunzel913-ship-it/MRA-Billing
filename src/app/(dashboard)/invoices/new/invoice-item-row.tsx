@@ -7,6 +7,8 @@ import { useInvoiceStore } from "@/stores/invoice-store";
 import type { InvoiceLineItem } from "@/lib/invoice-utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { QuantityInput } from "@/components/ui/quantity-input";
+import { useEditableInteger } from "@/lib/hooks/use-editable-integer";
 import {
   Select,
   SelectContent,
@@ -25,6 +27,14 @@ interface InvoiceItemRowProps {
 export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) {
   const update = (next: InvoiceLineItem) =>
     useInvoiceStore.getState().updateItem(index, next);
+
+  const quantity = useEditableInteger({
+    value: item.quantity,
+    onCommit: (nextQuantity) => update({ ...item, quantity: nextQuantity }),
+    min: 1,
+  });
+
+  const lineItemForTotal = { ...item, quantity: quantity.effectiveValue };
 
   return (
     <div className="grid grid-cols-12 items-end gap-2 rounded-lg border border-border bg-card/90 px-2 py-2 shadow-sm">
@@ -86,12 +96,10 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
         <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
           Qty
         </span>
-        <Input
-          className="h-9 text-sm"
-          type="number"
-          min={1}
-          value={item.quantity}
-          onChange={(e) => update({ ...item, quantity: Number(e.target.value) || 1 })}
+        <QuantityInput
+          displayValue={quantity.displayValue}
+          onValueChange={quantity.handleChange}
+          onBlur={quantity.handleBlur}
         />
       </div>
       <div className="col-span-4 sm:col-span-2">
@@ -112,7 +120,9 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
           <span className="mb-0.5 block text-[10px] font-semibold uppercase tracking-wide text-primary/80">
             Total
           </span>
-          <p className="text-sm font-bold text-primary">{formatCurrency(lineTotal(item))}</p>
+          <p className="text-sm font-bold text-primary">
+            {formatCurrency(lineTotal(lineItemForTotal))}
+          </p>
         </div>
         {canRemove && (
           <Button

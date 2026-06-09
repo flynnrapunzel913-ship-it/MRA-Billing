@@ -31,9 +31,9 @@ import { InvoiceSummaryPanel, InvoiceSummaryMobileBar } from "./invoice-summary-
 import { InvoiceItemRow } from "./invoice-item-row";
 import {
   InvoiceCustomerStep,
-  prepareCustomerStep,
   validateCustomerStep,
 } from "@/components/invoices/invoice-customer-step";
+import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
@@ -151,6 +151,10 @@ export default function InvoiceWizard() {
         toast.error("Enter description for all items");
         return false;
       }
+      if (items.some((item) => item.quantity < 1)) {
+        toast.error("Enter quantity of at least 1 for all items");
+        return false;
+      }
       if (items.some((item) => item.unitPrice <= 0)) {
         toast.error("Enter price for all items");
         return false;
@@ -173,18 +177,8 @@ export default function InvoiceWizard() {
     return true;
   };
 
-  const nextStep = async () => {
-    if (step === 0) {
-      setStepBusy(true);
-      try {
-        const ok = await prepareCustomerStep();
-        if (!ok) return;
-      } finally {
-        setStepBusy(false);
-      }
-    } else if (!validateStep(step)) {
-      return;
-    }
+  const nextStep = () => {
+    if (!validateStep(step)) return;
     if (step < 3) goTo((step + 1) as Step);
   };
 
@@ -193,12 +187,8 @@ export default function InvoiceWizard() {
   };
 
   const submitInvoice = async () => {
-    setStepBusy(true);
-    try {
-      const customerReady = await prepareCustomerStep();
-      if (!customerReady || !validateStep(1) || !validateStep(2)) return;
-    } finally {
-      setStepBusy(false);
+    if (!validateCustomerStep(customerName, customerMobile) || !validateStep(1) || !validateStep(2)) {
+      return;
     }
 
     for (const item of items) {
@@ -219,7 +209,7 @@ export default function InvoiceWizard() {
         body: JSON.stringify({
           customerId: customerId || undefined,
           customerName: customerName.trim(),
-          customerMobile: customerMobile.trim() || undefined,
+          customerMobile: sanitizeMobileInput(customerMobile) || undefined,
           customerAddress: customerAddress.trim() || undefined,
           customerGst: customerGst.trim() || undefined,
           invoiceDate,

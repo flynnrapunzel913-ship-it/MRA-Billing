@@ -18,8 +18,7 @@ export function NavDock({ role }: NavDockProps) {
   return (
     <nav
       className={cn(
-        "mt-2 hidden flex-wrap items-center justify-center gap-2 lg:flex",
-        "bg-transparent p-0"
+        "hidden w-full flex-wrap items-center justify-center gap-1.5 pb-2 pt-0 lg:flex"
       )}
       aria-label="Main navigation"
     >
@@ -31,7 +30,7 @@ export function NavDock({ role }: NavDockProps) {
             key={item.href}
             href={item.href}
             className={cn(
-              "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors duration-100",
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-100 sm:px-3.5 sm:text-sm",
               isActive ? "nav-pill-active" : "bg-transparent text-foreground/75 hover:bg-primary/10 hover:text-primary"
             )}
           >

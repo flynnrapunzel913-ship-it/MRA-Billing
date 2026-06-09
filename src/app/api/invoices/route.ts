@@ -7,7 +7,7 @@ import {
   calculatePaymentAmounts,
   formatInvoiceNumber,
 } from "@/lib/invoice-utils";
-import { generateMembershipId } from "@/lib/utils";
+import { resolveInvoiceCustomer } from "@/lib/invoices/resolve-invoice-customer";
 import { serializeInvoiceForJson } from "@/lib/serialize-prisma";
 import { recordCustomerActivity } from "@/lib/customer-activity";
 import { recordUserActivity } from "@/lib/user-activity";
@@ -163,57 +163,24 @@ export async function POST(request: NextRequest) {
 
     const { invoice, linkedCustomerId, customerJustCreated } = await prisma.$transaction(
       async (tx) => {
-        let linkedCustomerId: string | null = data.customerId ?? null;
-        let customerJustCreated: { id: string; name: string } | null = null;
+        const resolved = await resolveInvoiceCustomer(tx, {
+          customerId: data.customerId,
+          customerName: data.customerName,
+          customerMobile: data.customerMobile,
+          customerAddress: data.customerAddress,
+          customerGst: data.customerGst,
+        });
 
-        let customerId: string | null = linkedCustomerId;
-      let customerName = data.customerName;
-      let customerMobile = data.customerMobile?.trim() || null;
-      let customerAddress = data.customerAddress?.trim() || null;
-      let customerGst = data.customerGst?.trim() || null;
+        const {
+          customerId,
+          customerName,
+          customerMobile,
+          customerAddress,
+          customerGst,
+          customerJustCreated,
+        } = resolved;
 
-      if (customerId) {
-        const customer = await tx.customer.findUnique({ where: { id: customerId } });
-        if (!customer) {
-          throw new Error("Selected customer not found");
-        }
-        customerName = customer.name;
-        customerMobile = customer.mobile;
-        customerAddress = customer.address;
-        customerGst = customer.gstNumber;
-      } else {
-        const mobile = data.customerMobile?.trim();
-        if (mobile) {
-          const existing = await tx.customer.findFirst({ where: { mobile } });
-          if (existing) {
-            if (existing.name !== data.customerName) {
-              await tx.customer.update({
-                where: { id: existing.id },
-                data: { name: data.customerName },
-              });
-            }
-            customerId = existing.id;
-            customerName = existing.name;
-            customerMobile = existing.mobile;
-            customerAddress = existing.address;
-            customerGst = existing.gstNumber;
-          } else {
-            const customer = await tx.customer.create({
-              data: {
-                name: data.customerName,
-                mobile,
-                address: data.customerAddress?.trim() || null,
-                gstNumber: data.customerGst || null,
-                membershipId: generateMembershipId(),
-              },
-            });
-            customerId = customer.id;
-            customerJustCreated = { id: customer.id, name: customer.name };
-          }
-        }
-      }
-
-      linkedCustomerId = customerId;
+        const linkedCustomerId = customerId;
 
       const sequence = await tx.invoiceSequence.upsert({
         where: { year },

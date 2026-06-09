@@ -34,6 +34,7 @@
   --shadow-card: 0 12px 40px rgba(0, 60, 100, 0.12);
   --shadow-glow: 0 8px 32px rgba(0, 194, 255, 0.25);
   --glass-blur: 16px;
+  --dashboard-chrome-z: 40;
   --overlay: rgba(10, 61, 92, 0.42);
   --btn-gradient-start: #0a3d5c;
   --btn-gradient-end: #0070c0;
@@ -156,6 +157,24 @@ input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* Sticky dashboard header chrome — opaque so scrolling content never shows through */
+.dashboard-top-chrome {
+  position: sticky;
+  top: 0;
+  z-index: var(--dashboard-chrome-z);
+  isolation: isolate;
+  background: color-mix(in srgb, var(--background) 94%, transparent);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 8px 28px rgba(0, 60, 100, 0.08);
+}
+
+.dark .dashboard-top-chrome {
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
 }
 
 .glass-panel {
