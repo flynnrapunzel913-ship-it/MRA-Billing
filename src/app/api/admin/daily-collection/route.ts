@@ -5,12 +5,53 @@ import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 import { format } from "date-fns";
-import { getDailyCollectionSheet, parseCollectionDateInput } from "@/lib/daily-collection";
+import {
+  buildCollectionSnapshotFromSheet,
+  getDailyCollectionSheet,
+  parseCollectionDateInput,
+} from "@/lib/daily-collection";
+import {
+  calculateCashDifference,
+  calculatePhysicalCash,
+  normalizeDenominations,
+} from "@/lib/cash-denominations";
 
 const bodySchema = z.object({
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
+  cashDenominations: z.record(z.string(), z.number().int().nonnegative()).optional(),
+  cashDifferenceNotes: z.string().optional(),
 });
+
+async function resolveCashReconciliation(
+  dateStr: string,
+  denominationsInput: unknown,
+  cashDifferenceNotes?: string | null,
+  systemCashOverride?: number | null
+) {
+  const sheet = await getDailyCollectionSheet(dateStr);
+  const cashCollectedSystem =
+    systemCashOverride ?? sheet?.paymentBreakdown.cash ?? 0;
+  const cashDenominations = normalizeDenominations(denominationsInput);
+  const cashCountedPhysical = calculatePhysicalCash(cashDenominations);
+  const cashDifference = calculateCashDifference(cashCountedPhysical, cashCollectedSystem);
+
+  return {
+    cashCollectedSystem,
+    cashCountedPhysical,
+    cashDifference,
+    cashDifferenceNotes: cashDifferenceNotes?.trim() || null,
+    cashDenominations,
+  };
+}
+
+function auditCashDetails(cash: Awaited<ReturnType<typeof resolveCashReconciliation>>) {
+  return {
+    systemCash: cash.cashCollectedSystem,
+    physicalCash: cash.cashCountedPhysical,
+    difference: cash.cashDifference,
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -63,12 +104,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const sheet = await getDailyCollectionSheet(parsed.data.date);
+    if (!sheet) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+
+    const snapshot = buildCollectionSnapshotFromSheet(sheet);
+    const cash = await resolveCashReconciliation(
+      parsed.data.date,
+      parsed.data.cashDenominations,
+      parsed.data.cashDifferenceNotes
+    );
+
     const record = await prisma.dailyCollection.create({
       data: {
         collectionDate,
         notes: parsed.data.notes?.trim() || null,
         collectedAt: new Date(),
         collectedByUserId: user!.id!,
+        totalRevenue: snapshot.totalRevenue,
+        subscriptionRevenue: snapshot.subscriptionRevenue,
+        productRevenue: snapshot.productRevenue,
+        totalExpenses: snapshot.totalExpenses,
+        cashCollectedSystem: snapshot.cashCollected,
+        upiCollected: snapshot.upiCollected,
+        netCollection: snapshot.netCollection,
+        cashCountedPhysical: cash.cashCountedPhysical,
+        cashDifference: cash.cashDifference,
+        cashDifferenceNotes: cash.cashDifferenceNotes,
+        cashDenominations: cash.cashDenominations,
       },
       include: {
         collectedBy: { select: { id: true, name: true, username: true } },
@@ -84,6 +148,8 @@ export async function POST(request: NextRequest) {
       details: {
         date: parsed.data.date,
         notes: record.notes,
+        ...snapshot,
+        ...auditCashDetails(cash),
       },
     });
 
@@ -134,10 +200,26 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const storedSystemCash =
+      existing.cashCollectedSystem != null
+        ? Number(existing.cashCollectedSystem)
+        : null;
+
+    const cash = await resolveCashReconciliation(
+      parsed.data.date,
+      parsed.data.cashDenominations ?? existing.cashDenominations,
+      parsed.data.cashDifferenceNotes ?? existing.cashDifferenceNotes,
+      storedSystemCash
+    );
+
     const record = await prisma.dailyCollection.update({
       where: { id: existing.id },
       data: {
         notes: parsed.data.notes?.trim() || null,
+        cashCountedPhysical: cash.cashCountedPhysical,
+        cashDifference: cash.cashDifference,
+        cashDifferenceNotes: cash.cashDifferenceNotes,
+        cashDenominations: cash.cashDenominations,
       },
       include: {
         collectedBy: { select: { id: true, name: true, username: true } },
@@ -153,6 +235,7 @@ export async function PUT(request: NextRequest) {
       details: {
         date: parsed.data.date,
         notes: record.notes,
+        ...auditCashDetails(cash),
       },
     });
 

@@ -67,7 +67,7 @@ export const navGroups: NavGroup[] = [
     items: [
       {
         href: "/reports/revenue",
-        label: "Revenue",
+        label: "Daily Collection",
         icon: TrendingUp,
         roles: ["ADMIN"],
       },

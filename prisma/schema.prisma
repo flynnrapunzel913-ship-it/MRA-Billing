@@ -319,14 +319,25 @@ model Expense {
 
 /// End-of-day collection closing record — one row per calendar date.
 model DailyCollection {
-  id                String   @id @default(cuid())
-  collectionDate    DateTime @unique
-  notes             String?
-  collectedAt       DateTime
-  collectedByUserId String
-  collectedBy       User     @relation(fields: [collectedByUserId], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                  String   @id @default(cuid())
+  collectionDate      DateTime @unique
+  notes               String?
+  collectedAt         DateTime
+  collectedByUserId   String
+  collectedBy         User     @relation(fields: [collectedByUserId], references: [id])
+  totalRevenue        Decimal? @db.Decimal(12, 2)
+  subscriptionRevenue Decimal? @db.Decimal(12, 2)
+  productRevenue      Decimal? @db.Decimal(12, 2)
+  totalExpenses       Decimal? @db.Decimal(12, 2)
+  cashCollectedSystem Decimal? @db.Decimal(12, 2)
+  upiCollected        Decimal? @db.Decimal(12, 2)
+  netCollection       Decimal? @db.Decimal(12, 2)
+  cashCountedPhysical Decimal? @db.Decimal(12, 2)
+  cashDifference      Decimal? @db.Decimal(12, 2)
+  cashDifferenceNotes String?
+  cashDenominations   Json?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   @@index([collectionDate])
 }
