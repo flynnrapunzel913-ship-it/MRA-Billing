@@ -34,16 +34,12 @@ import {
   normalizeDashboardPayload,
   normalizeReceptionistDashboardKpis,
 } from "@/lib/dashboard-kpis";
-import { FinancialSummaryCards } from "@/components/dashboard/financial-summary-cards";
 
 interface ReceptionistDashboardData {
   role: "RECEPTIONIST";
   activeCustomers: number;
   invoicesToday: number;
   pendingPayments: number;
-  totalRevenue: number;
-  totalExpenses: number;
-  netProfit: number;
   recentInvoices: Array<{
     id: string;
     invoiceNumber: string;
@@ -150,14 +146,6 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
           );
         })}
       </div>
-
-      <FinancialSummaryCards
-        data={{
-          totalRevenue: data.totalRevenue,
-          totalExpenses: data.totalExpenses,
-          netProfit: data.netProfit,
-        }}
-      />
 
       <Card className={cn(glassCard, "overflow-hidden")}>
           <CardHeader className="border-b border-border px-5 py-4">
