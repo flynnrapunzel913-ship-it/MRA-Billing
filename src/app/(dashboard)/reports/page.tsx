@@ -129,7 +129,14 @@ export default function ReportsPage() {
           <CardHeader>
             <CardTitle>
               {reportTypes.find((r) => r.value === type)?.label}
-              {data.total !== undefined && ` - ${formatCurrency(data.total)}`}
+              {type === "revenue" && data.totalRevenue !== undefined && (
+                <span className="block text-sm font-normal text-muted-foreground">
+                  Revenue {formatCurrency(data.totalRevenue)} · Expenses{" "}
+                  {formatCurrency(data.totalExpenses)} · Net Profit{" "}
+                  {formatCurrency(data.netProfit)}
+                </span>
+              )}
+              {type !== "revenue" && data.total !== undefined && ` - ${formatCurrency(data.total)}`}
               {data.summary && ` - GST ${formatCurrency(data.summary.totalGst)}`}
             </CardTitle>
           </CardHeader>

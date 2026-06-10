@@ -7,16 +7,25 @@ import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { toKpiNumber } from "@/lib/dashboard-kpis";
 import { getTodayRange } from "@/lib/stock-utils";
+import { netProfit, sumExpenses, sumInvoiceRevenue } from "@/lib/expenses/expense-totals";
 
 export async function GET() {
   try {
     const { error, user } = await requireAuth();
     if (error) return error;
 
-    const [invoiceWhere, customerWhere] = await Promise.all([
+    const [invoiceWhere, customerWhere, totalRevenue, totalExpenses] = await Promise.all([
       getActiveInvoiceWhere(),
       getActiveCustomerWhere(),
+      getActiveInvoiceWhere().then((where) => sumInvoiceRevenue(where)),
+      sumExpenses(),
     ]);
+    const profit = netProfit(totalRevenue, totalExpenses);
+    const financialSummary = {
+      totalRevenue: toKpiNumber(totalRevenue),
+      totalExpenses: toKpiNumber(totalExpenses),
+      netProfit: toKpiNumber(profit),
+    };
     const { start: todayStart, end: todayEnd } = getTodayRange();
 
     if (user!.role === Role.RECEPTIONIST) {
@@ -54,6 +63,7 @@ export async function GET() {
         invoicesToday: toKpiNumber(invoicesToday),
         pendingPayments: toKpiNumber(pendingPayments),
         recentInvoices: recentInvoices ?? [],
+        ...financialSummary,
       });
     }
 
@@ -89,6 +99,7 @@ export async function GET() {
       activeStudents: toKpiNumber(activeStudents),
       pendingPayments: toKpiNumber(pendingPayments),
       recentInvoices: recentInvoices ?? [],
+      ...financialSummary,
     });
   } catch (error) {
     return apiErrorResponse(error, "Failed to load dashboard");

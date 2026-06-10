@@ -21,6 +21,22 @@ export interface ReceptionistDashboardKpis {
   pendingPayments: number;
 }
 
+export interface FinancialSummaryKpis {
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
+}
+
+export function normalizeFinancialSummary(data: Record<string, unknown>): FinancialSummaryKpis {
+  const totalRevenue = toKpiNumber(data.totalRevenue);
+  const totalExpenses = toKpiNumber(data.totalExpenses);
+  return {
+    totalRevenue,
+    totalExpenses,
+    netProfit: toKpiNumber(data.netProfit ?? totalRevenue - totalExpenses),
+  };
+}
+
 export function normalizeAdminDashboardKpis(data: Record<string, unknown>): AdminDashboardKpis {
   return {
     invoicesGenerated: toKpiNumber(data.invoicesGenerated ?? data.invoiceCount),
@@ -44,17 +60,21 @@ export function normalizeDashboardPayload(data: Record<string, unknown>) {
 
   if (role === "ADMIN") {
     const kpis = normalizeAdminDashboardKpis(data);
+    const financial = normalizeFinancialSummary(data);
     return {
       role: "ADMIN" as const,
       ...kpis,
+      ...financial,
       recentInvoices: Array.isArray(data.recentInvoices) ? data.recentInvoices : [],
     };
   }
 
   const kpis = normalizeReceptionistDashboardKpis(data);
+  const financial = normalizeFinancialSummary(data);
   return {
     role: "RECEPTIONIST" as const,
     ...kpis,
+    ...financial,
     recentInvoices: Array.isArray(data.recentInvoices) ? data.recentInvoices : [],
   };
 }

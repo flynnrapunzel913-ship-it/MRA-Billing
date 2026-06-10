@@ -8,6 +8,7 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/invoices/history": "/api/invoices",
   "/invoices/new": ["/api/customers?q=", "/api/catalog/subscriptions", "/api/catalog/products"],
   "/stock": ["/api/stock", "/api/stock/summary"],
+  "/expenses": "/api/expenses",
   "/stock/new": "/api/stock/filters",
   "/settings": "/api/settings",
   "/profile": "/api/profile",
@@ -50,12 +51,13 @@ export function prefetchAppRoutes(role: Role) {
           "/invoices",
           "/customers",
           "/stock",
+          "/expenses",
           "/reports/revenue",
           "/admin/users",
           "/admin/security",
           "/settings",
         ]
-      : ["/dashboard", "/invoices", "/customers", "/stock"];
+      : ["/dashboard", "/invoices", "/customers", "/stock", "/expenses"];
 
   for (const route of routes) prefetchRouteData(route);
 }

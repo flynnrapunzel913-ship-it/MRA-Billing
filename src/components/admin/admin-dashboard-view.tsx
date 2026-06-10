@@ -19,12 +19,16 @@ import {
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 import { formatKpiValue, normalizeAdminDashboardKpis } from "@/lib/dashboard-kpis";
+import { FinancialSummaryCards } from "@/components/dashboard/financial-summary-cards";
 
 export interface AdminDashboardData {
   role: "ADMIN";
   invoicesGenerated: number;
   activeStudents: number;
   pendingPayments: number;
+  totalRevenue: number;
+  totalExpenses: number;
+  netProfit: number;
   recentInvoices: Array<{
     id: string;
     invoiceNumber: string;
@@ -145,6 +149,14 @@ export function AdminDashboardView({
           );
         })}
       </div>
+
+      <FinancialSummaryCards
+        data={{
+          totalRevenue: data.totalRevenue,
+          totalExpenses: data.totalExpenses,
+          netProfit: data.netProfit,
+        }}
+      />
 
       <Card className={cn(glassCard, "overflow-hidden")}>
         <CardHeader className="border-b border-border px-5 py-4">

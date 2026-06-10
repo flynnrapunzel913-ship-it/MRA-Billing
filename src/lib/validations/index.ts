@@ -182,3 +182,12 @@ export const stockEntrySchema = z.object({
 });
 
 export type StockEntryInput = z.infer<typeof stockEntrySchema>;
+
+export const expenseSchema = z.object({
+  expenseDate: z.string().min(1, "Expense date is required"),
+  paidTo: z.string().min(2, "Paid to must be at least 2 characters"),
+  reason: z.string().min(3, "Reason must be at least 3 characters"),
+  amount: z.number().positive("Amount must be greater than 0"),
+});
+
+export type ExpenseInput = z.infer<typeof expenseSchema>;

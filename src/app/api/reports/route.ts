@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { netProfit, sumExpenses, sumInvoiceRevenue } from "@/lib/expenses/expense-totals";
 import {
   startOfDay,
   endOfDay,
@@ -49,13 +50,27 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (type === "revenue") {
-      const invoices = await prisma.invoice.findMany({
-        where: { ...invoiceWhere, invoiceDate: { gte: start, lte: end } },
-        orderBy: { invoiceDate: "desc" },
-      });
+      const [invoices, totalRevenue, totalExpenses] = await Promise.all([
+        prisma.invoice.findMany({
+          where: { ...invoiceWhere, invoiceDate: { gte: start, lte: end } },
+          orderBy: { invoiceDate: "desc" },
+        }),
+        sumInvoiceRevenue(invoiceWhere, { from: start, to: end }),
+        sumExpenses({ from: start, to: end }),
+      ]);
 
-      const total = invoices.reduce((sum, inv) => sum + Number(inv.amountPaid), 0);
-      return NextResponse.json({ type, period, start, end, total, rows: invoices });
+      const profit = netProfit(totalRevenue, totalExpenses);
+      return NextResponse.json({
+        type,
+        period,
+        start,
+        end,
+        total: totalRevenue,
+        totalRevenue,
+        totalExpenses,
+        netProfit: profit,
+        rows: invoices,
+      });
     }
 
     if (type === "gst") {
