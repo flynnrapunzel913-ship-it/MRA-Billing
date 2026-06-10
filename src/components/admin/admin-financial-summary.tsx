@@ -117,9 +117,8 @@ export function AdminFinancialSummary() {
     <section className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-bold tracking-tight">Financial Summary</h2>
           <p className="text-sm text-muted-foreground">
-            Daily collections, expenses, and net amount for the pool
+            Switch period to review collections and expenses
             {isRefreshing ? " · updating…" : ""}
           </p>
         </div>

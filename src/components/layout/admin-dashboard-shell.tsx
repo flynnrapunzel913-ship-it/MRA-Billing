@@ -18,7 +18,6 @@ export function AdminDashboardShell({ children }: AdminDashboardShellProps) {
     prefetchJson("/api/invoices");
     prefetchJson("/api/stock/summary");
     prefetchJson("/api/expenses");
-    prefetchJson("/api/admin/financial-summary?period=today");
     prefetchJson("/api/settings");
     prefetchJson("/api/profile");
   }, []);

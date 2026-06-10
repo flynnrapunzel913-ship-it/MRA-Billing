@@ -19,7 +19,6 @@ import {
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
 import { formatKpiValue, normalizeAdminDashboardKpis } from "@/lib/dashboard-kpis";
-import { AdminFinancialSummary } from "@/components/admin/admin-financial-summary";
 
 export interface AdminDashboardData {
   role: "ADMIN";
@@ -100,6 +99,9 @@ export function AdminDashboardView({
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>
+            <PrefetchLink href="/reports/daily-revenue">Daily Revenue</PrefetchLink>
+          </Button>
+          <Button variant="outline" asChild>
             <PrefetchLink href="/reports/revenue">Revenue Reports</PrefetchLink>
           </Button>
           <Button variant="outline" asChild>
@@ -146,8 +148,6 @@ export function AdminDashboardView({
           );
         })}
       </div>
-
-      <AdminFinancialSummary />
 
       <Card className={cn(glassCard, "overflow-hidden")}>
         <CardHeader className="border-b border-border px-5 py-4">

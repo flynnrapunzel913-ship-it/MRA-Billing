@@ -13,6 +13,7 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/settings": "/api/settings",
   "/profile": "/api/profile",
   "/reports/revenue": "/api/admin/revenue",
+  "/reports/daily-revenue": "/api/admin/financial-summary?period=today",
   "/reports": "/api/reports",
   "/admin/users": "/api/admin/users",
   "/admin/security": "/api/admin/security/events?page=1&pageSize=25",
@@ -59,10 +60,5 @@ export function prefetchAppRoutes(role: Role) {
         ]
       : ["/dashboard", "/invoices", "/customers", "/stock", "/expenses"];
 
-  for (const route of routes) {
-    prefetchRouteData(route);
-    if (role === "ADMIN" && route === "/dashboard") {
-      prefetchJson("/api/admin/financial-summary?period=today");
-    }
-  }
+  for (const route of routes) prefetchRouteData(route);
 }
