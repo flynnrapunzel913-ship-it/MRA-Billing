@@ -12,7 +12,7 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/stock/new": "/api/stock/filters",
   "/settings": "/api/settings",
   "/profile": "/api/profile",
-  "/reports/revenue": "/api/admin/revenue",
+  "/reports/revenue": "/api/admin/daily-collection",
   "/reports/daily-revenue": "/api/admin/financial-summary?period=today",
   "/reports": "/api/reports",
   "/admin/users": "/api/admin/users",

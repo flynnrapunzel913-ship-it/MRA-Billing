@@ -282,6 +282,23 @@ export async function getWeekRevenue(): Promise<number> {
   return Math.round(total * 100) / 100;
 }
 
+/** Sum of amountPaid from paid invoices dated yesterday. */
+export async function getYesterdayCollectedRevenue(): Promise<number> {
+  const yesterday = subDays(new Date(), 1);
+  const invoiceWhere = await getActiveInvoiceWhere();
+  const result = await prisma.invoice.aggregate({
+    where: {
+      ...invoiceWhere,
+      invoiceDate: { gte: startOfDay(yesterday), lte: endOfDay(yesterday) },
+      paymentStatus: { in: ["FULLY_PAID", "PARTIALLY_PAID"] },
+      amountPaid: { gt: 0 },
+    },
+    _sum: { amountPaid: true },
+  });
+  const total = Number(result._sum.amountPaid ?? 0);
+  return Math.round(total * 100) / 100;
+}
+
 export async function getRecentTransactions(limit = 10): Promise<RevenueTransaction[]> {
   const invoiceWhere = await getActiveInvoiceWhere();
   const invoices = await prisma.invoice.findMany({

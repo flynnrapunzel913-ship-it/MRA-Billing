@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 /** Bump when User model / UserActivity changes to bust dev global Prisma cache */
-export const PRISMA_CLIENT_MARKER = "user-management-v2";
+export const PRISMA_CLIENT_MARKER = "daily-collection-v1";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

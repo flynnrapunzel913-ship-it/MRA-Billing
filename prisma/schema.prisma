@@ -86,8 +86,9 @@ model User {
   activities   UserActivity[]
   stockEntries StockEntry[]
   stockLogs    StockActivity[]
-  expenses     Expense[]
-  auditLogs    AuditLog[]
+  expenses         Expense[]
+  dailyCollections DailyCollection[]
+  auditLogs        AuditLog[]
 }
 
 model UserActivity {
@@ -314,6 +315,20 @@ model Expense {
   updatedAt   DateTime @updatedAt
 
   @@index([expenseDate])
+}
+
+/// End-of-day collection closing record — one row per calendar date.
+model DailyCollection {
+  id                String   @id @default(cuid())
+  collectionDate    DateTime @unique
+  notes             String?
+  collectedAt       DateTime
+  collectedByUserId String
+  collectedBy       User     @relation(fields: [collectedByUserId], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([collectionDate])
 }
 
 /// Central security and business audit trail (S2-01).

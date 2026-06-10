@@ -19,25 +19,25 @@ import { readApiResponse } from "@/lib/api-error";
 import {
   buildCustomerInvoiceIndex,
   filterCustomers,
+  getCustomerCountLabel,
   type CustomerListRow,
-  type QuickFilter,
   type ServiceFilter,
+  type StatusFilter,
 } from "@/lib/customer-list-utils";
 
 type CustomerDirectoryView = "active" | "deleted";
 
-const QUICK_FILTERS: { id: QuickFilter; label: string }[] = [
+const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
   { id: "all", label: "All Customers" },
   { id: "active", label: "Active" },
-  { id: "renewal_due", label: "Renewal Due" },
+  { id: "passed_out", label: "Passed Out" },
   { id: "pending_payment", label: "Pending Payment" },
-  { id: "recent", label: "Recent" },
 ];
 
 export default function CustomersPage() {
   const [directoryView, setDirectoryView] = useState<CustomerDirectoryView>("active");
   const [search, setSearch] = useState("");
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
   const [selected, setSelected] = useState<CustomerListRow | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -61,10 +61,20 @@ export default function CustomersPage() {
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
     "/api/invoices"
   );
+  const { data: subscriptions } = useCachedFetch<
+    Array<{ id: string; name: string; status: string }>
+  >("/api/catalog/subscriptions");
   const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
     "/api/dashboard"
   );
   const isAdmin = dashboardMeta?.role === "ADMIN";
+
+  const subscriptionOptions = useMemo(() => {
+    const rows = subscriptions ?? [];
+    return rows
+      .filter((row) => row.status === "ACTIVE")
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [subscriptions]);
 
   const invoiceIndex = useMemo(
     () => buildCustomerInvoiceIndex(invoices ?? []),
@@ -78,18 +88,29 @@ export default function CustomersPage() {
       if (!q) return rows;
       return rows.filter(
         (customer) =>
-          customer.name.toLowerCase().includes(q) ||
-          (customer.mobile ?? "").includes(q) ||
-          customer.membershipId.toLowerCase().includes(q)
+          customer.name.toLowerCase().includes(q) || (customer.mobile ?? "").includes(q)
       );
     }
     return filterCustomers(rows, {
       search: debouncedSearch,
-      quickFilter,
+      statusFilter,
       serviceFilter,
       invoiceIndex,
     });
-  }, [customers, debouncedSearch, quickFilter, serviceFilter, invoiceIndex, directoryView]);
+  }, [customers, debouncedSearch, statusFilter, serviceFilter, invoiceIndex, directoryView]);
+
+  const countLabel = useMemo(() => {
+    if (directoryView === "deleted") {
+      const count = filtered.length;
+      return `${count} deleted customer${count === 1 ? "" : "s"}`;
+    }
+    return getCustomerCountLabel({
+      count: filtered.length,
+      statusFilter,
+      serviceFilter,
+      search: debouncedSearch,
+    });
+  }, [filtered.length, statusFilter, serviceFilter, debouncedSearch, directoryView]);
 
   const handleCreated = () => {
     setFormOpen(false);
@@ -211,32 +232,35 @@ export default function CustomersPage() {
       )}
 
       {directoryView === "active" && (
-      <div className="flex flex-col items-center gap-3 lg:flex-row lg:items-center lg:justify-center lg:gap-6">
-        <div className="flex flex-wrap justify-center gap-2">
-          {QUICK_FILTERS.map((pill) => (
-            <button
-              key={pill.id}
-              type="button"
-              onClick={() => setQuickFilter(pill.id)}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-                quickFilter === pill.id
-                  ? "nav-pill-active"
-                  : "border border-border/60 bg-card/40 text-foreground/80 hover:bg-muted/40"
-              )}
-            >
-              {pill.label}
-            </button>
-          ))}
-        </div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-wrap justify-center gap-2">
+            {STATUS_FILTERS.map((pill) => (
+              <button
+                key={pill.id}
+                type="button"
+                onClick={() => setStatusFilter(pill.id)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
+                  statusFilter === pill.id
+                    ? "nav-pill-active"
+                    : "border border-border/60 bg-card/40 text-foreground/80 hover:bg-muted/40"
+                )}
+              >
+                {pill.label}
+              </button>
+            ))}
+          </div>
 
-        <ServiceFilterSelect value={serviceFilter} onChange={setServiceFilter} />
-      </div>
+          <ServiceFilterSelect
+            value={serviceFilter}
+            onChange={setServiceFilter}
+            subscriptions={subscriptionOptions}
+          />
+        </div>
       )}
 
       <p className="text-center text-xs text-muted-foreground">
-        {filtered.length} customer{filtered.length === 1 ? "" : "s"}
-        {directoryView === "deleted" ? " deleted" : ""}
+        {countLabel}
         {isRefreshing ? " · updating…" : ""}
       </p>
 

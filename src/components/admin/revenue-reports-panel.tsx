@@ -42,8 +42,7 @@ type Transaction = {
 
 type RevenueSummary = {
   todayRevenue: number;
-  weekRevenue: number;
-  monthRevenue: number;
+  yesterdayCollectedRevenue: number;
 };
 
 const glassCard = cn(
@@ -139,7 +138,7 @@ export function RevenueReportsPanel() {
           <CardTitle className="text-lg">Revenue Summary</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-lg border border-[#E2E8F0]/80 bg-[#F8FAFC]/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
               <p className="text-sm text-muted-foreground">Today&apos;s Revenue</p>
               <p className="mt-1 text-2xl font-bold tabular-nums">
@@ -147,15 +146,9 @@ export function RevenueReportsPanel() {
               </p>
             </div>
             <div className="rounded-lg border border-[#E2E8F0]/80 bg-[#F8FAFC]/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <p className="text-sm text-muted-foreground">This Week Revenue</p>
+              <p className="text-sm text-muted-foreground">Yesterday Collected Revenue</p>
               <p className="mt-1 text-2xl font-bold tabular-nums">
-                {formatCurrency(summary?.weekRevenue ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-[#E2E8F0]/80 bg-[#F8FAFC]/80 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-              <p className="text-sm text-muted-foreground">This Month Revenue</p>
-              <p className="mt-1 text-2xl font-bold tabular-nums">
-                {formatCurrency(summary?.monthRevenue ?? 0)}
+                {formatCurrency(summary?.yesterdayCollectedRevenue ?? 0)}
               </p>
             </div>
           </div>

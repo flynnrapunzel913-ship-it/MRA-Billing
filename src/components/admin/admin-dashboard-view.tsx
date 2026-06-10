@@ -102,7 +102,7 @@ export function AdminDashboardView({
             <PrefetchLink href="/reports/daily-revenue">Daily Revenue</PrefetchLink>
           </Button>
           <Button variant="outline" asChild>
-            <PrefetchLink href="/reports/revenue">Revenue Reports</PrefetchLink>
+            <PrefetchLink href="/reports/revenue">Daily Collection</PrefetchLink>
           </Button>
           <Button variant="outline" asChild>
             <PrefetchLink href="/admin/users">User Management</PrefetchLink>

@@ -1,13 +1,9 @@
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 
-export type QuickFilter =
-  | "all"
-  | "active"
-  | "renewal_due"
-  | "pending_payment"
-  | "recent";
+export type StatusFilter = "all" | "active" | "passed_out" | "pending_payment";
 
-export type ServiceFilter = "all" | "swimming" | "coaching";
+/** Subscription name from catalog, or "all". */
+export type ServiceFilter = "all" | string;
 
 export type CustomerListRow = {
   id: string;
@@ -21,10 +17,15 @@ export type CustomerListRow = {
 };
 
 export type InvoiceIndexEntry = {
-  hasCoaching: boolean;
-  hasSwimming: boolean;
-  renewalDue: boolean;
   pendingPayment: boolean;
+  hasActiveSubscription: boolean;
+  hasExpiredSubscription: boolean;
+  /** All coaching package descriptions seen on invoices. */
+  subscriptionNames: string[];
+  activeSubscriptionNames: string[];
+  expiredSubscriptionNames: string[];
+  /** @deprecated Kept for display status badge logic. */
+  renewalDue: boolean;
 };
 
 type InvoiceItemLike = {
@@ -41,14 +42,25 @@ type InvoiceLike = {
 
 const RENEWAL_WINDOW_DAYS = 14;
 
+function normalizeName(value?: string | null) {
+  return (value ?? "").trim();
+}
+
+function namesMatch(a: string, b: string) {
+  return normalizeName(a).toLowerCase() === normalizeName(b).toLowerCase();
+}
+
 function isCoachingItem(item: InvoiceItemLike) {
   return item.itemType === COACHING_PACKAGE_TYPE;
 }
 
-function isSwimmingItem(item: InvoiceItemLike) {
-  if (isCoachingItem(item)) return false;
-  const text = `${item.itemType} ${item.description ?? ""}`.toLowerCase();
-  return text.includes("swim") || item.itemType !== COACHING_PACKAGE_TYPE;
+function isPackageActive(endDate?: string | null) {
+  if (!endDate) return true;
+  const end = new Date(endDate);
+  if (Number.isNaN(end.getTime())) return true;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return end >= today;
 }
 
 function isPackageRenewalDue(endDate?: string | null) {
@@ -62,7 +74,27 @@ function isPackageRenewalDue(endDate?: string | null) {
   return end <= windowEnd;
 }
 
-/** Build per-customer flags from existing invoice list API (no backend changes). */
+function addUniqueName(list: string[], name: string) {
+  const trimmed = normalizeName(name);
+  if (!trimmed) return;
+  if (!list.some((existing) => namesMatch(existing, trimmed))) {
+    list.push(trimmed);
+  }
+}
+
+function createEmptyEntry(): InvoiceIndexEntry {
+  return {
+    pendingPayment: false,
+    hasActiveSubscription: false,
+    hasExpiredSubscription: false,
+    subscriptionNames: [],
+    activeSubscriptionNames: [],
+    expiredSubscriptionNames: [],
+    renewalDue: false,
+  };
+}
+
+/** Build per-customer flags from invoice list API. */
 export function buildCustomerInvoiceIndex(
   invoices: InvoiceLike[]
 ): Map<string, InvoiceIndexEntry> {
@@ -72,33 +104,43 @@ export function buildCustomerInvoiceIndex(
     const customerId = invoice.customerId;
     if (!customerId) continue;
 
-    const entry = map.get(customerId) ?? {
-      hasCoaching: false,
-      hasSwimming: false,
-      renewalDue: false,
-      pendingPayment: false,
-    };
+    const entry = map.get(customerId) ?? createEmptyEntry();
 
     if (invoice.paymentStatus === "PENDING" || invoice.paymentStatus === "PARTIALLY_PAID") {
       entry.pendingPayment = true;
     }
 
     for (const item of invoice.items ?? []) {
-      if (isCoachingItem(item)) {
-        entry.hasCoaching = true;
-        if (isPackageRenewalDue(item.packageEndDate)) {
-          entry.renewalDue = true;
-        }
+      if (!isCoachingItem(item)) continue;
+
+      const subscriptionName = normalizeName(item.description) || "Coaching Package";
+      addUniqueName(entry.subscriptionNames, subscriptionName);
+
+      if (isPackageActive(item.packageEndDate)) {
+        addUniqueName(entry.activeSubscriptionNames, subscriptionName);
+      } else {
+        addUniqueName(entry.expiredSubscriptionNames, subscriptionName);
       }
-      if (isSwimmingItem(item)) {
-        entry.hasSwimming = true;
+
+      if (isPackageRenewalDue(item.packageEndDate)) {
+        entry.renewalDue = true;
       }
     }
 
     map.set(customerId, entry);
   }
 
+  for (const entry of map.values()) {
+    entry.hasActiveSubscription = entry.activeSubscriptionNames.length > 0;
+    entry.hasExpiredSubscription =
+      entry.expiredSubscriptionNames.length > 0 && entry.activeSubscriptionNames.length === 0;
+  }
+
   return map;
+}
+
+export function isInactiveCustomer(customer: CustomerListRow) {
+  return customer.status === "INACTIVE" || customer.status === "SUSPENDED";
 }
 
 export function getDisplayStatus(
@@ -111,81 +153,141 @@ export function getDisplayStatus(
   if (index?.pendingPayment) {
     return { label: "Pending Payment", variant: "destructive" };
   }
-  if (customer.status === "ACTIVE") {
+  if (index?.hasActiveSubscription || customer.status === "ACTIVE") {
     return { label: "Active", variant: "success" };
   }
-  if (customer.status === "SUSPENDED") {
-    return { label: "Suspended", variant: "secondary" };
+  if (isInactiveCustomer(customer) || index?.hasExpiredSubscription) {
+    return { label: "Passed Out", variant: "secondary" };
   }
-  if (customer.status === "INACTIVE") {
-    return { label: "Inactive", variant: "secondary" };
+  if (customer.status === "ACTIVE") {
+    return { label: "Active", variant: "success" };
   }
   return { label: customer.status, variant: "secondary" };
 }
 
-function isRecentCustomer(customer: CustomerListRow) {
-  const joined = new Date(customer.dateJoined);
-  if (Number.isNaN(joined.getTime())) return false;
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 30);
-  return joined >= cutoff;
-}
-
-export function matchesQuickFilter(
+export function matchesStatusFilter(
   customer: CustomerListRow,
-  filter: QuickFilter,
+  filter: StatusFilter,
   index?: InvoiceIndexEntry
 ) {
   switch (filter) {
     case "all":
       return true;
     case "active":
-      return customer.status === "ACTIVE" && !index?.renewalDue && !index?.pendingPayment;
-    case "renewal_due":
-      return Boolean(index?.renewalDue);
+      return Boolean(index?.hasActiveSubscription);
+    case "passed_out":
+      return (
+        isInactiveCustomer(customer) ||
+        Boolean(index?.hasExpiredSubscription) ||
+        (Boolean(index?.subscriptionNames.length) && !index?.hasActiveSubscription)
+      );
     case "pending_payment":
       return Boolean(index?.pendingPayment);
-    case "recent":
-      return isRecentCustomer(customer);
     default:
       return true;
   }
 }
 
 export function matchesServiceFilter(
-  customerId: string,
   filter: ServiceFilter,
+  statusFilter: StatusFilter,
   index?: InvoiceIndexEntry
 ) {
   if (filter === "all") return true;
-  if (filter === "coaching") return Boolean(index?.hasCoaching);
-  if (filter === "swimming") return Boolean(index?.hasSwimming);
-  return true;
+  if (!index) return false;
+
+  if (statusFilter === "active") {
+    return index.activeSubscriptionNames.some((name) => namesMatch(name, filter));
+  }
+
+  if (statusFilter === "passed_out") {
+    return index.expiredSubscriptionNames.some((name) => namesMatch(name, filter));
+  }
+
+  return index.subscriptionNames.some((name) => namesMatch(name, filter));
+}
+
+export function matchesCustomerSearch(customer: CustomerListRow, search: string) {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    customer.name.toLowerCase().includes(q) || (customer.mobile ?? "").includes(q)
+  );
 }
 
 export function filterCustomers(
   customers: CustomerListRow[],
   options: {
     search: string;
-    quickFilter: QuickFilter;
+    statusFilter: StatusFilter;
     serviceFilter: ServiceFilter;
     invoiceIndex: Map<string, InvoiceIndexEntry>;
   }
 ) {
-  const q = options.search.trim().toLowerCase();
-
   return customers.filter((customer) => {
     const index = options.invoiceIndex.get(customer.id);
 
-    if (!matchesQuickFilter(customer, options.quickFilter, index)) return false;
-    if (!matchesServiceFilter(customer.id, options.serviceFilter, index)) return false;
+    if (!matchesStatusFilter(customer, options.statusFilter, index)) return false;
+    if (!matchesServiceFilter(options.serviceFilter, options.statusFilter, index)) return false;
+    if (!matchesCustomerSearch(customer, options.search)) return false;
 
-    if (!q) return true;
-
-    return (
-      customer.name.toLowerCase().includes(q) ||
-      (customer.mobile ?? "").includes(q) ||
-      customer.membershipId.toLowerCase().includes(q)
-    );
+    return true;
   });
+}
+
+export type CustomerSummaryCounts = {
+  total: number;
+  active: number;
+  passedOut: number;
+  pendingPayment: number;
+};
+
+export function computeCustomerSummaryCounts(
+  customers: CustomerListRow[],
+  invoiceIndex: Map<string, InvoiceIndexEntry>
+): CustomerSummaryCounts {
+  let active = 0;
+  let passedOut = 0;
+  let pendingPayment = 0;
+
+  for (const customer of customers) {
+    const index = invoiceIndex.get(customer.id);
+    if (matchesStatusFilter(customer, "active", index)) active += 1;
+    if (matchesStatusFilter(customer, "passed_out", index)) passedOut += 1;
+    if (matchesStatusFilter(customer, "pending_payment", index)) pendingPayment += 1;
+  }
+
+  return {
+    total: customers.length,
+    active,
+    passedOut,
+    pendingPayment,
+  };
+}
+
+export function getCustomerCountLabel(options: {
+  count: number;
+  statusFilter: StatusFilter;
+  serviceFilter: ServiceFilter;
+  search: string;
+}) {
+  const { count, statusFilter, serviceFilter, search } = options;
+  const noun = count === 1 ? "Customer" : "Customers";
+  const hasSearch = search.trim().length > 0;
+  const hasService = serviceFilter !== "all";
+  const hasStatus = statusFilter !== "all";
+
+  if (hasSearch || (hasService && hasStatus)) {
+    return `${count} ${noun} Found`;
+  }
+
+  if (hasService) {
+    return `${count} ${serviceFilter} ${noun}`;
+  }
+
+  if (statusFilter === "active") return `${count} Active ${noun}`;
+  if (statusFilter === "passed_out") return `${count} Passed Out ${noun}`;
+  if (statusFilter === "pending_payment") return `${count} Pending Payment ${noun}`;
+
+  return `${count} ${noun}`;
 }

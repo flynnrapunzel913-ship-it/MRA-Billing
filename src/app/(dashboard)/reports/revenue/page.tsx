@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { RevenueReportsPanel } from "@/components/admin/revenue-reports-panel";
+import { DailyCollectionPanel } from "@/components/admin/daily-collection-panel";
 
-export default function RevenueReportsPage() {
+export default function RevenuePage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex items-center gap-4">
@@ -15,14 +15,14 @@ export default function RevenueReportsPage() {
           </Link>
         </Button>
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Revenue Reports</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Daily Collection</h2>
           <p className="text-sm text-muted-foreground">
-            Revenue logs, transaction history, and CSV export
+            End-of-day closing sheet — revenue, expenses, and collection status
           </p>
         </div>
       </div>
 
-      <RevenueReportsPanel />
+      <DailyCollectionPanel />
     </div>
   );
 }
