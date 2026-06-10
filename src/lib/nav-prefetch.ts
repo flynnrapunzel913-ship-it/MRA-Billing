@@ -59,5 +59,10 @@ export function prefetchAppRoutes(role: Role) {
         ]
       : ["/dashboard", "/invoices", "/customers", "/stock", "/expenses"];
 
-  for (const route of routes) prefetchRouteData(route);
+  for (const route of routes) {
+    prefetchRouteData(route);
+    if (role === "ADMIN" && route === "/dashboard") {
+      prefetchJson("/api/admin/financial-summary?period=today");
+    }
+  }
 }
