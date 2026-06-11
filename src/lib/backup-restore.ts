@@ -1,4 +1,4 @@
-import { Prisma, Role } from "@prisma/client";
+import { DurationUnit, Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   BACKUP_SCHEMA_VERSION,
@@ -21,7 +21,8 @@ const DATA_KEYS = [
   "invoiceItems",
   "invoiceSequences",
   "settings",
-  "subscriptions",
+  "subscriptionCategories",
+  "subscriptionPlans",
   "academyProducts",
   "stockSequences",
   "stockEntries",
@@ -164,7 +165,8 @@ export function parseBackupFile(raw: string): DatabaseBackup {
     invoiceItems: [],
     invoiceSequences: [],
     settings: [],
-    subscriptions: [],
+    subscriptionCategories: [],
+    subscriptionPlans: [],
     academyProducts: [],
     stockSequences: [],
     stockEntries: [],
@@ -293,7 +295,36 @@ export function validateBackupForRestore(backup: DatabaseBackup): void {
   collectIds(backup.data.invoiceSequences as Record<string, unknown>[], "invoiceSequence");
   collectIds(backup.data.stockSequences as Record<string, unknown>[], "stockSequence");
   collectIds(backup.data.settings as Record<string, unknown>[], "settings");
-  collectIds(backup.data.subscriptions as Record<string, unknown>[], "subscription");
+  const categoryIds = collectIds(
+    backup.data.subscriptionCategories as Record<string, unknown>[],
+    "subscriptionCategory"
+  );
+  const planIds = collectIds(
+    backup.data.subscriptionPlans as Record<string, unknown>[],
+    "subscriptionPlan"
+  );
+  for (const row of backup.data.subscriptionPlans as Record<string, unknown>[]) {
+    const categoryId = requireString(row, "categoryId");
+    if (!categoryIds.has(categoryId)) {
+      throw new BackupRestoreError("Invalid backup: subscription plan references unknown category");
+    }
+  }
+
+  for (const row of invoiceItems) {
+    const categoryId = row.subscriptionCategoryId;
+    if (categoryId !== null && categoryId !== undefined) {
+      if (typeof categoryId !== "string" || !categoryIds.has(categoryId)) {
+        throw new BackupRestoreError("Invalid backup: invoice item references unknown subscription category");
+      }
+    }
+    const planId = row.subscriptionPlanId;
+    if (planId !== null && planId !== undefined) {
+      if (typeof planId !== "string" || !planIds.has(planId)) {
+        throw new BackupRestoreError("Invalid backup: invoice item references unknown subscription plan");
+      }
+    }
+  }
+
   collectIds(backup.data.academyProducts as Record<string, unknown>[], "academyProduct");
 }
 
@@ -362,14 +393,47 @@ function mapSettings(row: Record<string, unknown>): Prisma.SettingsCreateManyInp
   };
 }
 
-function mapSubscription(row: Record<string, unknown>): Prisma.SubscriptionCreateManyInput {
+function optionalInt(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || Number.isNaN(value) || !Number.isInteger(value)) {
+    throw new BackupRestoreError("Invalid backup: expected integer or null");
+  }
+  return value;
+}
+
+function optionalDurationUnit(value: unknown): DurationUnit | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "string") {
+    throw new BackupRestoreError("Invalid backup: invalid durationUnit");
+  }
+  return value as DurationUnit;
+}
+
+function mapSubscriptionCategory(
+  row: Record<string, unknown>
+): Prisma.SubscriptionCategoryCreateManyInput {
   return {
     id: requireString(row, "id"),
     name: requireString(row, "name"),
     description: optionalString(row.description),
-    duration: requireString(row, "duration"),
+    isActive: requireBoolean(row, "isActive"),
+    createdAt: parseDateValue(row.createdAt, "createdAt"),
+    updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
+  };
+}
+
+function mapSubscriptionPlan(row: Record<string, unknown>): Prisma.SubscriptionPlanCreateManyInput {
+  return {
+    id: requireString(row, "id"),
+    categoryId: requireString(row, "categoryId"),
+    planName: requireString(row, "planName"),
     price: requireNumber(row, "price"),
-    status: requireString(row, "status") as Prisma.SubscriptionCreateManyInput["status"],
+    durationValue: optionalInt(row.durationValue),
+    durationUnit: optionalDurationUnit(row.durationUnit),
+    sessionCount: optionalInt(row.sessionCount),
+    validityDays: optionalInt(row.validityDays),
+    description: optionalString(row.description),
+    isActive: requireBoolean(row, "isActive"),
     createdAt: parseDateValue(row.createdAt, "createdAt"),
     updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
   };
@@ -447,6 +511,14 @@ function mapInvoiceItem(row: Record<string, unknown>): Prisma.InvoiceItemCreateM
     amount: requireNumber(row, "amount"),
     packageStartDate: optionalDate(row.packageStartDate),
     packageEndDate: optionalDate(row.packageEndDate),
+    subscriptionCategoryId: optionalString(row.subscriptionCategoryId),
+    subscriptionPlanId: optionalString(row.subscriptionPlanId),
+    categoryNameSnapshot: optionalString(row.categoryNameSnapshot),
+    planNameSnapshot: optionalString(row.planNameSnapshot),
+    priceSnapshot:
+      row.priceSnapshot === null || row.priceSnapshot === undefined
+        ? null
+        : requireNumber(row, "priceSnapshot"),
   };
 }
 
@@ -536,7 +608,8 @@ export async function restoreDatabaseFromBackup(
     await tx.stockEntry.deleteMany();
     await tx.customer.deleteMany();
     await tx.user.deleteMany();
-    await tx.subscription.deleteMany();
+    await tx.subscriptionPlan.deleteMany();
+    await tx.subscriptionCategory.deleteMany();
     await tx.academyProduct.deleteMany();
     await tx.invoiceSequence.deleteMany();
     await tx.stockSequence.deleteMany();
@@ -557,9 +630,18 @@ export async function restoreDatabaseFromBackup(
       await tx.settings.createMany({ data: settings.map(mapSettings) });
     }
 
-    const subscriptions = rows.subscriptions as Record<string, unknown>[];
-    if (subscriptions.length > 0) {
-      await tx.subscription.createMany({ data: subscriptions.map(mapSubscription) });
+    const subscriptionCategories = rows.subscriptionCategories as Record<string, unknown>[];
+    if (subscriptionCategories.length > 0) {
+      await tx.subscriptionCategory.createMany({
+        data: subscriptionCategories.map(mapSubscriptionCategory),
+      });
+    }
+
+    const subscriptionPlans = rows.subscriptionPlans as Record<string, unknown>[];
+    if (subscriptionPlans.length > 0) {
+      await tx.subscriptionPlan.createMany({
+        data: subscriptionPlans.map(mapSubscriptionPlan),
+      });
     }
 
     const academyProducts = rows.academyProducts as Record<string, unknown>[];

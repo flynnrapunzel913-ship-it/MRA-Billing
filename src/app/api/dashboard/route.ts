@@ -44,6 +44,10 @@ export async function GET() {
             customerName: true,
             paymentStatus: true,
             invoiceDate: true,
+            items: {
+              select: { description: true, itemType: true },
+              orderBy: { slNo: "asc" },
+            },
           },
         }),
       ]);
@@ -79,6 +83,10 @@ export async function GET() {
           invoiceDate: true,
           createdById: true,
           createdBy: { select: { name: true } },
+          items: {
+            select: { description: true, itemType: true },
+            orderBy: { slNo: "asc" },
+          },
         },
       }),
     ]);

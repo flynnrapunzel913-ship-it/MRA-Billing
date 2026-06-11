@@ -8,6 +8,11 @@ export interface InvoiceLineItem {
   unitPrice: number;
   packageStartDate?: string;
   packageEndDate?: string;
+  subscriptionCategoryId?: string;
+  subscriptionPlanId?: string;
+  categoryNameSnapshot?: string;
+  planNameSnapshot?: string;
+  priceSnapshot?: number;
 }
 
 export interface GstOptions {

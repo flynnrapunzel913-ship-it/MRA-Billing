@@ -10,9 +10,10 @@ import {
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
 import {
-  subscriptionInvoiceDescription,
-  packageEndDateFromDuration,
-} from "@/lib/catalog";
+  planInvoiceDescription,
+  packageEndDateFromPlan,
+  type CatalogPlan,
+} from "@/lib/subscription-catalog";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -47,11 +48,9 @@ interface InvoiceFormState {
   setPaymentMethod: (method: PaymentMethodType) => void;
   setAmountPaid: (amount: number) => void;
   addItem: (itemType?: ItemType) => void;
-  addSubscriptionFromCatalog: (item: {
-    name: string;
-    duration: string;
-    price: number;
-  }) => boolean;
+  addSubscriptionFromCatalog: (
+    item: CatalogPlan & { categoryName: string }
+  ) => boolean;
   addProductFromCatalog: (item: { name: string; price: number }) => boolean;
   updateItem: (index: number, item: InvoiceLineItem) => void;
   removeItem: (index: number) => void;
@@ -156,14 +155,23 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     let added = false;
     set((state) => {
       const start = state.invoiceDate;
-      const end = packageEndDateFromDuration(start, item.duration);
+      const end = packageEndDateFromPlan(start, item);
       const next = applyCatalogItem(state.items, {
         itemType: COACHING_PACKAGE_TYPE,
-        description: subscriptionInvoiceDescription(item.name, item.duration),
+        description: planInvoiceDescription(
+          item.categoryName,
+          item.planName,
+          item.durationLabel
+        ),
         quantity: 1,
         unitPrice: item.price,
         packageStartDate: start,
         packageEndDate: end,
+        subscriptionCategoryId: item.categoryId,
+        subscriptionPlanId: item.id,
+        categoryNameSnapshot: item.categoryName,
+        planNameSnapshot: item.planName,
+        priceSnapshot: item.price,
       });
       if (!next) return state;
       added = true;

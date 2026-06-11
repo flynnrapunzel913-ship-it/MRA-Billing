@@ -1,6 +1,20 @@
 import { CatalogItemStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
+export type {
+  CatalogCategory,
+  CatalogPlan,
+} from "@/lib/subscription-catalog";
+
+export {
+  planInvoiceDescription,
+  packageEndDateFromPlan,
+  formatDurationLabel,
+  listSubscriptionCategories,
+  listActiveCatalogPlans,
+} from "@/lib/subscription-catalog";
+
+/** @deprecated Use CatalogPlan */
 export type CatalogSubscription = {
   id: string;
   name: string;
@@ -22,28 +36,6 @@ export type CatalogProduct = {
   updatedAt: string;
 };
 
-export function serializeSubscription(row: {
-  id: string;
-  name: string;
-  description: string | null;
-  duration: string;
-  price: unknown;
-  status: CatalogItemStatus;
-  createdAt: Date;
-  updatedAt: Date;
-}): CatalogSubscription {
-  return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    duration: row.duration,
-    price: Number(row.price),
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
-
 export function serializeProduct(row: {
   id: string;
   name: string;
@@ -64,13 +56,14 @@ export function serializeProduct(row: {
   };
 }
 
+/** @deprecated Use planInvoiceDescription */
 export function subscriptionInvoiceDescription(name: string, duration: string) {
   const trimmed = duration.trim();
   if (!trimmed) return name;
   return `${name} (${trimmed})`;
 }
 
-/** Estimate package end date from duration label and start date (ISO date string). */
+/** @deprecated Use packageEndDateFromPlan */
 export function packageEndDateFromDuration(startDate: string, duration: string): string {
   const start = new Date(startDate);
   if (Number.isNaN(start.getTime())) return "";
@@ -97,24 +90,6 @@ export function packageEndDateFromDuration(startDate: string, duration: string):
   }
 
   return "";
-}
-
-export async function searchSubscriptions(q: string, activeOnly: boolean) {
-  return prisma.subscription.findMany({
-    where: {
-      ...(activeOnly ? { status: "ACTIVE" } : {}),
-      ...(q.trim()
-        ? {
-            OR: [
-              { name: { contains: q.trim(), mode: "insensitive" } },
-              { description: { contains: q.trim(), mode: "insensitive" } },
-              { duration: { contains: q.trim(), mode: "insensitive" } },
-            ],
-          }
-        : {}),
-    },
-    orderBy: [{ status: "asc" }, { name: "asc" }],
-  });
 }
 
 export async function searchProducts(q: string, activeOnly: boolean) {

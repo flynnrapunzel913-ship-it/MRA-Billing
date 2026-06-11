@@ -19,6 +19,7 @@ import {
 const bodySchema = z.object({
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
+  collectedByName: z.string().trim().min(1, "Collected by name is required").optional(),
   cashDenominations: z.record(z.string(), z.number().int().nonnegative()).optional(),
   cashDifferenceNotes: z.string().optional(),
 });
@@ -116,12 +117,19 @@ export async function POST(request: NextRequest) {
       parsed.data.cashDifferenceNotes
     );
 
+    const collectedByName =
+      parsed.data.collectedByName?.trim() ||
+      user!.name?.trim() ||
+      user!.username?.trim() ||
+      "Admin";
+
     const record = await prisma.dailyCollection.create({
       data: {
         collectionDate,
         notes: parsed.data.notes?.trim() || null,
         collectedAt: new Date(),
         collectedByUserId: user!.id!,
+        collectedByName,
         totalRevenue: snapshot.totalRevenue,
         subscriptionRevenue: snapshot.subscriptionRevenue,
         productRevenue: snapshot.productRevenue,
@@ -216,6 +224,9 @@ export async function PUT(request: NextRequest) {
       where: { id: existing.id },
       data: {
         notes: parsed.data.notes?.trim() || null,
+        ...(parsed.data.collectedByName
+          ? { collectedByName: parsed.data.collectedByName.trim() }
+          : {}),
         cashCountedPhysical: cash.cashCountedPhysical,
         cashDifference: cash.cashDifference,
         cashDifferenceNotes: cash.cashDifferenceNotes,

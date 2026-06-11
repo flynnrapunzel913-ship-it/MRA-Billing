@@ -1,4 +1,11 @@
+import { formatDate, formatDateInput } from "@/lib/utils";
+
 export const RECENT_INVOICE_COUNT = 10;
+
+export type InvoiceListItem = {
+  description: string;
+  itemType: string;
+};
 
 export type InvoiceListRow = {
   id: string;
@@ -8,7 +15,45 @@ export type InvoiceListRow = {
   grandTotal: string | number;
   paymentStatus: string;
   createdById?: string;
+  items?: InvoiceListItem[];
 };
+
+export type InvoiceDateGroup<T extends { invoiceDate: string }> = {
+  dateKey: string;
+  dateLabel: string;
+  invoices: T[];
+};
+
+export function groupInvoicesByDate<T extends { invoiceDate: string }>(
+  invoices: T[]
+): InvoiceDateGroup<T>[] {
+  const groups: InvoiceDateGroup<T>[] = [];
+  let currentKey: string | null = null;
+
+  for (const invoice of invoices) {
+    const key = formatDateInput(invoice.invoiceDate);
+    if (key !== currentKey) {
+      groups.push({
+        dateKey: key,
+        dateLabel: formatDate(invoice.invoiceDate),
+        invoices: [invoice],
+      });
+      currentKey = key;
+    } else {
+      groups[groups.length - 1].invoices.push(invoice);
+    }
+  }
+
+  return groups;
+}
+
+export function formatInvoiceItems(items?: InvoiceListItem[]): string {
+  if (!items?.length) return "—";
+  const names = items
+    .map((item) => item.description?.trim())
+    .filter((name): name is string => Boolean(name));
+  return names.length > 0 ? names.join(", ") : "—";
+}
 
 export function sortInvoicesNewestFirst<T extends { invoiceDate: string }>(invoices: T[]): T[] {
   return [...invoices].sort(

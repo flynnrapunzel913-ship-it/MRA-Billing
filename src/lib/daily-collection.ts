@@ -41,8 +41,7 @@ export type OutstandingPaymentRow = {
 };
 
 export type OutstandingSummary = {
-  pendingCustomerCount: number;
-  partialCustomerCount: number;
+  outstandingCustomerCount: number;
   outstandingAmount: number;
   rows: OutstandingPaymentRow[];
 };
@@ -69,6 +68,7 @@ export type CollectionRecord = {
   id: string;
   notes: string | null;
   collectedAt: string;
+  collectedByName: string | null;
   collectedBy: { id: string; name: string; username: string };
   snapshot: CollectionSnapshot | null;
   cashReconciliation: CashReconciliation | null;
@@ -188,8 +188,7 @@ function buildOutstandingSummary(
     paymentStatus: InvoicePaymentStatus;
   }>
 ): OutstandingSummary {
-  const pendingCustomers = new Set<string>();
-  const partialCustomers = new Set<string>();
+  const outstandingCustomers = new Set<string>();
   let outstandingAmount = 0;
 
   const rows: OutstandingPaymentRow[] = invoices
@@ -198,25 +197,23 @@ function buildOutstandingSummary(
         inv.paymentStatus === "PENDING" || inv.paymentStatus === "PARTIALLY_PAID"
     )
     .map((inv) => {
-    const key = inv.customerId ?? inv.customerName;
-    if (inv.paymentStatus === "PENDING") pendingCustomers.add(key);
-    if (inv.paymentStatus === "PARTIALLY_PAID") partialCustomers.add(key);
-    const amountPending = toJsonNumber(inv.amountRemaining);
-    outstandingAmount += amountPending;
-    return {
-      customerName: inv.customerName,
-      invoiceNumber: inv.invoiceNumber,
-      invoiceId: inv.id,
-      grandTotal: toJsonNumber(inv.grandTotal),
-      amountPaid: toJsonNumber(inv.amountPaid),
-      amountPending,
-      status: inv.paymentStatus,
-    };
-  });
+      const key = inv.customerId ?? inv.customerName;
+      outstandingCustomers.add(key);
+      const amountPending = toJsonNumber(inv.amountRemaining);
+      outstandingAmount += amountPending;
+      return {
+        customerName: inv.customerName,
+        invoiceNumber: inv.invoiceNumber,
+        invoiceId: inv.id,
+        grandTotal: toJsonNumber(inv.grandTotal),
+        amountPaid: toJsonNumber(inv.amountPaid),
+        amountPending,
+        status: inv.paymentStatus,
+      };
+    });
 
   return {
-    pendingCustomerCount: pendingCustomers.size,
-    partialCustomerCount: partialCustomers.size,
+    outstandingCustomerCount: outstandingCustomers.size,
     outstandingAmount,
     rows,
   };
@@ -420,6 +417,7 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
           id: collection.id,
           notes: collection.notes,
           collectedAt: collection.collectedAt.toISOString(),
+          collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
           snapshot: collectionSnapshot,
           cashReconciliation: serializeCashReconciliation(collection),

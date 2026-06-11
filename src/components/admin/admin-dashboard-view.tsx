@@ -1,23 +1,14 @@
 "use client";
 
 import { PrefetchLink } from "@/components/ui/prefetch-link";
-import { FileText, Users, Clock, Plus, Receipt, ExternalLink, Trash2 } from "lucide-react";
+import { FileText, Users, Clock, Plus, Receipt } from "lucide-react";
 import { DeleteInvoiceDialog } from "@/components/invoices/delete-invoice-dialog";
 import { useInvoiceDelete } from "@/lib/hooks/use-invoice-delete";
 import type { InvoiceListRow } from "@/lib/invoice-list-utils";
+import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatCurrency, formatDate, cn } from "@/lib/utils";
-import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import { formatKpiValue, normalizeAdminDashboardKpis } from "@/lib/dashboard-kpis";
 
 export interface AdminDashboardData {
@@ -34,6 +25,7 @@ export interface AdminDashboardData {
     invoiceDate: string;
     createdById?: string;
     createdBy?: { name: string };
+    items?: Array<{ description: string; itemType: string }>;
   }>;
 }
 
@@ -172,69 +164,12 @@ export function AdminDashboardView({
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="font-semibold">Invoice No</TableHead>
-                    <TableHead className="font-semibold">Customer</TableHead>
-                    <TableHead className="font-semibold">Date</TableHead>
-                    <TableHead className="font-semibold text-right">Amount</TableHead>
-                    <TableHead className="font-semibold">Status</TableHead>
-                    <TableHead className="font-semibold text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(data.recentInvoices ?? []).map((invoice, index) => (
-                    <TableRow
-                      key={invoice.id}
-                      className={cn(
-                        "transition-colors hover:bg-muted/30",
-                        index % 2 === 1 && "bg-muted/20"
-                      )}
-                    >
-                      <TableCell>
-                        <PrefetchLink
-                          href={`/invoices/${invoice.id}`}
-                          className="font-semibold text-primary hover:underline"
-                        >
-                          {invoice.invoiceNumber}
-                        </PrefetchLink>
-                      </TableCell>
-                      <TableCell className="font-medium">{invoice.customerName}</TableCell>
-                      <TableCell className="text-muted-foreground">{formatDate(invoice.invoiceDate)}</TableCell>
-                      <TableCell className="text-right font-semibold tabular-nums">
-                        {formatCurrency(Number(invoice.grandTotal))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
-                          {paymentStatusLabel(invoice.paymentStatus)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="outline" size="sm" className="h-8" asChild>
-                            <a href={`/api/invoices/${invoice.id}/pdf`} target="_blank" rel="noreferrer">
-                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                              PDF
-                            </a>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => setDeleteTarget(toListRow(invoice))}
-                            aria-label={`Delete ${invoice.invoiceNumber}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <RecentInvoicesTable
+              invoices={data.recentInvoices ?? []}
+              showAmount
+              showDelete
+              onDelete={(invoice) => setDeleteTarget(toListRow(invoice))}
+            />
           )}
         </CardContent>
       </Card>

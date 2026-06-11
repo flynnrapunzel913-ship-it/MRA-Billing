@@ -42,7 +42,8 @@ export default function SettingsPage() {
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
-  const { data: settings, isLoading: loading } = useCachedFetch<SettingsInput>("/api/settings");
+  const { data: settings, isLoading: loading, refetch, setData } =
+    useCachedFetch<SettingsInput>("/api/settings");
 
   const {
     register,
@@ -50,13 +51,22 @@ export default function SettingsPage() {
     reset,
     watch,
     setValue,
-    formState: { isSubmitting },
+    formState: { isSubmitting, errors },
   } = useForm<SettingsInput>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
+      academyName: "MR Academy",
+      address: "",
+      phonePrimary: "",
+      email: "",
+      gstNumber: "",
       gstEnabled: true,
       defaultCgstRate: 9,
       defaultSgstRate: 9,
+      logoUrl: "/branding/logo.png",
+      footerImageUrl: "/branding/footer-curves.jpeg",
+      headerImageUrl: "/branding/address-panel.jpeg",
+      brandColor: "#0070C0",
       termsAndConditions:
         "1. Fees once paid are non-refundable.\n2. Subject to academy rules.\n3. This is a computer generated invoice.",
     },
@@ -73,6 +83,16 @@ export default function SettingsPage() {
       gstEnabled: settings.gstEnabled ?? true,
       defaultCgstRate: Number(settings.defaultCgstRate ?? 9),
       defaultSgstRate: Number(settings.defaultSgstRate ?? 9),
+      phoneSecondary: settings.phoneSecondary ?? "",
+      website: settings.website ?? "",
+      signatureUrl: settings.signatureUrl ?? "",
+      bankName: settings.bankName ?? "",
+      bankAccount: settings.bankAccount ?? "",
+      bankIfsc: settings.bankIfsc ?? "",
+      bankBranch: settings.bankBranch ?? "",
+      upiId: settings.upiId ?? "",
+      upiQrCode: settings.upiQrCode ?? "",
+      headerImageUrl: settings.headerImageUrl ?? "/branding/address-panel.jpeg",
     });
   }, [settings, reset]);
 
@@ -82,12 +102,38 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     });
-    if (!res.ok) {
-      toast.error("Failed to save settings");
+    const result = await readApiResponse<SettingsInput>(res, "Failed to save settings");
+    if (!result.ok) {
+      toast.error(result.message);
       return;
     }
+    setData(result.data);
+    reset({
+      ...result.data,
+      gstEnabled: result.data.gstEnabled ?? true,
+      defaultCgstRate: Number(result.data.defaultCgstRate ?? 9),
+      defaultSgstRate: Number(result.data.defaultSgstRate ?? 9),
+      phoneSecondary: result.data.phoneSecondary ?? "",
+      website: result.data.website ?? "",
+      signatureUrl: result.data.signatureUrl ?? "",
+      bankName: result.data.bankName ?? "",
+      bankAccount: result.data.bankAccount ?? "",
+      bankIfsc: result.data.bankIfsc ?? "",
+      bankBranch: result.data.bankBranch ?? "",
+      upiId: result.data.upiId ?? "",
+      upiQrCode: result.data.upiQrCode ?? "",
+      headerImageUrl: result.data.headerImageUrl ?? "/branding/address-panel.jpeg",
+    });
     invalidateCache("/api/settings");
+    void refetch();
     toast.success("Settings updated");
+  };
+
+  const onInvalid = (fieldErrors: typeof errors) => {
+    const firstError = Object.values(fieldErrors)[0];
+    toast.error(
+      firstError?.message?.toString() ?? "Please fix the highlighted fields before saving"
+    );
   };
 
   const downloadDatabaseBackup = async () => {
@@ -168,7 +214,8 @@ export default function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-5">
+        <input type="hidden" {...register("headerImageUrl")} />
         <Card>
           <CardHeader>
             <CardTitle>Academy Details</CardTitle>
@@ -177,6 +224,9 @@ export default function SettingsPage() {
             <div className="space-y-2 md:col-span-2">
               <Label>Academy Name</Label>
               <Input {...register("academyName")} />
+              {errors.academyName && (
+                <p className="text-sm text-destructive">{errors.academyName.message}</p>
+              )}
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Registered Address (internal only — not printed on invoice)</Label>
@@ -193,6 +243,9 @@ export default function SettingsPage() {
             <div className="space-y-2">
               <Label>Email</Label>
               <Input {...register("email")} />
+              {errors.email && (
+                <p className="text-sm text-destructive">{errors.email.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Website</Label>
@@ -338,7 +391,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Restore Database Backup</p>
                 <p className="text-sm text-muted-foreground">
-                  Upload an S2-14 backup JSON file to replace all current system data.
+                  Upload an S2-15 backup JSON file to replace all current system data.
                 </p>
               </div>
               <input

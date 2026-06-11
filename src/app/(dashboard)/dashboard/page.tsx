@@ -10,21 +10,11 @@ import {
   Clock,
   Plus,
   Receipt,
-  ExternalLink,
 } from "lucide-react";
+import { RecentInvoicesTable } from "@/components/dashboard/recent-invoices-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { formatDate, cn } from "@/lib/utils";
-import { paymentStatusLabel, paymentStatusBadgeVariant } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 import {
   AdminDashboardView,
   type AdminDashboardData,
@@ -46,6 +36,7 @@ interface ReceptionistDashboardData {
     customerName: string;
     paymentStatus: string;
     invoiceDate: string;
+    items?: Array<{ description: string; itemType: string }>;
   }>;
 }
 
@@ -161,57 +152,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
                 No invoices yet. Create one to get started.
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/30 hover:bg-muted/30">
-                      <TableHead className="font-semibold">Invoice No</TableHead>
-                      <TableHead className="font-semibold">Customer</TableHead>
-                      <TableHead className="font-semibold">Date</TableHead>
-                      <TableHead className="font-semibold">Status</TableHead>
-                      <TableHead className="text-right font-semibold">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {(data.recentInvoices ?? []).map((invoice, index) => (
-                      <TableRow
-                        key={invoice.id}
-                        className={cn(index % 2 === 1 && "bg-muted/20")}
-                      >
-                        <TableCell>
-                          <PrefetchLink
-                            href={`/invoices/${invoice.id}`}
-                            className="font-semibold text-primary hover:underline"
-                          >
-                            {invoice.invoiceNumber}
-                          </PrefetchLink>
-                        </TableCell>
-                        <TableCell className="font-medium">{invoice.customerName}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(invoice.invoiceDate)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={paymentStatusBadgeVariant(invoice.paymentStatus)}>
-                            {paymentStatusLabel(invoice.paymentStatus)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button variant="outline" size="sm" className="h-8" asChild>
-                            <a
-                              href={`/api/invoices/${invoice.id}/pdf`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                              PDF
-                            </a>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <RecentInvoicesTable invoices={data.recentInvoices ?? []} />
             )}
             <div className="border-t border-border px-5 py-3">
               <Button variant="ghost" size="sm" asChild>

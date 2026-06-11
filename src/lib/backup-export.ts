@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 
-export const BACKUP_SCHEMA_VERSION = "S2-14";
+export const BACKUP_SCHEMA_VERSION = "S2-15";
 
 export type DatabaseBackup = {
   exportedAt: string;
@@ -15,7 +15,8 @@ export type DatabaseBackup = {
     invoiceItems: number;
     invoiceSequences: number;
     settings: number;
-    subscriptions: number;
+    subscriptionCategories: number;
+    subscriptionPlans: number;
     academyProducts: number;
     stockSequences: number;
     stockEntries: number;
@@ -31,7 +32,8 @@ export type DatabaseBackup = {
     invoiceItems: unknown[];
     invoiceSequences: unknown[];
     settings: unknown[];
-    subscriptions: unknown[];
+    subscriptionCategories: unknown[];
+    subscriptionPlans: unknown[];
     academyProducts: unknown[];
     stockSequences: unknown[];
     stockEntries: unknown[];
@@ -75,7 +77,8 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     invoiceItems,
     invoiceSequences,
     settings,
-    subscriptions,
+    subscriptionCategories,
+    subscriptionPlans,
     academyProducts,
     stockSequences,
     stockEntries,
@@ -90,7 +93,8 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     prisma.invoiceItem.findMany(),
     prisma.invoiceSequence.findMany(),
     prisma.settings.findMany(),
-    prisma.subscription.findMany(),
+    prisma.subscriptionCategory.findMany(),
+    prisma.subscriptionPlan.findMany(),
     prisma.academyProduct.findMany(),
     prisma.stockSequence.findMany(),
     prisma.stockEntry.findMany(),
@@ -107,7 +111,8 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     invoiceItems: invoiceItems.length,
     invoiceSequences: invoiceSequences.length,
     settings: settings.length,
-    subscriptions: subscriptions.length,
+    subscriptionCategories: subscriptionCategories.length,
+    subscriptionPlans: subscriptionPlans.length,
     academyProducts: academyProducts.length,
     stockSequences: stockSequences.length,
     stockEntries: stockEntries.length,
@@ -128,7 +133,8 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
       invoiceItems: serializeForBackup(invoiceItems) as unknown[],
       invoiceSequences: serializeForBackup(invoiceSequences) as unknown[],
       settings: serializeForBackup(settings) as unknown[],
-      subscriptions: serializeForBackup(subscriptions) as unknown[],
+      subscriptionCategories: serializeForBackup(subscriptionCategories) as unknown[],
+      subscriptionPlans: serializeForBackup(subscriptionPlans) as unknown[],
       academyProducts: serializeForBackup(academyProducts) as unknown[],
       stockSequences: serializeForBackup(stockSequences) as unknown[],
       stockEntries: serializeForBackup(stockEntries) as unknown[],

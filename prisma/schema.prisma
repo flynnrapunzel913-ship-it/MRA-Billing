@@ -69,6 +69,15 @@ enum CatalogItemStatus {
   INACTIVE
 }
 
+enum DurationUnit {
+  DAY
+  MONTH
+  YEAR
+  CLASS
+  HOUR
+  CUSTOM
+}
+
 model User {
   id           String          @id @default(cuid())
   username     String          @unique
@@ -178,17 +187,24 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id          String  @id @default(cuid())
-  invoiceId   String
-  slNo        Int
-  itemType    String
-  description String
-  quantity    Int     @default(1)
-  unitPrice        Decimal   @db.Decimal(10, 2)
-  amount           Decimal   @db.Decimal(12, 2)
-  packageStartDate DateTime?
-  packageEndDate   DateTime?
-  invoice          Invoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id                     String  @id @default(cuid())
+  invoiceId              String
+  slNo                   Int
+  itemType               String
+  description            String
+  quantity               Int     @default(1)
+  unitPrice              Decimal @db.Decimal(10, 2)
+  amount                 Decimal @db.Decimal(12, 2)
+  packageStartDate       DateTime?
+  packageEndDate         DateTime?
+  subscriptionCategoryId String?
+  subscriptionPlanId     String?
+  categoryNameSnapshot   String?
+  planNameSnapshot       String?
+  priceSnapshot          Decimal? @db.Decimal(10, 2)
+  invoice                Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  subscriptionCategory   SubscriptionCategory? @relation(fields: [subscriptionCategoryId], references: [id], onDelete: SetNull)
+  subscriptionPlan       SubscriptionPlan?     @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
 }
 
 model InvoiceSequence {
@@ -224,18 +240,39 @@ model Settings {
   updatedAt          DateTime @updatedAt
 }
 
-model Subscription {
+model SubscriptionCategory {
   id          String             @id @default(cuid())
   name        String
   description String?
-  duration    String
-  price       Decimal            @db.Decimal(10, 2)
-  status      CatalogItemStatus  @default(ACTIVE)
+  isActive    Boolean            @default(true)
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  plans       SubscriptionPlan[]
+  invoiceItems InvoiceItem[]
 
-  @@index([status])
+  @@index([isActive])
   @@index([name])
+}
+
+model SubscriptionPlan {
+  id             String               @id @default(cuid())
+  categoryId     String
+  category       SubscriptionCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  planName       String
+  price          Decimal              @db.Decimal(10, 2)
+  durationValue  Int?
+  durationUnit   DurationUnit?
+  sessionCount   Int?
+  validityDays   Int?
+  description    String?
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  invoiceItems   InvoiceItem[]
+
+  @@index([categoryId])
+  @@index([isActive])
+  @@index([planName])
 }
 
 model AcademyProduct {
@@ -324,6 +361,7 @@ model DailyCollection {
   notes               String?
   collectedAt         DateTime
   collectedByUserId   String
+  collectedByName     String?
   collectedBy         User     @relation(fields: [collectedByUserId], references: [id])
   totalRevenue        Decimal? @db.Decimal(12, 2)
   subscriptionRevenue Decimal? @db.Decimal(12, 2)

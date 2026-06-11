@@ -221,8 +221,7 @@ function OutstandingTable({ sheet }: { sheet: DailyCollectionSheet }) {
             <TableHead className="font-semibold">Invoice</TableHead>
             <TableHead className="text-right font-semibold">Total</TableHead>
             <TableHead className="text-right font-semibold">Paid</TableHead>
-            <TableHead className="text-right font-semibold">Pending</TableHead>
-            <TableHead className="font-semibold">Status</TableHead>
+            <TableHead className="text-right font-semibold">Outstanding</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -245,11 +244,6 @@ function OutstandingTable({ sheet }: { sheet: DailyCollectionSheet }) {
               </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(row.amountPending)}
-              </TableCell>
-              <TableCell>
-                <Badge variant={row.status === "PENDING" ? "warning" : "secondary"}>
-                  {row.status === "PENDING" ? "Pending" : "Partial"}
-                </Badge>
               </TableCell>
             </TableRow>
           ))}
@@ -329,6 +323,7 @@ export function DailyCollectionPanel() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [denominations, setDenominations] = useState<CashDenominations>(emptyCashState());
   const [collectorName, setCollectorName] = useState("");
+  const [profileDefaultName, setProfileDefaultName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -346,10 +341,19 @@ export function DailyCollectionPanel() {
       setDenominations(
         cashStateFromReconciliation(result.data.collection?.cashReconciliation)
       );
+      if (result.data.collection) {
+        setCollectorName(
+          result.data.collection.collectedByName ??
+            result.data.collection.collectedBy.name ??
+            result.data.collection.collectedBy.username
+        );
+      } else {
+        setCollectorName(profileDefaultName);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [profileDefaultName]);
 
   useEffect(() => {
     void loadSheet(selectedDate);
@@ -363,7 +367,9 @@ export function DailyCollectionPanel() {
         "Failed to load profile"
       );
       if (result.ok) {
-        setCollectorName(result.data.name || result.data.username);
+        const defaultName = result.data.name || result.data.username;
+        setProfileDefaultName(defaultName);
+        setCollectorName((prev) => prev || defaultName);
       }
     })();
   }, []);
@@ -377,6 +383,7 @@ export function DailyCollectionPanel() {
         body: JSON.stringify({
           date: selectedDate,
           notes,
+          collectedByName: collectorName.trim(),
           cashDenominations: denominations,
         }),
       });
@@ -401,6 +408,7 @@ export function DailyCollectionPanel() {
         body: JSON.stringify({
           date: selectedDate,
           notes,
+          collectedByName: collectorName.trim(),
           cashDenominations: denominations,
         }),
       });
@@ -417,8 +425,6 @@ export function DailyCollectionPanel() {
   };
 
   const collected = !!sheet?.collection;
-  const collectedByName =
-    sheet?.collection?.collectedBy.name ?? collectorName ?? "—";
 
   return (
     <div className="space-y-8">
@@ -510,17 +516,11 @@ export function DailyCollectionPanel() {
               title="Outstanding Payments"
               description="Customers who still owe money from invoices created today"
             />
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className={summaryCard}>
-                <p className="text-sm text-muted-foreground">Pending Customers</p>
+                <p className="text-sm text-muted-foreground">Outstanding Customers</p>
                 <p className="mt-1 text-2xl font-bold tabular-nums">
-                  {sheet.outstanding.pendingCustomerCount}
-                </p>
-              </div>
-              <div className={summaryCard}>
-                <p className="text-sm text-muted-foreground">Partial Payments</p>
-                <p className="mt-1 text-2xl font-bold tabular-nums">
-                  {sheet.outstanding.partialCustomerCount}
+                  {sheet.outstanding.outstandingCustomerCount}
                 </p>
               </div>
               <SummaryKpi
@@ -595,9 +595,9 @@ export function DailyCollectionPanel() {
                   <Label htmlFor="collected-by">Collected By</Label>
                   <Input
                     id="collected-by"
-                    value={collectedByName}
-                    readOnly
-                    className="bg-muted/30"
+                    value={collectorName}
+                    onChange={(e) => setCollectorName(e.target.value)}
+                    placeholder="Owner or collector name"
                   />
                 </div>
 
@@ -613,11 +613,14 @@ export function DailyCollectionPanel() {
                 </div>
 
                 {collected ? (
-                  <Button onClick={handleSaveNotes} disabled={saving}>
+                  <Button onClick={handleSaveNotes} disabled={saving || !collectorName.trim()}>
                     {saving ? "Saving…" : "Save Changes"}
                   </Button>
                 ) : (
-                  <Button onClick={handleMarkCollected} disabled={saving}>
+                  <Button
+                    onClick={handleMarkCollected}
+                    disabled={saving || !collectorName.trim()}
+                  >
                     {saving ? "Saving…" : "Mark Collection As Collected"}
                   </Button>
                 )}

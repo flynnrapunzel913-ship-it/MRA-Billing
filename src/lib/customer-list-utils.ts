@@ -32,6 +32,7 @@ type InvoiceItemLike = {
   itemType: string;
   description?: string;
   packageEndDate?: string | null;
+  categoryNameSnapshot?: string | null;
 };
 
 type InvoiceLike = {
@@ -44,6 +45,17 @@ const RENEWAL_WINDOW_DAYS = 14;
 
 function normalizeName(value?: string | null) {
   return (value ?? "").trim();
+}
+
+function subscriptionCategoryLabel(item: InvoiceItemLike): string {
+  const snapshot = normalizeName(item.categoryNameSnapshot);
+  if (snapshot) return snapshot;
+
+  const desc = normalizeName(item.description);
+  const separator = desc.indexOf(" — ");
+  if (separator > 0) return desc.slice(0, separator).trim();
+
+  return desc || "Coaching Package";
 }
 
 function namesMatch(a: string, b: string) {
@@ -113,7 +125,7 @@ export function buildCustomerInvoiceIndex(
     for (const item of invoice.items ?? []) {
       if (!isCoachingItem(item)) continue;
 
-      const subscriptionName = normalizeName(item.description) || "Coaching Package";
+      const subscriptionName = subscriptionCategoryLabel(item);
       addUniqueName(entry.subscriptionNames, subscriptionName);
 
       if (isPackageActive(item.packageEndDate)) {

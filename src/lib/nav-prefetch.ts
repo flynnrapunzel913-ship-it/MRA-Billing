@@ -17,7 +17,7 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/reports": "/api/reports",
   "/admin/users": "/api/admin/users",
   "/admin/security": "/api/admin/security/events?page=1&pageSize=25",
-  "/admin/subscriptions": "/api/admin/subscriptions",
+  "/admin/subscriptions": "/api/admin/subscription-categories",
 };
 
 export function prefetchRouteData(href: string) {
