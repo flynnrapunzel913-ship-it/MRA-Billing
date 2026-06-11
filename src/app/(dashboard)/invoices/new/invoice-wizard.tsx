@@ -35,7 +35,7 @@ import {
 } from "@/components/invoices/invoice-customer-step";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
-import { PackageItemPicker } from "@/components/catalog/package-item-picker";
+import { SubscriptionPricingPicker } from "@/components/catalog/subscription-pricing-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -236,10 +236,9 @@ export default function InvoiceWizard() {
             packageEndDate: isCoachingPackage(item.itemType)
               ? item.packageEndDate || undefined
               : undefined,
-            packageGroupId: item.packageGroupId,
-            packageItemId: item.packageItemId,
-            groupNameSnapshot: item.groupNameSnapshot,
-            itemTitleSnapshot: item.itemTitleSnapshot,
+            subscriptionPricingId: item.subscriptionPricingId,
+            sectionSnapshot: item.sectionSnapshot,
+            labelSnapshot: item.labelSnapshot,
             priceSnapshot: item.priceSnapshot,
           })),
         }),
@@ -342,14 +341,14 @@ export default function InvoiceWizard() {
               >
                 <div className="mb-4 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-border/60 bg-card/30 p-4">
-                    <PackageItemPicker
+                    <SubscriptionPricingPicker
                       onSelect={(pkg) => {
                         const added = addSubscriptionFromCatalog(pkg);
                         if (!added) {
                           toast.error("Press Add Custom Item before adding another line");
                           return;
                         }
-                        toast.success(`Added ${pkg.title}`);
+                        toast.success(`Added ${pkg.label}`);
                       }}
                     />
                   </div>

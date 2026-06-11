@@ -1,18 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { PricingSection } from "@prisma/client";
 import { readApiResponse } from "@/lib/api-error";
 import { formatCurrency } from "@/lib/utils";
-import type { CatalogPackageGroup, CatalogPackageItem } from "@/lib/package-catalog";
+import type { PricingRow, PricingSectionGroup } from "@/lib/subscription-pricing";
 import { Label } from "@/components/ui/label";
 
-type PackageItemPickerProps = {
-  onSelect: (item: CatalogPackageItem & { groupName: string }) => void;
+type SubscriptionPricingPickerProps = {
+  onSelect: (item: PricingRow & { sectionTitle: string }) => void;
 };
 
-export function PackageItemPicker({ onSelect }: PackageItemPickerProps) {
-  const [groups, setGroups] = useState<CatalogPackageGroup[]>([]);
-  const [groupId, setGroupId] = useState("");
+export function SubscriptionPricingPicker({ onSelect }: SubscriptionPricingPickerProps) {
+  const [sections, setSections] = useState<PricingSectionGroup[]>([]);
+  const [section, setSection] = useState<PricingSection>("MONTHLY_PACKAGE");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -20,11 +21,14 @@ export function PackageItemPicker({ onSelect }: PackageItemPickerProps) {
       setLoading(true);
       try {
         const res = await fetch("/api/catalog/subscriptions");
-        const result = await readApiResponse<CatalogPackageGroup[]>(res, "Failed to load packages");
+        const result = await readApiResponse<PricingSectionGroup[]>(
+          res,
+          "Failed to load packages"
+        );
         if (result.ok) {
           const rows = Array.isArray(result.data) ? result.data : [];
-          setGroups(rows);
-          if (rows[0]) setGroupId(rows[0].id);
+          setSections(rows);
+          if (rows[0]) setSection(rows[0].section);
         }
       } finally {
         setLoading(false);
@@ -32,36 +36,36 @@ export function PackageItemPicker({ onSelect }: PackageItemPickerProps) {
     })();
   }, []);
 
-  const group = groups.find((row) => row.id === groupId);
+  const group = sections.find((row) => row.section === section);
   const items = group?.items.filter((item) => item.isActive) ?? [];
 
   return (
     <div className="space-y-3">
       <div className="space-y-2">
         <Label className="text-xs font-semibold uppercase tracking-wide text-primary/80">
-          Package Group
+          Package Section
         </Label>
         <select
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          value={groupId}
-          onChange={(e) => setGroupId(e.target.value)}
-          disabled={loading || groups.length === 0}
+          value={section}
+          onChange={(e) => setSection(e.target.value as PricingSection)}
+          disabled={loading || sections.length === 0}
         >
-          {groups.map((row) => (
-            <option key={row.id} value={row.id}>
-              {row.name}
+          {sections.map((row) => (
+            <option key={row.section} value={row.section}>
+              {row.title}
             </option>
           ))}
         </select>
       </div>
       <div className="space-y-2">
         <Label className="text-xs font-semibold uppercase tracking-wide text-primary/80">
-          Select Item
+          Select Package
         </Label>
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading…</p>
         ) : items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No active items in this group.</p>
+          <p className="text-sm text-muted-foreground">No active packages in this section.</p>
         ) : (
           <div className="space-y-2">
             {items.map((item) => (
@@ -72,11 +76,11 @@ export function PackageItemPicker({ onSelect }: PackageItemPickerProps) {
                 onClick={() =>
                   onSelect({
                     ...item,
-                    groupName: group?.name ?? item.groupName,
+                    sectionTitle: group?.title ?? "",
                   })
                 }
               >
-                <span className="font-medium leading-snug">{item.title}</span>
+                <span className="font-medium">{item.label}</span>
                 <span className="shrink-0 font-semibold tabular-nums">
                   {formatCurrency(item.price)}
                 </span>

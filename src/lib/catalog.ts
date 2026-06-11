@@ -2,15 +2,18 @@ import { CatalogItemStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export type {
-  CatalogPackageGroup,
-  CatalogPackageItem,
-} from "@/lib/package-catalog";
+  PricingRow,
+  PricingSectionGroup,
+} from "@/lib/subscription-pricing";
 
 export {
-  packageInvoiceDescription,
-  listPackageGroups,
-  listActivePackageItems,
-} from "@/lib/package-catalog";
+  pricingInvoiceDescription,
+  sectionTitle,
+  listSubscriptionPricing,
+  listPricingCatalog,
+  PRICING_SECTION_META,
+  PRICING_SECTION_ORDER,
+} from "@/lib/subscription-pricing";
 
 export type CatalogProduct = {
   id: string;

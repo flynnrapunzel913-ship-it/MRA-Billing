@@ -9,7 +9,7 @@ import {
   COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
-import { packageInvoiceDescription, type CatalogPackageItem } from "@/lib/package-catalog";
+import { pricingInvoiceDescription, type PricingRow } from "@/lib/subscription-pricing";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -45,7 +45,7 @@ interface InvoiceFormState {
   setAmountPaid: (amount: number) => void;
   addItem: (itemType?: ItemType) => void;
   addSubscriptionFromCatalog: (
-    item: CatalogPackageItem & { groupName: string }
+    item: PricingRow & { sectionTitle: string }
   ) => boolean;
   addProductFromCatalog: (item: { name: string; price: number }) => boolean;
   updateItem: (index: number, item: InvoiceLineItem) => void;
@@ -152,15 +152,14 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     set((state) => {
       const next = applyCatalogItem(state.items, {
         itemType: COACHING_PACKAGE_TYPE,
-        description: packageInvoiceDescription(item.groupName, item.title),
+        description: pricingInvoiceDescription(item.section, item.label),
         quantity: 1,
         unitPrice: item.price,
         packageStartDate: state.invoiceDate,
         packageEndDate: "",
-        packageGroupId: item.groupId,
-        packageItemId: item.id,
-        groupNameSnapshot: item.groupName,
-        itemTitleSnapshot: item.title,
+        subscriptionPricingId: item.id,
+        sectionSnapshot: item.section,
+        labelSnapshot: item.label,
         priceSnapshot: item.price,
       });
       if (!next) return state;

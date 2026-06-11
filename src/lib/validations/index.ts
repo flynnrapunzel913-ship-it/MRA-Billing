@@ -43,10 +43,9 @@ export const invoiceItemSchema = z.object({
   unitPrice: z.number().nonnegative(),
   packageStartDate: z.string().optional(),
   packageEndDate: z.string().optional(),
-  packageGroupId: z.string().optional(),
-  packageItemId: z.string().optional(),
-  groupNameSnapshot: z.string().optional(),
-  itemTitleSnapshot: z.string().optional(),
+  subscriptionPricingId: z.string().optional(),
+  sectionSnapshot: z.string().optional(),
+  labelSnapshot: z.string().optional(),
   priceSnapshot: z.number().nonnegative().optional(),
 });
 
@@ -162,15 +161,15 @@ export const resetPasswordSchema = z.object({
 
 export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 
-export const packageGroupSchema = z.object({
-  name: z.string().min(2, "Group name is required"),
-  description: z.string().optional(),
-  isActive: z.boolean(),
-});
+const pricingSectionSchema = z.enum([
+  "MONTHLY_PACKAGE",
+  "COACHING_PACKAGE",
+  "CASUAL_SWIMMING",
+]);
 
-export const packageItemSchema = z.object({
-  groupId: z.string().min(1, "Package group is required"),
-  title: z.string().min(1, "Title is required"),
+export const subscriptionPricingSchema = z.object({
+  section: pricingSectionSchema,
+  label: z.string().min(1, "Label is required"),
   price: z.number().nonnegative("Price must be zero or greater"),
   description: z.string().optional().nullable(),
   isActive: z.boolean(),
@@ -186,8 +185,7 @@ export const academyProductSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type PackageGroupInput = z.infer<typeof packageGroupSchema>;
-export type PackageItemInput = z.infer<typeof packageItemSchema>;
+export type SubscriptionPricingInput = z.infer<typeof subscriptionPricingSchema>;
 export type AcademyProductInput = z.infer<typeof academyProductSchema>;
 export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;

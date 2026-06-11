@@ -391,7 +391,7 @@ export default function SettingsPage() {
               <div>
                 <p className="text-sm font-medium">Restore Database Backup</p>
                 <p className="text-sm text-muted-foreground">
-                  Upload an S2-16 backup JSON file to replace all current system data.
+                  Upload an S2-17 backup JSON file to replace all current system data.
                 </p>
               </div>
               <input

@@ -32,7 +32,8 @@ type InvoiceItemLike = {
   itemType: string;
   description?: string;
   packageEndDate?: string | null;
-  groupNameSnapshot?: string | null;
+  sectionSnapshot?: string | null;
+  labelSnapshot?: string | null;
 };
 
 type InvoiceLike = {
@@ -47,9 +48,11 @@ function normalizeName(value?: string | null) {
   return (value ?? "").trim();
 }
 
-function packageGroupLabel(item: InvoiceItemLike): string {
-  const snapshot = normalizeName(item.groupNameSnapshot);
-  if (snapshot) return snapshot;
+function pricingSectionLabel(item: InvoiceItemLike): string {
+  const section = normalizeName(item.sectionSnapshot);
+  if (section === "MONTHLY_PACKAGE") return "Monthly Package (Without Coaching)";
+  if (section === "COACHING_PACKAGE") return "Basic Coaching Package";
+  if (section === "CASUAL_SWIMMING") return "Casual Swimming";
 
   const desc = normalizeName(item.description);
   const separator = desc.indexOf(" — ");
@@ -125,7 +128,7 @@ export function buildCustomerInvoiceIndex(
     for (const item of invoice.items ?? []) {
       if (!isCoachingItem(item)) continue;
 
-      const subscriptionName = packageGroupLabel(item);
+      const subscriptionName = pricingSectionLabel(item);
       addUniqueName(entry.subscriptionNames, subscriptionName);
 
       if (isPackageActive(item.packageEndDate)) {

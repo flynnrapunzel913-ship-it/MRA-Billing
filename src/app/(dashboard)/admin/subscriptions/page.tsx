@@ -19,7 +19,7 @@ import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { CatalogProduct } from "@/lib/catalog";
-import { PackagePriceListPanel } from "@/components/admin/package-price-list-panel";
+import { SubscriptionPricingPanel } from "@/components/admin/subscription-pricing-panel";
 import { ProductFormDialog } from "@/components/admin/product-form-dialog";
 
 type Tab = "subscriptions" | "products";
@@ -114,9 +114,9 @@ export default function SubscriptionManagementPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Price List</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Subscription Pricing</h2>
           <p className="text-sm text-muted-foreground">
-            Enter packages exactly as on your printed price sheet
+            MR Academy price list — monthly, coaching, and casual swimming
           </p>
         </div>
         {tab === "products" && (
@@ -160,13 +160,13 @@ export default function SubscriptionManagementPage() {
       {tab === "subscriptions" ? (
         <Card className={glassCard}>
           <CardHeader className="border-b border-[#E2E8F0]/80 pb-4 dark:border-white/10">
-            <CardTitle className="text-lg">Package Price List</CardTitle>
+            <CardTitle className="text-lg">Price List</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Create a group, then add items with a title and price
+              Three sections matching the printed rate card
             </p>
           </CardHeader>
           <CardContent className="p-5">
-            <PackagePriceListPanel />
+            <SubscriptionPricingPanel />
           </CardContent>
         </Card>
       ) : (

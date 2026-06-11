@@ -21,8 +21,7 @@ const DATA_KEYS = [
   "invoiceItems",
   "invoiceSequences",
   "settings",
-  "packageGroups",
-  "packageItems",
+  "subscriptionPricing",
   "academyProducts",
   "stockSequences",
   "stockEntries",
@@ -165,8 +164,7 @@ export function parseBackupFile(raw: string): DatabaseBackup {
     invoiceItems: [],
     invoiceSequences: [],
     settings: [],
-    packageGroups: [],
-    packageItems: [],
+    subscriptionPricing: [],
     academyProducts: [],
     stockSequences: [],
     stockEntries: [],
@@ -295,32 +293,18 @@ export function validateBackupForRestore(backup: DatabaseBackup): void {
   collectIds(backup.data.invoiceSequences as Record<string, unknown>[], "invoiceSequence");
   collectIds(backup.data.stockSequences as Record<string, unknown>[], "stockSequence");
   collectIds(backup.data.settings as Record<string, unknown>[], "settings");
-  const groupIds = collectIds(
-    backup.data.packageGroups as Record<string, unknown>[],
-    "packageGroup"
+  const pricingIds = collectIds(
+    backup.data.subscriptionPricing as Record<string, unknown>[],
+    "subscriptionPricing"
   );
-  const itemIds = collectIds(
-    backup.data.packageItems as Record<string, unknown>[],
-    "packageItem"
-  );
-  for (const row of backup.data.packageItems as Record<string, unknown>[]) {
-    const groupId = requireString(row, "groupId");
-    if (!groupIds.has(groupId)) {
-      throw new BackupRestoreError("Invalid backup: package item references unknown group");
-    }
-  }
 
   for (const row of invoiceItems) {
-    const groupId = row.packageGroupId;
-    if (groupId !== null && groupId !== undefined) {
-      if (typeof groupId !== "string" || !groupIds.has(groupId)) {
-        throw new BackupRestoreError("Invalid backup: invoice item references unknown package group");
-      }
-    }
-    const itemId = row.packageItemId;
-    if (itemId !== null && itemId !== undefined) {
-      if (typeof itemId !== "string" || !itemIds.has(itemId)) {
-        throw new BackupRestoreError("Invalid backup: invoice item references unknown package item");
+    const pricingId = row.subscriptionPricingId;
+    if (pricingId !== null && pricingId !== undefined) {
+      if (typeof pricingId !== "string" || !pricingIds.has(pricingId)) {
+        throw new BackupRestoreError(
+          "Invalid backup: invoice item references unknown subscription pricing"
+        );
       }
     }
   }
@@ -393,22 +377,13 @@ function mapSettings(row: Record<string, unknown>): Prisma.SettingsCreateManyInp
   };
 }
 
-function mapPackageGroup(row: Record<string, unknown>): Prisma.PackageGroupCreateManyInput {
+function mapSubscriptionPricing(
+  row: Record<string, unknown>
+): Prisma.SubscriptionPricingCreateManyInput {
   return {
     id: requireString(row, "id"),
-    name: requireString(row, "name"),
-    description: optionalString(row.description),
-    isActive: requireBoolean(row, "isActive"),
-    createdAt: parseDateValue(row.createdAt, "createdAt"),
-    updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
-  };
-}
-
-function mapPackageItem(row: Record<string, unknown>): Prisma.PackageItemCreateManyInput {
-  return {
-    id: requireString(row, "id"),
-    groupId: requireString(row, "groupId"),
-    title: requireString(row, "title"),
+    section: requireString(row, "section") as Prisma.SubscriptionPricingCreateManyInput["section"],
+    label: requireString(row, "label"),
     price: requireNumber(row, "price"),
     description: optionalString(row.description),
     isActive: requireBoolean(row, "isActive"),
@@ -489,10 +464,9 @@ function mapInvoiceItem(row: Record<string, unknown>): Prisma.InvoiceItemCreateM
     amount: requireNumber(row, "amount"),
     packageStartDate: optionalDate(row.packageStartDate),
     packageEndDate: optionalDate(row.packageEndDate),
-    packageGroupId: optionalString(row.packageGroupId),
-    packageItemId: optionalString(row.packageItemId),
-    groupNameSnapshot: optionalString(row.groupNameSnapshot),
-    itemTitleSnapshot: optionalString(row.itemTitleSnapshot),
+    subscriptionPricingId: optionalString(row.subscriptionPricingId),
+    sectionSnapshot: optionalString(row.sectionSnapshot),
+    labelSnapshot: optionalString(row.labelSnapshot),
     priceSnapshot:
       row.priceSnapshot === null || row.priceSnapshot === undefined
         ? null
@@ -586,8 +560,7 @@ export async function restoreDatabaseFromBackup(
     await tx.stockEntry.deleteMany();
     await tx.customer.deleteMany();
     await tx.user.deleteMany();
-    await tx.packageItem.deleteMany();
-    await tx.packageGroup.deleteMany();
+    await tx.subscriptionPricing.deleteMany();
     await tx.academyProduct.deleteMany();
     await tx.invoiceSequence.deleteMany();
     await tx.stockSequence.deleteMany();
@@ -608,17 +581,10 @@ export async function restoreDatabaseFromBackup(
       await tx.settings.createMany({ data: settings.map(mapSettings) });
     }
 
-    const packageGroups = rows.packageGroups as Record<string, unknown>[];
-    if (packageGroups.length > 0) {
-      await tx.packageGroup.createMany({
-        data: packageGroups.map(mapPackageGroup),
-      });
-    }
-
-    const packageItems = rows.packageItems as Record<string, unknown>[];
-    if (packageItems.length > 0) {
-      await tx.packageItem.createMany({
-        data: packageItems.map(mapPackageItem),
+    const subscriptionPricing = rows.subscriptionPricing as Record<string, unknown>[];
+    if (subscriptionPricing.length > 0) {
+      await tx.subscriptionPricing.createMany({
+        data: subscriptionPricing.map(mapSubscriptionPricing),
       });
     }
 

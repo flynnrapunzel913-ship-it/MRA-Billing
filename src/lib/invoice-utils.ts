@@ -8,10 +8,9 @@ export interface InvoiceLineItem {
   unitPrice: number;
   packageStartDate?: string;
   packageEndDate?: string;
-  packageGroupId?: string;
-  packageItemId?: string;
-  groupNameSnapshot?: string;
-  itemTitleSnapshot?: string;
+  subscriptionPricingId?: string;
+  sectionSnapshot?: string;
+  labelSnapshot?: string;
   priceSnapshot?: number;
 }
 

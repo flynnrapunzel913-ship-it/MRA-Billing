@@ -3,39 +3,38 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { PricingSection } from "@prisma/client";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { packageItemSchema, type PackageItemInput } from "@/lib/validations";
+import {
+  subscriptionPricingSchema,
+  type SubscriptionPricingInput,
+} from "@/lib/validations";
+import { PRICING_SECTION_META } from "@/lib/subscription-pricing";
+import type { PricingRow } from "@/lib/subscription-pricing";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: PackageItemInput) => Promise<void>;
-  groupId: string;
-  groupName: string;
-  initial?: {
-    id: string;
-    groupId: string;
-    title: string;
-    price: number;
-    description: string | null;
-    isActive: boolean;
-  };
+  onSubmit: (data: SubscriptionPricingInput) => Promise<void>;
+  section: PricingSection;
+  initial?: PricingRow;
   saving?: boolean;
 };
 
-export function PackageItemFormDialog({
+export function SubscriptionPricingFormDialog({
   open,
   onClose,
   onSubmit,
-  groupId,
-  groupName,
+  section,
   initial,
   saving,
 }: Props) {
+  const meta = PRICING_SECTION_META[section];
+
   const {
     register,
     handleSubmit,
@@ -43,11 +42,11 @@ export function PackageItemFormDialog({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<PackageItemInput>({
-    resolver: zodResolver(packageItemSchema),
+  } = useForm<SubscriptionPricingInput>({
+    resolver: zodResolver(subscriptionPricingSchema),
     defaultValues: {
-      groupId,
-      title: "",
+      section,
+      label: "",
       price: 0,
       description: "",
       isActive: true,
@@ -61,22 +60,22 @@ export function PackageItemFormDialog({
     reset(
       initial
         ? {
-            groupId: initial.groupId,
-            title: initial.title,
+            section: initial.section,
+            label: initial.label,
             price: initial.price,
             description: initial.description ?? "",
             isActive: initial.isActive,
           }
-        : { groupId, title: "", price: 0, description: "", isActive: true }
+        : { section, label: "", price: 0, description: "", isActive: true }
     );
-  }, [open, initial, groupId, reset]);
+  }, [open, initial, section, reset]);
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? "Edit Package Item" : "Add Package Item"}
-      description={groupName}
+      title={initial ? `Edit — ${meta.title}` : meta.addLabel}
+      description={meta.title}
       maxWidth="md"
       footer={
         <>
@@ -84,17 +83,17 @@ export function PackageItemFormDialog({
             Cancel
           </Button>
           <Button disabled={saving} onClick={handleSubmit(onSubmit)}>
-            {saving ? "Saving…" : initial ? "Save Item" : "Add Item"}
+            {saving ? "Saving…" : initial ? "Save" : "Add"}
           </Button>
         </>
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        <input type="hidden" {...register("groupId")} />
+        <input type="hidden" {...register("section")} />
         <div className="space-y-2">
-          <Label>Title</Label>
-          <Input {...register("title")} placeholder="1 Month" />
-          {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
+          <Label>{meta.labelField}</Label>
+          <Input {...register("label")} placeholder={meta.labelPlaceholder} />
+          {errors.label && <p className="text-sm text-destructive">{errors.label.message}</p>}
         </div>
         <div className="space-y-2">
           <Label>Price (₹)</Label>
@@ -109,11 +108,7 @@ export function PackageItemFormDialog({
         </div>
         <div className="space-y-2">
           <Label>Description (optional)</Label>
-          <Textarea
-            {...register("description")}
-            rows={2}
-            placeholder="Extra note shown on the price list"
-          />
+          <Textarea {...register("description")} rows={2} />
         </div>
         {initial && (
           <label className="flex items-center gap-2 text-sm">

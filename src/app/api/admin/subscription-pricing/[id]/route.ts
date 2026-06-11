@@ -1,15 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
-import { serializePackageGroup } from "@/lib/package-catalog";
-import { packageItemSchema } from "@/lib/validations";
+import { serializePricingRow } from "@/lib/subscription-pricing";
+import { subscriptionPricingSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 
 type Params = { params: Promise<{ id: string }> };
 
-const itemUpdateSchema = packageItemSchema.omit({ groupId: true }).partial().extend({
-  groupId: packageItemSchema.shape.groupId.optional(),
-});
+const pricingUpdateSchema = subscriptionPricingSchema.partial();
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
@@ -18,17 +16,17 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const { id } = await params;
     const body = await request.json();
-    const parsed = itemUpdateSchema.safeParse(body);
+    const parsed = pricingUpdateSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
     const data = parsed.data;
-    const updated = await prisma.packageItem.update({
+    const updated = await prisma.subscriptionPricing.update({
       where: { id },
       data: {
-        ...(data.groupId ? { groupId: data.groupId } : {}),
-        ...(data.title !== undefined ? { title: data.title.trim() } : {}),
+        ...(data.section !== undefined ? { section: data.section } : {}),
+        ...(data.label !== undefined ? { label: data.label.trim() } : {}),
         ...(data.price !== undefined ? { price: data.price } : {}),
         ...(data.description !== undefined
           ? { description: data.description?.trim() || null }
@@ -37,14 +35,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       },
     });
 
-    const group = await prisma.packageGroup.findUnique({
-      where: { id: updated.groupId },
-      include: { items: { orderBy: [{ price: "asc" }, { title: "asc" }] } },
-    });
-
-    return NextResponse.json(group ? serializePackageGroup(group) : { success: true });
+    return NextResponse.json(serializePricingRow(updated));
   } catch (error) {
-    return apiErrorResponse(error, "Failed to update package item");
+    return apiErrorResponse(error, "Failed to update pricing entry");
   }
 }
 
@@ -54,12 +47,9 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
     if (error) return error;
 
     const { id } = await params;
-    await prisma.packageItem.update({
-      where: { id },
-      data: { isActive: false },
-    });
+    await prisma.subscriptionPricing.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error) {
-    return apiErrorResponse(error, "Failed to disable package item");
+    return apiErrorResponse(error, "Failed to delete pricing entry");
   }
 }
