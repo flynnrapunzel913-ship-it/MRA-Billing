@@ -32,7 +32,7 @@ type InvoiceItemLike = {
   itemType: string;
   description?: string;
   packageEndDate?: string | null;
-  categoryNameSnapshot?: string | null;
+  groupNameSnapshot?: string | null;
 };
 
 type InvoiceLike = {
@@ -47,8 +47,8 @@ function normalizeName(value?: string | null) {
   return (value ?? "").trim();
 }
 
-function subscriptionCategoryLabel(item: InvoiceItemLike): string {
-  const snapshot = normalizeName(item.categoryNameSnapshot);
+function packageGroupLabel(item: InvoiceItemLike): string {
+  const snapshot = normalizeName(item.groupNameSnapshot);
   if (snapshot) return snapshot;
 
   const desc = normalizeName(item.description);
@@ -125,7 +125,7 @@ export function buildCustomerInvoiceIndex(
     for (const item of invoice.items ?? []) {
       if (!isCoachingItem(item)) continue;
 
-      const subscriptionName = subscriptionCategoryLabel(item);
+      const subscriptionName = packageGroupLabel(item);
       addUniqueName(entry.subscriptionNames, subscriptionName);
 
       if (isPackageActive(item.packageEndDate)) {

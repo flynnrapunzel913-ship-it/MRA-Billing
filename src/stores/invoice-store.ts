@@ -9,11 +9,7 @@ import {
   COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
-import {
-  planInvoiceDescription,
-  packageEndDateFromPlan,
-  type CatalogPlan,
-} from "@/lib/subscription-catalog";
+import { packageInvoiceDescription, type CatalogPackageItem } from "@/lib/package-catalog";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -49,7 +45,7 @@ interface InvoiceFormState {
   setAmountPaid: (amount: number) => void;
   addItem: (itemType?: ItemType) => void;
   addSubscriptionFromCatalog: (
-    item: CatalogPlan & { categoryName: string }
+    item: CatalogPackageItem & { groupName: string }
   ) => boolean;
   addProductFromCatalog: (item: { name: string; price: number }) => boolean;
   updateItem: (index: number, item: InvoiceLineItem) => void;
@@ -154,23 +150,17 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   addSubscriptionFromCatalog: (item) => {
     let added = false;
     set((state) => {
-      const start = state.invoiceDate;
-      const end = packageEndDateFromPlan(start, item);
       const next = applyCatalogItem(state.items, {
         itemType: COACHING_PACKAGE_TYPE,
-        description: planInvoiceDescription(
-          item.categoryName,
-          item.planName,
-          item.durationLabel
-        ),
+        description: packageInvoiceDescription(item.groupName, item.title),
         quantity: 1,
         unitPrice: item.price,
-        packageStartDate: start,
-        packageEndDate: end,
-        subscriptionCategoryId: item.categoryId,
-        subscriptionPlanId: item.id,
-        categoryNameSnapshot: item.categoryName,
-        planNameSnapshot: item.planName,
+        packageStartDate: state.invoiceDate,
+        packageEndDate: "",
+        packageGroupId: item.groupId,
+        packageItemId: item.id,
+        groupNameSnapshot: item.groupName,
+        itemTitleSnapshot: item.title,
         priceSnapshot: item.price,
       });
       if (!next) return state;

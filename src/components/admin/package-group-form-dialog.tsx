@@ -8,27 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  subscriptionCategorySchema,
-  type SubscriptionCategoryInput,
-} from "@/lib/validations";
-import type { CatalogCategory } from "@/lib/subscription-catalog";
+import { packageGroupSchema, type PackageGroupInput } from "@/lib/validations";
+import type { CatalogPackageGroup } from "@/lib/package-catalog";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSubmit: (data: SubscriptionCategoryInput) => Promise<void>;
-  initial?: CatalogCategory;
+  onSubmit: (data: PackageGroupInput) => Promise<void>;
+  initial?: CatalogPackageGroup;
   saving?: boolean;
 };
 
-export function SubscriptionCategoryFormDialog({
-  open,
-  onClose,
-  onSubmit,
-  initial,
-  saving,
-}: Props) {
+export function PackageGroupFormDialog({ open, onClose, onSubmit, initial, saving }: Props) {
   const {
     register,
     handleSubmit,
@@ -36,8 +27,8 @@ export function SubscriptionCategoryFormDialog({
     watch,
     setValue,
     formState: { errors },
-  } = useForm<SubscriptionCategoryInput>({
-    resolver: zodResolver(subscriptionCategorySchema),
+  } = useForm<PackageGroupInput>({
+    resolver: zodResolver(packageGroupSchema),
     defaultValues: { name: "", description: "", isActive: true },
   });
 
@@ -60,7 +51,7 @@ export function SubscriptionCategoryFormDialog({
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? "Edit Category" : "New Subscription Category"}
+      title={initial ? "Edit Package Group" : "New Package Group"}
       maxWidth="md"
       footer={
         <>
@@ -68,29 +59,31 @@ export function SubscriptionCategoryFormDialog({
             Cancel
           </Button>
           <Button disabled={saving} onClick={handleSubmit(onSubmit)}>
-            {saving ? "Saving…" : initial ? "Save Category" : "Create Category"}
+            {saving ? "Saving…" : initial ? "Save Group" : "Create Group"}
           </Button>
         </>
       }
     >
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-2">
-          <Label>Category Name</Label>
+          <Label>Group Name</Label>
           <Input {...register("name")} placeholder="Monthly Package (Without Coaching)" />
           {errors.name && <p className="text-sm text-destructive">{errors.name.message}</p>}
         </div>
         <div className="space-y-2">
-          <Label>Description</Label>
-          <Textarea {...register("description")} rows={3} />
+          <Label>Description (optional)</Label>
+          <Textarea {...register("description")} rows={3} placeholder="Shown below the group heading" />
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={isActive}
-            onChange={(e) => setValue("isActive", e.target.checked)}
-          />
-          Active
-        </label>
+        {initial && (
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={isActive}
+              onChange={(e) => setValue("isActive", e.target.checked)}
+            />
+            Active on price list
+          </label>
+        )}
       </form>
     </Modal>
   );

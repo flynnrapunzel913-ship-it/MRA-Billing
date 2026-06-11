@@ -35,7 +35,7 @@ import {
 } from "@/components/invoices/invoice-customer-step";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
-import { SubscriptionPlanPicker } from "@/components/catalog/subscription-plan-picker";
+import { PackageItemPicker } from "@/components/catalog/package-item-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -236,10 +236,10 @@ export default function InvoiceWizard() {
             packageEndDate: isCoachingPackage(item.itemType)
               ? item.packageEndDate || undefined
               : undefined,
-            subscriptionCategoryId: item.subscriptionCategoryId,
-            subscriptionPlanId: item.subscriptionPlanId,
-            categoryNameSnapshot: item.categoryNameSnapshot,
-            planNameSnapshot: item.planNameSnapshot,
+            packageGroupId: item.packageGroupId,
+            packageItemId: item.packageItemId,
+            groupNameSnapshot: item.groupNameSnapshot,
+            itemTitleSnapshot: item.itemTitleSnapshot,
             priceSnapshot: item.priceSnapshot,
           })),
         }),
@@ -342,14 +342,14 @@ export default function InvoiceWizard() {
               >
                 <div className="mb-4 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-lg border border-border/60 bg-card/30 p-4">
-                    <SubscriptionPlanPicker
-                      onSelect={(plan) => {
-                        const added = addSubscriptionFromCatalog(plan);
+                    <PackageItemPicker
+                      onSelect={(pkg) => {
+                        const added = addSubscriptionFromCatalog(pkg);
                         if (!added) {
                           toast.error("Press Add Custom Item before adding another line");
                           return;
                         }
-                        toast.success(`Added ${plan.planName}`);
+                        toast.success(`Added ${pkg.title}`);
                       }}
                     />
                   </div>

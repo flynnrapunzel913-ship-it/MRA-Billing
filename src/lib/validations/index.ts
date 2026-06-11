@@ -43,10 +43,10 @@ export const invoiceItemSchema = z.object({
   unitPrice: z.number().nonnegative(),
   packageStartDate: z.string().optional(),
   packageEndDate: z.string().optional(),
-  subscriptionCategoryId: z.string().optional(),
-  subscriptionPlanId: z.string().optional(),
-  categoryNameSnapshot: z.string().optional(),
-  planNameSnapshot: z.string().optional(),
+  packageGroupId: z.string().optional(),
+  packageItemId: z.string().optional(),
+  groupNameSnapshot: z.string().optional(),
+  itemTitleSnapshot: z.string().optional(),
   priceSnapshot: z.number().nonnegative().optional(),
 });
 
@@ -162,33 +162,18 @@ export const resetPasswordSchema = z.object({
 
 export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 
-const durationUnitSchema = z.enum(["DAY", "MONTH", "YEAR", "CLASS", "HOUR", "CUSTOM"]);
-
-export const subscriptionCategorySchema = z.object({
-  name: z.string().min(2, "Category name is required"),
+export const packageGroupSchema = z.object({
+  name: z.string().min(2, "Group name is required"),
   description: z.string().optional(),
   isActive: z.boolean(),
 });
 
-export const subscriptionPlanSchema = z.object({
-  categoryId: z.string().min(1, "Category is required"),
-  planName: z.string().min(1, "Plan name is required"),
+export const packageItemSchema = z.object({
+  groupId: z.string().min(1, "Package group is required"),
+  title: z.string().min(1, "Title is required"),
   price: z.number().nonnegative("Price must be zero or greater"),
-  durationValue: z.number().int().positive().optional().nullable(),
-  durationUnit: durationUnitSchema.optional().nullable(),
-  sessionCount: z.number().int().positive().optional().nullable(),
-  validityDays: z.number().int().positive().optional().nullable(),
   description: z.string().optional().nullable(),
   isActive: z.boolean(),
-});
-
-/** @deprecated Use subscriptionCategorySchema + subscriptionPlanSchema */
-export const subscriptionSchema = z.object({
-  name: z.string().min(2, "Subscription name is required"),
-  description: z.string().optional(),
-  duration: z.string().min(1, "Duration is required"),
-  price: z.number().nonnegative("Price must be zero or greater"),
-  status: catalogItemStatusSchema.default("ACTIVE"),
 });
 
 export const academyProductSchema = z.object({
@@ -201,9 +186,8 @@ export const academyProductSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type SubscriptionCategoryInput = z.infer<typeof subscriptionCategorySchema>;
-export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanSchema>;
-export type SubscriptionInput = z.infer<typeof subscriptionSchema>;
+export type PackageGroupInput = z.infer<typeof packageGroupSchema>;
+export type PackageItemInput = z.infer<typeof packageItemSchema>;
 export type AcademyProductInput = z.infer<typeof academyProductSchema>;
 export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;

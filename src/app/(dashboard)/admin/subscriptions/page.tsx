@@ -19,7 +19,7 @@ import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { CatalogProduct } from "@/lib/catalog";
-import { SubscriptionCatalogPanel } from "@/components/admin/subscription-catalog-panel";
+import { PackagePriceListPanel } from "@/components/admin/package-price-list-panel";
 import { ProductFormDialog } from "@/components/admin/product-form-dialog";
 
 type Tab = "subscriptions" | "products";
@@ -114,9 +114,9 @@ export default function SubscriptionManagementPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Subscription Management</h2>
+          <h2 className="text-2xl font-bold tracking-tight">Price List</h2>
           <p className="text-sm text-muted-foreground">
-            Manage package categories, plans, and products for invoices
+            Enter packages exactly as on your printed price sheet
           </p>
         </div>
         {tab === "products" && (
@@ -160,13 +160,13 @@ export default function SubscriptionManagementPage() {
       {tab === "subscriptions" ? (
         <Card className={glassCard}>
           <CardHeader className="border-b border-[#E2E8F0]/80 pb-4 dark:border-white/10">
-            <CardTitle className="text-lg">Package Catalog</CardTitle>
+            <CardTitle className="text-lg">Package Price List</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Categories with multiple plans — fully configurable without code changes
+              Create a group, then add items with a title and price
             </p>
           </CardHeader>
           <CardContent className="p-5">
-            <SubscriptionCatalogPanel />
+            <PackagePriceListPanel />
           </CardContent>
         </Card>
       ) : (
