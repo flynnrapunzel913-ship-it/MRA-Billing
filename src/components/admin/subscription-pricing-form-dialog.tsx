@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { PricingSection } from "@prisma/client";
@@ -13,8 +13,12 @@ import {
   subscriptionPricingSchema,
   type SubscriptionPricingInput,
 } from "@/lib/validations";
-import { PRICING_SECTION_META } from "@/lib/subscription-pricing";
-import type { PricingRow } from "@/lib/subscription-pricing";
+import {
+  PRICING_SECTION_META,
+  monthlyPackageLabel,
+  parseMonthsFromMonthlyLabel,
+  type PricingRow,
+} from "@/lib/subscription-pricing";
 
 type Props = {
   open: boolean;
@@ -34,6 +38,9 @@ export function SubscriptionPricingFormDialog({
   saving,
 }: Props) {
   const meta = PRICING_SECTION_META[section];
+  const isMonthly = section === "MONTHLY_PACKAGE";
+  const [months, setMonths] = useState(1);
+  const [monthsError, setMonthsError] = useState("");
 
   const {
     register,
@@ -57,6 +64,10 @@ export function SubscriptionPricingFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    const parsedMonths = initial ? parseMonthsFromMonthlyLabel(initial.label) : null;
+    const monthCount = parsedMonths ?? 1;
+    setMonths(monthCount);
+    setMonthsError("");
     reset(
       initial
         ? {
@@ -66,9 +77,39 @@ export function SubscriptionPricingFormDialog({
             description: initial.description ?? "",
             isActive: initial.isActive,
           }
-        : { section, label: "", price: 0, description: "", isActive: true }
+        : {
+            section,
+            label: isMonthly ? monthlyPackageLabel(monthCount) : "",
+            price: 0,
+            description: "",
+            isActive: true,
+          }
     );
-  }, [open, initial, section, reset]);
+  }, [open, initial, section, isMonthly, reset]);
+
+  useEffect(() => {
+    if (!open || !isMonthly) return;
+    if (months > 0) {
+      setValue("label", monthlyPackageLabel(months));
+    }
+  }, [months, isMonthly, open, setValue]);
+
+  const handleFormSubmit = async (data: SubscriptionPricingInput) => {
+    if (isMonthly) {
+      if (!Number.isInteger(months) || months < 1) {
+        setMonthsError("Enter a valid number of months (1 or more)");
+        return;
+      }
+      setMonthsError("");
+      await onSubmit({
+        ...data,
+        label: monthlyPackageLabel(months),
+        description: null,
+      });
+      return;
+    }
+    await onSubmit(data);
+  };
 
   return (
     <Modal
@@ -82,34 +123,79 @@ export function SubscriptionPricingFormDialog({
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
-          <Button disabled={saving} onClick={handleSubmit(onSubmit)}>
+          <Button disabled={saving} onClick={handleSubmit(handleFormSubmit)}>
             {saving ? "Saving…" : initial ? "Save" : "Add"}
           </Button>
         </>
       }
     >
-      <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
+      <form className="space-y-4" onSubmit={handleSubmit(handleFormSubmit)}>
         <input type="hidden" {...register("section")} />
-        <div className="space-y-2">
-          <Label>{meta.labelField}</Label>
-          <Input {...register("label")} placeholder={meta.labelPlaceholder} />
-          {errors.label && <p className="text-sm text-destructive">{errors.label.message}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label>Price (₹)</Label>
-          <Input
-            type="number"
-            min={0}
-            step="0.01"
-            {...register("price", { valueAsNumber: true })}
-            placeholder="3540"
-          />
-          {errors.price && <p className="text-sm text-destructive">{errors.price.message}</p>}
-        </div>
-        <div className="space-y-2">
-          <Label>Description (optional)</Label>
-          <Textarea {...register("description")} rows={2} />
-        </div>
+
+        {isMonthly ? (
+          <>
+            <div className="space-y-2">
+              <Label>Number of Months</Label>
+              <Input
+                type="number"
+                min={1}
+                step={1}
+                value={months}
+                onChange={(e) => {
+                  setMonths(Number(e.target.value));
+                  setMonthsError("");
+                }}
+                placeholder="1"
+              />
+              {monthsError && <p className="text-sm text-destructive">{monthsError}</p>}
+              <p className="text-xs text-muted-foreground">
+                Shows as: {monthlyPackageLabel(months > 0 ? months : 1)}
+                {months === 12 ? " (12 months)" : ""}
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Price (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                {...register("price", { valueAsNumber: true })}
+                placeholder="3540"
+              />
+              {errors.price && (
+                <p className="text-sm text-destructive">{errors.price.message}</p>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label>{meta.labelField}</Label>
+              <Input {...register("label")} placeholder={meta.labelPlaceholder} />
+              {errors.label && (
+                <p className="text-sm text-destructive">{errors.label.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Price (₹)</Label>
+              <Input
+                type="number"
+                min={0}
+                step="0.01"
+                {...register("price", { valueAsNumber: true })}
+                placeholder="3540"
+              />
+              {errors.price && (
+                <p className="text-sm text-destructive">{errors.price.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Description (optional)</Label>
+              <Textarea {...register("description")} rows={2} />
+            </div>
+          </>
+        )}
+
         {initial && (
           <label className="flex items-center gap-2 text-sm">
             <input

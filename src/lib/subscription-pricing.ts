@@ -51,6 +51,23 @@ export const PRICING_SECTION_ORDER: PricingSection[] = [
   "CASUAL_SWIMMING",
 ];
 
+/** Build display label for monthly package from month count. */
+export function monthlyPackageLabel(months: number): string {
+  if (months === 12) return "1 Year";
+  if (months === 1) return "1 Month";
+  return `${months} Months`;
+}
+
+/** Parse month count from a monthly package label when editing. */
+export function parseMonthsFromMonthlyLabel(label: string): number | null {
+  const trimmed = label.trim().toLowerCase();
+  if (trimmed === "1 year") return 12;
+  if (trimmed === "1 month") return 1;
+  const match = trimmed.match(/^(\d+)\s*months?$/);
+  if (match) return Number(match[1]);
+  return null;
+}
+
 export function sectionTitle(section: PricingSection | string): string {
   const key = section as PricingSection;
   return PRICING_SECTION_META[key]?.title ?? String(section);
