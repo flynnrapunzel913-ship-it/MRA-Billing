@@ -43,10 +43,11 @@ export const invoiceItemSchema = z.object({
   unitPrice: z.number().nonnegative(),
   packageStartDate: z.string().optional(),
   packageEndDate: z.string().optional(),
-  subscriptionPricingId: z.string().optional(),
-  sectionSnapshot: z.string().optional(),
-  labelSnapshot: z.string().optional(),
-  priceSnapshot: z.number().nonnegative().optional(),
+  subscriptionPlanId: z.string().optional(),
+  planNameSnapshot: z.string().optional(),
+  descriptionSnapshot: z.string().optional(),
+  durationSnapshot: z.string().optional(),
+  feesSnapshot: z.number().nonnegative().optional(),
 });
 
 export const invoiceSchema = z
@@ -161,17 +162,11 @@ export const resetPasswordSchema = z.object({
 
 export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 
-const pricingSectionSchema = z.enum([
-  "MONTHLY_PACKAGE",
-  "COACHING_PACKAGE",
-  "CASUAL_SWIMMING",
-]);
-
-export const subscriptionPricingSchema = z.object({
-  section: pricingSectionSchema,
-  label: z.string().min(1, "Label is required"),
-  price: z.number().nonnegative("Price must be zero or greater"),
+export const subscriptionPlanSchema = z.object({
+  planName: z.string().min(1, "Plan name is required"),
   description: z.string().optional().nullable(),
+  duration: z.string().min(1, "Duration is required"),
+  fees: z.number().nonnegative("Fees must be zero or greater"),
   isActive: z.boolean(),
 });
 
@@ -185,7 +180,7 @@ export const academyProductSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
-export type SubscriptionPricingInput = z.infer<typeof subscriptionPricingSchema>;
+export type SubscriptionPlanInput = z.infer<typeof subscriptionPlanSchema>;
 export type AcademyProductInput = z.infer<typeof academyProductSchema>;
 export type QuickCustomerInput = z.infer<typeof quickCustomerSchema>;
 export type CustomerInput = z.infer<typeof customerSchema>;

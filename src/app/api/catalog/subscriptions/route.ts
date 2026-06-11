@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
-import { listPricingCatalog } from "@/lib/subscription-pricing";
+import { listSubscriptionPlans } from "@/lib/subscription-plans";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,9 +9,20 @@ export async function GET(request: NextRequest) {
     if (error) return error;
 
     const q = request.nextUrl.searchParams.get("q") ?? "";
-    const groups = await listPricingCatalog({ q, activeOnly: true });
-    return NextResponse.json(groups);
+    const rows = await listSubscriptionPlans({ q, activeOnly: true });
+
+    return NextResponse.json(
+      rows.map((row) => ({
+        id: row.id,
+        name: row.planName,
+        planName: row.planName,
+        description: row.description,
+        duration: row.duration,
+        price: row.fees,
+        fees: row.fees,
+      }))
+    );
   } catch (error) {
-    return apiErrorResponse(error, "Failed to load subscription pricing");
+    return apiErrorResponse(error, "Failed to load subscription plans");
   }
 }

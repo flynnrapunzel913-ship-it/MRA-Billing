@@ -35,7 +35,6 @@ import {
 } from "@/components/invoices/invoice-customer-step";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
-import { SubscriptionPricingPicker } from "@/components/catalog/subscription-pricing-picker";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -236,10 +235,11 @@ export default function InvoiceWizard() {
             packageEndDate: isCoachingPackage(item.itemType)
               ? item.packageEndDate || undefined
               : undefined,
-            subscriptionPricingId: item.subscriptionPricingId,
-            sectionSnapshot: item.sectionSnapshot,
-            labelSnapshot: item.labelSnapshot,
-            priceSnapshot: item.priceSnapshot,
+            subscriptionPlanId: item.subscriptionPlanId,
+            planNameSnapshot: item.planNameSnapshot,
+            descriptionSnapshot: item.descriptionSnapshot,
+            durationSnapshot: item.durationSnapshot,
+            feesSnapshot: item.feesSnapshot,
           })),
         }),
       });
@@ -340,18 +340,29 @@ export default function InvoiceWizard() {
                 description="Pick a subscription or product first. Use Add Custom Item for each additional line."
               >
                 <div className="mb-4 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-lg border border-border/60 bg-card/30 p-4">
-                    <SubscriptionPricingPicker
-                      onSelect={(pkg) => {
-                        const added = addSubscriptionFromCatalog(pkg);
-                        if (!added) {
-                          toast.error("Press Add Custom Item before adding another line");
-                          return;
-                        }
-                        toast.success(`Added ${pkg.label}`);
-                      }}
-                    />
-                  </div>
+                  <CatalogItemPicker
+                    type="subscription"
+                    label="Select Subscription Plan"
+                    placeholder="Search subscription plans…"
+                    onSelect={(item) => {
+                      if (!("duration" in item)) return;
+                      const added = addSubscriptionFromCatalog({
+                        id: item.id,
+                        planName: item.name,
+                        description: item.description ?? null,
+                        duration: item.duration,
+                        fees: item.price,
+                        isActive: true,
+                        createdAt: "",
+                        updatedAt: "",
+                      });
+                      if (!added) {
+                        toast.error("Press Add Custom Item before adding another line");
+                        return;
+                      }
+                      toast.success(`Added ${item.name}`);
+                    }}
+                  />
                   <CatalogItemPicker
                     type="product"
                     label="Add Product"

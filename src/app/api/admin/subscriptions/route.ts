@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
-import { groupPricingBySection, listSubscriptionPricing } from "@/lib/subscription-pricing";
+import { listSubscriptionPlans } from "@/lib/subscription-plans";
 
-/** Legacy route — returns grouped subscription pricing. */
+/** Legacy route — returns flat subscription plans. */
 export async function GET(request: NextRequest) {
   try {
     const { error } = await requireAdmin();
     if (error) return error;
 
     const q = request.nextUrl.searchParams.get("q") ?? "";
-    const rows = await listSubscriptionPricing({ q });
-    return NextResponse.json(groupPricingBySection(rows));
+    const rows = await listSubscriptionPlans({ q });
+    return NextResponse.json(rows);
   } catch (error) {
     return apiErrorResponse(error, "Failed to load subscriptions");
   }
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST() {
   return NextResponse.json(
-    { error: "Use POST /api/admin/subscription-pricing" },
+    { error: "Use POST /api/admin/subscription-plans" },
     { status: 410 }
   );
 }

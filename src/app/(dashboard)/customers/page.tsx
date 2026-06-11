@@ -61,8 +61,8 @@ export default function CustomersPage() {
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
     "/api/invoices"
   );
-  const { data: pricingSections } = useCachedFetch<
-    Array<{ section: string; title: string; items: Array<{ isActive: boolean }> }>
+  const { data: subscriptionPlans } = useCachedFetch<
+    Array<{ id: string; planName: string; name: string; isActive?: boolean }>
   >("/api/catalog/subscriptions");
   const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
     "/api/dashboard"
@@ -70,12 +70,11 @@ export default function CustomersPage() {
   const isAdmin = dashboardMeta?.role === "ADMIN";
 
   const subscriptionOptions = useMemo(() => {
-    const rows = pricingSections ?? [];
+    const rows = subscriptionPlans ?? [];
     return rows
-      .filter((row) => row.items.some((item) => item.isActive))
-      .map((row) => ({ id: row.section, name: row.title }))
+      .map((row) => ({ id: row.id, name: row.planName ?? row.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [pricingSections]);
+  }, [subscriptionPlans]);
 
   const invoiceIndex = useMemo(
     () => buildCustomerInvoiceIndex(invoices ?? []),

@@ -69,12 +69,6 @@ enum CatalogItemStatus {
   INACTIVE
 }
 
-enum PricingSection {
-  MONTHLY_PACKAGE
-  COACHING_PACKAGE
-  CASUAL_SWIMMING
-}
-
 model User {
   id           String          @id @default(cuid())
   username     String          @unique
@@ -194,12 +188,13 @@ model InvoiceItem {
   amount                 Decimal @db.Decimal(12, 2)
   packageStartDate       DateTime?
   packageEndDate         DateTime?
-  subscriptionPricingId String?
-  sectionSnapshot       String?
-  labelSnapshot         String?
-  priceSnapshot         Decimal? @db.Decimal(10, 2)
-  invoice               Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  subscriptionPricing   SubscriptionPricing? @relation(fields: [subscriptionPricingId], references: [id], onDelete: SetNull)
+  subscriptionPlanId   String?
+  planNameSnapshot     String?
+  descriptionSnapshot  String?
+  durationSnapshot     String?
+  feesSnapshot         Decimal? @db.Decimal(10, 2)
+  invoice              Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  subscriptionPlan     SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
 }
 
 model InvoiceSequence {
@@ -235,20 +230,19 @@ model Settings {
   updatedAt          DateTime @updatedAt
 }
 
-model SubscriptionPricing {
-  id           String         @id @default(cuid())
-  section      PricingSection
-  label        String
-  price        Decimal        @db.Decimal(10, 2)
+model SubscriptionPlan {
+  id           String   @id @default(cuid())
+  planName     String
   description  String?
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  duration     String
+  fees         Decimal  @db.Decimal(10, 2)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
   invoiceItems InvoiceItem[]
 
-  @@index([section])
   @@index([isActive])
-  @@index([label])
+  @@index([planName])
 }
 
 model AcademyProduct {

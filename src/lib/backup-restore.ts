@@ -21,7 +21,7 @@ const DATA_KEYS = [
   "invoiceItems",
   "invoiceSequences",
   "settings",
-  "subscriptionPricing",
+  "subscriptionPlans",
   "academyProducts",
   "stockSequences",
   "stockEntries",
@@ -164,7 +164,7 @@ export function parseBackupFile(raw: string): DatabaseBackup {
     invoiceItems: [],
     invoiceSequences: [],
     settings: [],
-    subscriptionPricing: [],
+    subscriptionPlans: [],
     academyProducts: [],
     stockSequences: [],
     stockEntries: [],
@@ -293,17 +293,17 @@ export function validateBackupForRestore(backup: DatabaseBackup): void {
   collectIds(backup.data.invoiceSequences as Record<string, unknown>[], "invoiceSequence");
   collectIds(backup.data.stockSequences as Record<string, unknown>[], "stockSequence");
   collectIds(backup.data.settings as Record<string, unknown>[], "settings");
-  const pricingIds = collectIds(
-    backup.data.subscriptionPricing as Record<string, unknown>[],
-    "subscriptionPricing"
+  const planIds = collectIds(
+    backup.data.subscriptionPlans as Record<string, unknown>[],
+    "subscriptionPlan"
   );
 
   for (const row of invoiceItems) {
-    const pricingId = row.subscriptionPricingId;
-    if (pricingId !== null && pricingId !== undefined) {
-      if (typeof pricingId !== "string" || !pricingIds.has(pricingId)) {
+    const planId = row.subscriptionPlanId;
+    if (planId !== null && planId !== undefined) {
+      if (typeof planId !== "string" || !planIds.has(planId)) {
         throw new BackupRestoreError(
-          "Invalid backup: invoice item references unknown subscription pricing"
+          "Invalid backup: invoice item references unknown subscription plan"
         );
       }
     }
@@ -377,15 +377,13 @@ function mapSettings(row: Record<string, unknown>): Prisma.SettingsCreateManyInp
   };
 }
 
-function mapSubscriptionPricing(
-  row: Record<string, unknown>
-): Prisma.SubscriptionPricingCreateManyInput {
+function mapSubscriptionPlan(row: Record<string, unknown>): Prisma.SubscriptionPlanCreateManyInput {
   return {
     id: requireString(row, "id"),
-    section: requireString(row, "section") as Prisma.SubscriptionPricingCreateManyInput["section"],
-    label: requireString(row, "label"),
-    price: requireNumber(row, "price"),
+    planName: requireString(row, "planName"),
     description: optionalString(row.description),
+    duration: requireString(row, "duration"),
+    fees: requireNumber(row, "fees"),
     isActive: requireBoolean(row, "isActive"),
     createdAt: parseDateValue(row.createdAt, "createdAt"),
     updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
@@ -464,13 +462,14 @@ function mapInvoiceItem(row: Record<string, unknown>): Prisma.InvoiceItemCreateM
     amount: requireNumber(row, "amount"),
     packageStartDate: optionalDate(row.packageStartDate),
     packageEndDate: optionalDate(row.packageEndDate),
-    subscriptionPricingId: optionalString(row.subscriptionPricingId),
-    sectionSnapshot: optionalString(row.sectionSnapshot),
-    labelSnapshot: optionalString(row.labelSnapshot),
-    priceSnapshot:
-      row.priceSnapshot === null || row.priceSnapshot === undefined
+    subscriptionPlanId: optionalString(row.subscriptionPlanId),
+    planNameSnapshot: optionalString(row.planNameSnapshot),
+    descriptionSnapshot: optionalString(row.descriptionSnapshot),
+    durationSnapshot: optionalString(row.durationSnapshot),
+    feesSnapshot:
+      row.feesSnapshot === null || row.feesSnapshot === undefined
         ? null
-        : requireNumber(row, "priceSnapshot"),
+        : requireNumber(row, "feesSnapshot"),
   };
 }
 
@@ -560,7 +559,7 @@ export async function restoreDatabaseFromBackup(
     await tx.stockEntry.deleteMany();
     await tx.customer.deleteMany();
     await tx.user.deleteMany();
-    await tx.subscriptionPricing.deleteMany();
+    await tx.subscriptionPlan.deleteMany();
     await tx.academyProduct.deleteMany();
     await tx.invoiceSequence.deleteMany();
     await tx.stockSequence.deleteMany();
@@ -581,10 +580,10 @@ export async function restoreDatabaseFromBackup(
       await tx.settings.createMany({ data: settings.map(mapSettings) });
     }
 
-    const subscriptionPricing = rows.subscriptionPricing as Record<string, unknown>[];
-    if (subscriptionPricing.length > 0) {
-      await tx.subscriptionPricing.createMany({
-        data: subscriptionPricing.map(mapSubscriptionPricing),
+    const subscriptionPlans = rows.subscriptionPlans as Record<string, unknown>[];
+    if (subscriptionPlans.length > 0) {
+      await tx.subscriptionPlan.createMany({
+        data: subscriptionPlans.map(mapSubscriptionPlan),
       });
     }
 

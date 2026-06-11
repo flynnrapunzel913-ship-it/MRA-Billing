@@ -1,19 +1,12 @@
 import { CatalogItemStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
-export type {
-  PricingRow,
-  PricingSectionGroup,
-} from "@/lib/subscription-pricing";
+export type { SubscriptionPlanRow } from "@/lib/subscription-plans";
 
 export {
-  pricingInvoiceDescription,
-  sectionTitle,
-  listSubscriptionPricing,
-  listPricingCatalog,
-  PRICING_SECTION_META,
-  PRICING_SECTION_ORDER,
-} from "@/lib/subscription-pricing";
+  planInvoiceDescription,
+  listSubscriptionPlans,
+} from "@/lib/subscription-plans";
 
 export type CatalogProduct = {
   id: string;

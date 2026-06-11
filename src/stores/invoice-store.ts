@@ -9,7 +9,7 @@ import {
   COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
-import { pricingInvoiceDescription, type PricingRow } from "@/lib/subscription-pricing";
+import { planInvoiceDescription, type SubscriptionPlanRow } from "@/lib/subscription-plans";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -44,9 +44,7 @@ interface InvoiceFormState {
   setPaymentMethod: (method: PaymentMethodType) => void;
   setAmountPaid: (amount: number) => void;
   addItem: (itemType?: ItemType) => void;
-  addSubscriptionFromCatalog: (
-    item: PricingRow & { sectionTitle: string }
-  ) => boolean;
+  addSubscriptionFromCatalog: (item: SubscriptionPlanRow) => boolean;
   addProductFromCatalog: (item: { name: string; price: number }) => boolean;
   updateItem: (index: number, item: InvoiceLineItem) => void;
   removeItem: (index: number) => void;
@@ -152,15 +150,16 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
     set((state) => {
       const next = applyCatalogItem(state.items, {
         itemType: COACHING_PACKAGE_TYPE,
-        description: pricingInvoiceDescription(item.section, item.label),
+        description: planInvoiceDescription(item),
         quantity: 1,
-        unitPrice: item.price,
+        unitPrice: item.fees,
         packageStartDate: state.invoiceDate,
         packageEndDate: "",
-        subscriptionPricingId: item.id,
-        sectionSnapshot: item.section,
-        labelSnapshot: item.label,
-        priceSnapshot: item.price,
+        subscriptionPlanId: item.id,
+        planNameSnapshot: item.planName,
+        descriptionSnapshot: item.description ?? undefined,
+        durationSnapshot: item.duration,
+        feesSnapshot: item.fees,
       });
       if (!next) return state;
       added = true;
