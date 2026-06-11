@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import {
   Calendar,
   CheckCircle2,
@@ -198,55 +197,6 @@ function ExpenseTable({ expenses }: { expenses: DailyCollectionSheet["expenses"]
               </Fragment>
             );
           })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
-function OutstandingTable({ sheet }: { sheet: DailyCollectionSheet }) {
-  const { outstanding } = sheet;
-  if (outstanding.rows.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground">No outstanding payments for this date.</p>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border/60">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="font-semibold">Customer</TableHead>
-            <TableHead className="font-semibold">Invoice</TableHead>
-            <TableHead className="text-right font-semibold">Total</TableHead>
-            <TableHead className="text-right font-semibold">Paid</TableHead>
-            <TableHead className="text-right font-semibold">Outstanding</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {outstanding.rows.map((row) => (
-            <TableRow key={row.invoiceId}>
-              <TableCell className="font-medium">{row.customerName}</TableCell>
-              <TableCell>
-                <Link
-                  href={`/invoices/${row.invoiceId}`}
-                  className="text-primary hover:underline"
-                >
-                  {row.invoiceNumber}
-                </Link>
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatCurrency(row.grandTotal)}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {formatCurrency(row.amountPaid)}
-              </TableCell>
-              <TableCell className="text-right font-medium tabular-nums">
-                {formatCurrency(row.amountPending)}
-              </TableCell>
-            </TableRow>
-          ))}
         </TableBody>
       </Table>
     </div>
@@ -482,9 +432,9 @@ export function DailyCollectionPanel() {
         </div>
       ) : (
         <>
-          {/* Section 1: Revenue Earned */}
+          {/* 1. Revenue Earned Today */}
           <section className="space-y-4">
-            <SectionHeader title="Revenue Earned" />
+            <SectionHeader title="Revenue Earned Today" />
             <div className="grid gap-4 sm:grid-cols-3">
               <SummaryKpi label="Total Revenue" value={sheet.totalRevenue} />
               <SummaryKpi label="Subscription Revenue" value={sheet.subscriptionRevenue} />
@@ -493,78 +443,60 @@ export function DailyCollectionPanel() {
             <RevenueBreakdownTable sheet={sheet} />
           </section>
 
-          {/* Section 2: Expenses */}
+          {/* 2. Expenses Given Today */}
           <section className="space-y-4">
-            <SectionHeader title="Expenses" />
+            <SectionHeader title="Expenses Given Today" />
             <SummaryKpi label="Total Expenses" value={sheet.totalExpenses} />
             <ExpenseTable expenses={sheet.expenses} />
           </section>
 
-          {/* Section 3: Collections Breakdown */}
+          {/* 3. Collections Breakdown */}
           <section className="space-y-4">
             <SectionHeader title="Collections Breakdown" />
             <div className="grid gap-4 sm:grid-cols-3">
               <SummaryKpi label="Cash Collected" value={sheet.paymentBreakdown.cash} />
-              <SummaryKpi label="UPI / PhonePe Collected" value={sheet.paymentBreakdown.upi} />
-              <SummaryKpi label="Total Collected" value={sheet.paymentBreakdown.totalCollected} />
-            </div>
-          </section>
-
-          {/* Section 4: Outstanding Payments */}
-          <section className="space-y-4">
-            <SectionHeader
-              title="Outstanding Payments"
-              description="Customers who still owe money from invoices created today"
-            />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className={summaryCard}>
-                <p className="text-sm text-muted-foreground">Outstanding Customers</p>
-                <p className="mt-1 text-2xl font-bold tabular-nums">
-                  {sheet.outstanding.outstandingCustomerCount}
-                </p>
-              </div>
+              <SummaryKpi label="PhonePe / UPI Collected" value={sheet.paymentBreakdown.upi} />
               <SummaryKpi
-                label="Outstanding Amount"
-                value={sheet.outstanding.outstandingAmount}
+                label="Total Collections"
+                value={sheet.paymentBreakdown.grossCollected}
               />
             </div>
-            <OutstandingTable sheet={sheet} />
           </section>
 
-          {/* Section 5: Day Closing Summary */}
+          {/* 4. Net Amount To Be Collected */}
           <section className="space-y-4">
-            <SectionHeader title="Day Closing Summary" />
-            <Card className={cn(sectionCard, "border-primary/30 bg-primary/5")}>
+            <SectionHeader
+              title="Net Amount To Be Collected"
+              description="Total Revenue − Total Expenses"
+            />
+            <Card className={cn(sectionCard, "border-primary/40 bg-primary/5 ring-1 ring-primary/20")}>
               <CardContent className="grid gap-4 p-5 sm:grid-cols-3">
                 <div>
-                  <p className="text-sm text-muted-foreground">Revenue Earned</p>
+                  <p className="text-sm text-muted-foreground">Revenue</p>
                   <p className="mt-1 text-2xl font-bold tabular-nums">
                     {formatCurrency(sheet.totalRevenue)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Expenses Given</p>
+                  <p className="text-sm text-muted-foreground">Expenses</p>
                   <p className="mt-1 text-2xl font-bold tabular-nums text-destructive">
-                    {formatCurrency(sheet.totalExpenses)}
+                    − {formatCurrency(sheet.totalExpenses)}
                   </p>
                 </div>
-                <div className="rounded-lg border border-primary/30 bg-background/60 p-4">
-                  <p className="text-sm font-medium text-primary">Net Collection</p>
-                  <p className="mt-1 text-3xl font-bold tabular-nums text-primary">
+                <div className="rounded-lg border border-primary/40 bg-background/80 p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-primary">Net Collection</p>
+                  <p className="mt-1 text-4xl font-bold tabular-nums text-primary">
                     {formatCurrency(sheet.netCollection)}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Revenue Earned − Expenses Given
                   </p>
                 </div>
               </CardContent>
             </Card>
           </section>
 
-          {/* Section 6: Physical Cash Verification */}
+          {/* 5. Cash Reconciliation */}
           <section className="space-y-4">
             <CashDenominationSection
-              systemCash={sheet.paymentBreakdown.cash}
+              systemCash={sheet.paymentBreakdown.netCash}
               denominations={denominations}
               onDenominationsChange={setDenominations}
               denominationsLocked={collected}
@@ -572,11 +504,11 @@ export function DailyCollectionPanel() {
             />
           </section>
 
-          {/* Section 7: Collection Acknowledgement */}
+          {/* 6. Mark Collection As Collected */}
           <section className="space-y-4">
             <Card className={sectionCard}>
               <CardHeader className="border-b border-border px-5 py-4">
-                <CardTitle className="text-base">Collection Acknowledgement</CardTitle>
+                <CardTitle className="text-base">Mark Collection As Collected</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 p-5">
                 {collected && (
@@ -602,7 +534,7 @@ export function DailyCollectionPanel() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="collection-notes">Notes</Label>
+                  <Label htmlFor="collection-notes">Owner Notes</Label>
                   <Textarea
                     id="collection-notes"
                     rows={4}

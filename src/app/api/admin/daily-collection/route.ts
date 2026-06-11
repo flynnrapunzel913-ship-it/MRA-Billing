@@ -32,7 +32,7 @@ async function resolveCashReconciliation(
 ) {
   const sheet = await getDailyCollectionSheet(dateStr);
   const cashCollectedSystem =
-    systemCashOverride ?? sheet?.paymentBreakdown.cash ?? 0;
+    systemCashOverride ?? sheet?.paymentBreakdown.netCash ?? 0;
   const cashDenominations = normalizeDenominations(denominationsInput);
   const cashCountedPhysical = calculatePhysicalCash(cashDenominations);
   const cashDifference = calculateCashDifference(cashCountedPhysical, cashCollectedSystem);
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
         subscriptionRevenue: snapshot.subscriptionRevenue,
         productRevenue: snapshot.productRevenue,
         totalExpenses: snapshot.totalExpenses,
-        cashCollectedSystem: snapshot.cashCollected,
+        cashCollectedSystem: cash.cashCollectedSystem,
         upiCollected: snapshot.upiCollected,
         netCollection: snapshot.netCollection,
         cashCountedPhysical: cash.cashCountedPhysical,
@@ -208,16 +208,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const storedSystemCash =
-      existing.cashCollectedSystem != null
-        ? Number(existing.cashCollectedSystem)
-        : null;
-
     const cash = await resolveCashReconciliation(
       parsed.data.date,
       parsed.data.cashDenominations ?? existing.cashDenominations,
-      parsed.data.cashDifferenceNotes ?? existing.cashDifferenceNotes,
-      storedSystemCash
+      parsed.data.cashDifferenceNotes ?? existing.cashDifferenceNotes
     );
 
     const record = await prisma.dailyCollection.update({

@@ -73,7 +73,7 @@ export function CashDenominationSection({
       <CardHeader className="border-b border-border px-5 py-4">
         <CardTitle className="text-base">Physical Cash Verification</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Count physical cash by denomination and reconcile with system cash collection
+          Count physical cash in the drawer and reconcile with net cash after today&apos;s expenses
         </p>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
@@ -126,7 +126,7 @@ export function CashDenominationSection({
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-border/60 bg-card/40 p-4">
-            <p className="text-sm text-muted-foreground">System Cash Collection</p>
+            <p className="text-sm text-muted-foreground">System Net Cash (after expenses)</p>
             <p className="mt-1 text-xl font-bold tabular-nums">{formatCurrency(systemAmount)}</p>
           </div>
           <div className="rounded-lg border border-border/60 bg-card/40 p-4">

@@ -1,5 +1,5 @@
 import { endOfDay, format, parseISO, startOfDay, subDays } from "date-fns";
-import type { InvoicePaymentStatus, Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
@@ -27,23 +27,12 @@ export type PaymentBreakdown = {
   upi: number;
   card: number;
   other: number;
-  totalCollected: number;
-};
-
-export type OutstandingPaymentRow = {
-  customerName: string;
-  invoiceNumber: string;
-  invoiceId: string;
-  grandTotal: number;
-  amountPaid: number;
-  amountPending: number;
-  status: "PENDING" | "PARTIALLY_PAID";
-};
-
-export type OutstandingSummary = {
-  outstandingCustomerCount: number;
-  outstandingAmount: number;
-  rows: OutstandingPaymentRow[];
+  /** Gross payments received (all methods, before expenses). */
+  grossCollected: number;
+  /** Cash remaining after same-day expenses (expenses assumed paid from cash). */
+  netCash: number;
+  /** UPI collected (expenses are not deducted from UPI). */
+  netUpi: number;
 };
 
 export type CashReconciliation = {
@@ -93,7 +82,6 @@ export type DailyCollectionSheet = {
   expenses: ExpenseDetailRow[];
   paymentBreakdown: PaymentBreakdown;
   netCollection: number;
-  outstanding: OutstandingSummary;
   collection: CollectionRecord | null;
   recentHistory: CollectionHistoryRow[];
 };
@@ -144,79 +132,98 @@ function serializeSnapshot(row: {
   };
 }
 
-function buildPaymentBreakdown(
-  paymentGroups: Array<{ paymentMethod: string; _sum: { amountPaid: unknown } }>
-): PaymentBreakdown {
-  const breakdown: PaymentBreakdown = {
-    cash: 0,
-    upi: 0,
-    card: 0,
-    other: 0,
-    totalCollected: 0,
+/** Pure collection math — used by the daily sheet and unit tests. */
+export function computeCollectionTotals(input: {
+  subscriptionRevenue: number;
+  productRevenue: number;
+  grossCash: number;
+  grossUpi: number;
+  grossCard: number;
+  grossOther: number;
+  totalExpenses: number;
+}): {
+  totalRevenue: number;
+  totalExpenses: number;
+  netCollection: number;
+  paymentBreakdown: PaymentBreakdown;
+} {
+  const grossCollected =
+    input.grossCash + input.grossUpi + input.grossCard + input.grossOther;
+  const itemRevenue = input.subscriptionRevenue + input.productRevenue;
+  const totalRevenue = grossCollected > 0 ? grossCollected : itemRevenue;
+  const netCash = input.grossCash - input.totalExpenses;
+  const netUpi = input.grossUpi;
+  const netCollection = totalRevenue - input.totalExpenses;
+
+  return {
+    totalRevenue,
+    totalExpenses: input.totalExpenses,
+    netCollection,
+    paymentBreakdown: {
+      cash: input.grossCash,
+      upi: input.grossUpi,
+      card: input.grossCard,
+      other: input.grossOther,
+      grossCollected,
+      netCash,
+      netUpi,
+    },
   };
+}
+
+function buildPaymentBreakdown(
+  paymentGroups: Array<{ paymentMethod: string; _sum: { amountPaid: unknown } }>,
+  totalExpenses: number,
+  subscriptionRevenue: number,
+  productRevenue: number
+): PaymentBreakdown {
+  let grossCash = 0;
+  let grossUpi = 0;
+  let grossCard = 0;
+  let grossOther = 0;
 
   for (const row of paymentGroups) {
     const amount = toJsonNumber(row._sum.amountPaid);
     switch (row.paymentMethod) {
       case "CASH":
-        breakdown.cash = amount;
+        grossCash = amount;
         break;
       case "UPI":
-        breakdown.upi = amount;
+        grossUpi = amount;
         break;
       case "CARD":
-        breakdown.card = amount;
+        grossCard = amount;
         break;
       default:
-        breakdown.other += amount;
+        grossOther += amount;
     }
   }
 
-  breakdown.totalCollected = breakdown.cash + breakdown.upi;
-  return breakdown;
+  return computeCollectionTotals({
+    subscriptionRevenue,
+    productRevenue,
+    grossCash,
+    grossUpi,
+    grossCard,
+    grossOther,
+    totalExpenses,
+  }).paymentBreakdown;
 }
 
-function buildOutstandingSummary(
-  invoices: Array<{
-    id: string;
-    invoiceNumber: string;
-    customerName: string;
-    customerId: string | null;
-    grandTotal: unknown;
-    amountPaid: unknown;
-    amountRemaining: unknown;
-    paymentStatus: InvoicePaymentStatus;
-  }>
-): OutstandingSummary {
-  const outstandingCustomers = new Set<string>();
-  let outstandingAmount = 0;
-
-  const rows: OutstandingPaymentRow[] = invoices
-    .filter(
-      (inv): inv is typeof inv & { paymentStatus: "PENDING" | "PARTIALLY_PAID" } =>
-        inv.paymentStatus === "PENDING" || inv.paymentStatus === "PARTIALLY_PAID"
-    )
-    .map((inv) => {
-      const key = inv.customerId ?? inv.customerName;
-      outstandingCustomers.add(key);
-      const amountPending = toJsonNumber(inv.amountRemaining);
-      outstandingAmount += amountPending;
-      return {
-        customerName: inv.customerName,
-        invoiceNumber: inv.invoiceNumber,
-        invoiceId: inv.id,
-        grandTotal: toJsonNumber(inv.grandTotal),
-        amountPaid: toJsonNumber(inv.amountPaid),
-        amountPending,
-        status: inv.paymentStatus,
-      };
-    });
-
-  return {
-    outstandingCustomerCount: outstandingCustomers.size,
-    outstandingAmount,
-    rows,
-  };
+function buildSnapshotPaymentBreakdown(
+  snapshot: CollectionSnapshot,
+  liveCard: number,
+  liveOther: number
+): PaymentBreakdown {
+  return computeCollectionTotals({
+    subscriptionRevenue: snapshot.subscriptionRevenue,
+    productRevenue: snapshot.productRevenue,
+    grossCash: snapshot.cashCollected,
+    grossUpi: snapshot.upiCollected,
+    grossCard: liveCard,
+    grossOther: liveOther,
+    totalExpenses: snapshot.totalExpenses,
+  }).paymentBreakdown;
 }
 
 export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCollectionSheet | null> {
@@ -233,12 +240,6 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     amountPaid: { gt: 0 },
   };
 
-  const outstandingInvoiceWhere: Prisma.InvoiceWhereInput = {
-    ...invoiceWhere,
-    invoiceDate: { gte: dayStart, lte: dayEnd },
-    paymentStatus: { in: ["PENDING", "PARTIALLY_PAID"] },
-  };
-
   const expenseWhere = {
     expenseDate: { gte: dayStart, lte: dayEnd },
   };
@@ -250,7 +251,6 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     coachingGroups,
     productGroups,
     expenseRows,
-    outstandingInvoices,
     collection,
     historyCollections,
   ] = await Promise.all([
@@ -280,20 +280,6 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
       orderBy: { createdAt: "asc" },
       include: {
         createdBy: { select: { name: true, username: true } },
-      },
-    }),
-    prisma.invoice.findMany({
-      where: outstandingInvoiceWhere,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        invoiceNumber: true,
-        customerName: true,
-        customerId: true,
-        grandTotal: true,
-        amountPaid: true,
-        amountRemaining: true,
-        paymentStatus: true,
       },
     }),
     prisma.dailyCollection.findUnique({
@@ -342,10 +328,24 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
 
   const liveSubscriptionRevenue = subscriptionBreakdown.reduce((s, r) => s + r.amount, 0);
   const liveProductRevenue = productBreakdown.reduce((s, r) => s + r.amount, 0);
-  const liveTotalRevenue = liveSubscriptionRevenue + liveProductRevenue;
   const liveTotalExpenses = expenseRows.reduce((sum, row) => sum + toJsonNumber(row.amount), 0);
-  const livePaymentBreakdown = buildPaymentBreakdown(paymentGroups);
-  const liveNetCollection = liveTotalRevenue - liveTotalExpenses;
+  const livePaymentBreakdown = buildPaymentBreakdown(
+    paymentGroups,
+    liveTotalExpenses,
+    liveSubscriptionRevenue,
+    liveProductRevenue
+  );
+  const liveTotals = computeCollectionTotals({
+    subscriptionRevenue: liveSubscriptionRevenue,
+    productRevenue: liveProductRevenue,
+    grossCash: livePaymentBreakdown.cash,
+    grossUpi: livePaymentBreakdown.upi,
+    grossCard: livePaymentBreakdown.card,
+    grossOther: livePaymentBreakdown.other,
+    totalExpenses: liveTotalExpenses,
+  });
+  const liveTotalRevenue = liveTotals.totalRevenue;
+  const liveNetCollection = liveTotals.netCollection;
   const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
 
   const expenses: ExpenseDetailRow[] = expenseRows.map((row) => ({
@@ -358,10 +358,16 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     createdAt: row.createdAt.toISOString(),
   }));
 
-  const outstanding = buildOutstandingSummary(outstandingInvoices);
-
   const collectionSnapshot = collection ? serializeSnapshot(collection) : null;
   const isSnapshot = collectionSnapshot != null;
+  const displaySnapshot =
+    collectionSnapshot != null
+      ? {
+          ...collectionSnapshot,
+          cashCollected: livePaymentBreakdown.cash,
+          upiCollected: livePaymentBreakdown.upi,
+        }
+      : null;
 
   const historyByDate = new Map(
     historyCollections.map((row) => {
@@ -402,16 +408,13 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     totalExpenses: isSnapshot ? collectionSnapshot.totalExpenses : liveTotalExpenses,
     expenses,
     paymentBreakdown: isSnapshot
-      ? {
-          cash: collectionSnapshot.cashCollected,
-          upi: collectionSnapshot.upiCollected,
-          card: livePaymentBreakdown.card,
-          other: livePaymentBreakdown.other,
-          totalCollected: collectionSnapshot.cashCollected + collectionSnapshot.upiCollected,
-        }
+      ? buildSnapshotPaymentBreakdown(
+          displaySnapshot!,
+          livePaymentBreakdown.card,
+          livePaymentBreakdown.other
+        )
       : livePaymentBreakdown,
     netCollection: isSnapshot ? collectionSnapshot.netCollection : liveNetCollection,
-    outstanding,
     collection: collection
       ? {
           id: collection.id,
@@ -419,7 +422,7 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
           collectedAt: collection.collectedAt.toISOString(),
           collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
-          snapshot: collectionSnapshot,
+          snapshot: displaySnapshot,
           cashReconciliation: serializeCashReconciliation(collection),
         }
       : null,
