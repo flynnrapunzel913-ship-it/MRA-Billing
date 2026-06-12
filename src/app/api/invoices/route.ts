@@ -22,8 +22,8 @@ async function getGstSettings() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   return {
     gstEnabled: settings?.gstEnabled ?? true,
-    cgstRate: Number(settings?.defaultCgstRate ?? 9),
-    sgstRate: Number(settings?.defaultSgstRate ?? 9),
+    cgstRate: Number(settings?.defaultCgstRate ?? 0),
+    sgstRate: Number(settings?.defaultSgstRate ?? 0),
   };
 }
 

@@ -177,79 +177,13 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { error, user } = await requireAdmin();
+    const { error } = await requireAdmin();
     if (error) return error;
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
-
-    const parsed = bodySchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-    }
-
-    const collectionDate = parseCollectionDateInput(parsed.data.date);
-    if (!collectionDate) {
-      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
-    }
-
-    const existing = await prisma.dailyCollection.findUnique({
-      where: { collectionDate },
-    });
-
-    if (!existing) {
-      return NextResponse.json(
-        { error: "No collection record found for this date" },
-        { status: 404 }
-      );
-    }
-
-    const cash = await resolveCashReconciliation(
-      parsed.data.date,
-      parsed.data.cashDenominations ?? existing.cashDenominations,
-      parsed.data.cashDifferenceNotes ?? existing.cashDifferenceNotes
+    return NextResponse.json(
+      { error: "This day's collection is locked and cannot be changed" },
+      { status: 409 }
     );
-
-    const record = await prisma.dailyCollection.update({
-      where: { id: existing.id },
-      data: {
-        notes: parsed.data.notes?.trim() || null,
-        ...(parsed.data.collectedByName
-          ? { collectedByName: parsed.data.collectedByName.trim() }
-          : {}),
-        cashCountedPhysical: cash.cashCountedPhysical,
-        cashDifference: cash.cashDifference,
-        cashDifferenceNotes: cash.cashDifferenceNotes,
-        cashDenominations: cash.cashDenominations,
-      },
-      include: {
-        collectedBy: { select: { id: true, name: true, username: true } },
-      },
-    });
-
-    void logAuditEvent({
-      userId: user!.id,
-      username: user!.username,
-      action: AUDIT_ACTIONS.DAILY_COLLECTION_UPDATED,
-      entityType: "DAILY_COLLECTION",
-      entityId: record.id,
-      details: {
-        date: parsed.data.date,
-        notes: record.notes,
-        ...auditCashDetails(cash),
-      },
-    });
-
-    return NextResponse.json({
-      id: record.id,
-      notes: record.notes,
-      collectedAt: record.collectedAt.toISOString(),
-      collectedBy: record.collectedBy,
-    });
   } catch (error) {
     return apiErrorResponse(error, "Failed to update daily collection");
   }

@@ -115,8 +115,8 @@ export default function InvoiceWizard() {
       .then((r) => r.json())
       .then((s) => {
         setGstEnabled(s.gstEnabled ?? true);
-        setCgstRate(Number(s.defaultCgstRate ?? 9));
-        setSgstRate(Number(s.defaultSgstRate ?? 9));
+        setCgstRate(Number(s.defaultCgstRate ?? 0));
+        setSgstRate(Number(s.defaultSgstRate ?? 0));
       });
     const prefillName = searchParams.get("customerName");
     const prefillMobile = searchParams.get("customerMobile");

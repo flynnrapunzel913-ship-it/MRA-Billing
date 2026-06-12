@@ -213,8 +213,8 @@ model Settings {
   website            String?
   gstNumber          String   @default("")
   gstEnabled         Boolean  @default(true)
-  defaultCgstRate    Decimal  @default(9) @db.Decimal(5, 2)
-  defaultSgstRate    Decimal  @default(9) @db.Decimal(5, 2)
+  defaultCgstRate    Decimal  @default(0) @db.Decimal(5, 2)
+  defaultSgstRate    Decimal  @default(0) @db.Decimal(5, 2)
   bankName           String?
   bankAccount        String?
   bankIfsc           String?

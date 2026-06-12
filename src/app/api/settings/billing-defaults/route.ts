@@ -20,8 +20,8 @@ export async function GET() {
 
     return NextResponse.json({
       gstEnabled: settings?.gstEnabled ?? true,
-      defaultCgstRate: Number(settings?.defaultCgstRate ?? 9),
-      defaultSgstRate: Number(settings?.defaultSgstRate ?? 9),
+      defaultCgstRate: Number(settings?.defaultCgstRate ?? 0),
+      defaultSgstRate: Number(settings?.defaultSgstRate ?? 0),
     });
   } catch (error) {
     return apiErrorResponse(error, "Failed to load billing defaults");

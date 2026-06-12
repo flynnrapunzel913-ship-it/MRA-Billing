@@ -43,8 +43,8 @@ export function calculateInvoiceTotals(
   options: GstOptions = {}
 ): InvoiceTotals {
   const gstEnabled = options.gstEnabled ?? true;
-  const cgstRate = gstEnabled ? (options.cgstRate ?? 9) : 0;
-  const sgstRate = gstEnabled ? (options.sgstRate ?? 9) : 0;
+  const cgstRate = gstEnabled ? (options.cgstRate ?? 0) : 0;
+  const sgstRate = gstEnabled ? (options.sgstRate ?? 0) : 0;
 
   const subtotal = items.reduce(
     (sum, item) => sum + item.quantity * item.unitPrice,

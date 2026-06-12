@@ -342,32 +342,7 @@ export function DailyCollectionPanel() {
         toast.error(result.message);
         return;
       }
-      toast.success("Day collection marked and saved");
-      await loadSheet(selectedDate);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveNotes = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/admin/daily-collection", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: selectedDate,
-          notes,
-          collectedByName: collectorName.trim(),
-          cashDenominations: denominations,
-        }),
-      });
-      const result = await readApiResponse(res, "Failed to update collection");
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-      toast.success("Collection record updated");
+      toast.success("Day collection recorded and locked");
       await loadSheet(selectedDate);
     } finally {
       setSaving(false);
@@ -375,6 +350,7 @@ export function DailyCollectionPanel() {
   };
 
   const collected = !!sheet?.collection;
+  const acknowledgementLocked = collected;
 
   return (
     <div className="space-y-8">
@@ -507,15 +483,21 @@ export function DailyCollectionPanel() {
           {/* 6. Mark Collection As Collected */}
           <section className="space-y-4">
             <Card className={sectionCard}>
-              <CardHeader className="border-b border-border px-5 py-4">
+              <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
                 <CardTitle className="text-base">Mark Collection As Collected</CardTitle>
+                {acknowledgementLocked && (
+                  <Badge variant="outline" className="gap-1">
+                    <Lock className="h-3 w-3" />
+                    Locked
+                  </Badge>
+                )}
               </CardHeader>
               <CardContent className="space-y-4 p-5">
-                {collected && (
+                {acknowledgementLocked && (
                   <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
                     <p className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
                       <CheckCircle2 className="h-5 w-5" />
-                      Collection recorded
+                      Collection recorded and locked
                     </p>
                     <p className="mt-2 text-sm text-muted-foreground">
                       Collected at {formatDateTime(sheet.collection!.collectedAt)}
@@ -530,6 +512,9 @@ export function DailyCollectionPanel() {
                     value={collectorName}
                     onChange={(e) => setCollectorName(e.target.value)}
                     placeholder="Owner or collector name"
+                    readOnly={acknowledgementLocked}
+                    disabled={acknowledgementLocked}
+                    className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
                   />
                 </div>
 
@@ -541,14 +526,13 @@ export function DailyCollectionPanel() {
                     placeholder="Collected all cash and verified PhonePe settlement."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
+                    readOnly={acknowledgementLocked}
+                    disabled={acknowledgementLocked}
+                    className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
                   />
                 </div>
 
-                {collected ? (
-                  <Button onClick={handleSaveNotes} disabled={saving || !collectorName.trim()}>
-                    {saving ? "Saving…" : "Save Changes"}
-                  </Button>
-                ) : (
+                {!acknowledgementLocked && (
                   <Button
                     onClick={handleMarkCollected}
                     disabled={saving || !collectorName.trim()}
