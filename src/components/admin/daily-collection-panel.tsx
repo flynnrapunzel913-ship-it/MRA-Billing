@@ -1,11 +1,9 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   Lock,
 } from "lucide-react";
@@ -33,10 +31,9 @@ import {
   cashStateFromReconciliation,
   emptyCashState,
 } from "@/components/admin/cash-denomination-section";
-import { formatCashDifference, type CashDenominations } from "@/lib/cash-denominations";
+import { type CashDenominations } from "@/lib/cash-denominations";
 
 const sectionCard = cn("glass-panel overflow-hidden");
-const summaryCard = "rounded-xl border border-border/60 bg-card/50 p-4 sm:p-5";
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("en-IN", {
@@ -57,49 +54,26 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function SectionHeader({
-  title,
-  description,
-}: {
-  title: string;
-  description?: string;
-}) {
-  return (
-    <div className="space-y-1">
-      <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
-      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-    </div>
-  );
-}
-
-function SummaryKpi({
+function SummaryStat({
   label,
   value,
-  highlight,
+  className,
 }: {
   label: string;
-  value: number;
-  highlight?: boolean;
+  value: string;
+  className?: string;
 }) {
   return (
-    <div className={cn(summaryCard, highlight && "border-primary/40 bg-primary/5 ring-1 ring-primary/20")}>
-      <p className="text-sm text-muted-foreground">{label}</p>
-      <p
-        className={cn(
-          "mt-1 text-2xl font-bold tabular-nums",
-          highlight && "text-primary"
-        )}
-      >
-        {formatCurrency(value)}
-      </p>
+    <div className={cn("rounded-lg border border-border/60 bg-card/50 p-4", className)}>
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-bold tabular-nums">{value}</p>
     </div>
   );
 }
 
 function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
-  const rows = sheet.revenueBreakdown;
-  if (rows.length === 0) {
-    return <p className="text-sm text-muted-foreground">No revenue recorded for this date.</p>;
+  if (sheet.revenueBreakdown.length === 0) {
+    return null;
   }
 
   return (
@@ -107,13 +81,13 @@ function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="font-semibold">Source</TableHead>
+            <TableHead className="font-semibold">Revenue Source</TableHead>
             <TableHead className="text-right font-semibold">Count</TableHead>
-            <TableHead className="text-right font-semibold">Revenue</TableHead>
+            <TableHead className="text-right font-semibold">Amount</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => (
+          {sheet.revenueBreakdown.map((row) => (
             <TableRow key={row.name}>
               <TableCell className="font-medium">{row.name}</TableCell>
               <TableCell className="text-right tabular-nums">{row.count}</TableCell>
@@ -123,7 +97,13 @@ function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
             </TableRow>
           ))}
           <TableRow className="bg-muted/20 font-semibold">
-            <TableCell>Total</TableCell>
+            <TableCell>
+              Total
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                (Subscription {formatCurrency(sheet.subscriptionRevenue)} · Products{" "}
+                {formatCurrency(sheet.productRevenue)})
+              </span>
+            </TableCell>
             <TableCell className="text-right">—</TableCell>
             <TableCell className="text-right tabular-nums">
               {formatCurrency(sheet.totalRevenue)}
@@ -135,9 +115,7 @@ function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
   );
 }
 
-function ExpenseTable({ expenses }: { expenses: DailyCollectionSheet["expenses"] }) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
+function ExpenseTable({ expenses, total }: { expenses: DailyCollectionSheet["expenses"]; total: number }) {
   if (expenses.length === 0) {
     return <p className="text-sm text-muted-foreground">No expenses for this date.</p>;
   }
@@ -147,7 +125,6 @@ function ExpenseTable({ expenses }: { expenses: DailyCollectionSheet["expenses"]
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="w-8" />
             <TableHead className="font-semibold">Time</TableHead>
             <TableHead className="font-semibold">To Whom</TableHead>
             <TableHead className="font-semibold">Reason</TableHead>
@@ -155,48 +132,22 @@ function ExpenseTable({ expenses }: { expenses: DailyCollectionSheet["expenses"]
           </TableRow>
         </TableHeader>
         <TableBody>
-          {expenses.map((expense) => {
-            const open = expandedId === expense.id;
-            return (
-              <Fragment key={expense.id}>
-                <TableRow className="cursor-pointer" onClick={() => setExpandedId(open ? null : expense.id)}>
-                  <TableCell>
-                    {open ? (
-                      <ChevronUp className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </TableCell>
-                  <TableCell className="tabular-nums">{formatTime(expense.createdAt)}</TableCell>
-                  <TableCell>{expense.paidTo}</TableCell>
-                  <TableCell>{expense.reason}</TableCell>
-                  <TableCell className="text-right font-medium tabular-nums">
-                    {formatCurrency(expense.amount)}
-                  </TableCell>
-                </TableRow>
-                {open && (
-                  <TableRow className="bg-muted/10">
-                    <TableCell colSpan={5} className="py-3">
-                      <dl className="grid gap-3 text-sm sm:grid-cols-3">
-                        <div>
-                          <dt className="text-muted-foreground">Created By</dt>
-                          <dd className="font-medium">{expense.createdBy}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">Created Time</dt>
-                          <dd className="font-medium">{formatDateTime(expense.createdAt)}</dd>
-                        </div>
-                        <div>
-                          <dt className="text-muted-foreground">Notes</dt>
-                          <dd className="font-medium text-muted-foreground">—</dd>
-                        </div>
-                      </dl>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </Fragment>
-            );
-          })}
+          {expenses.map((expense) => (
+            <TableRow key={expense.id}>
+              <TableCell className="tabular-nums">{formatTime(expense.createdAt)}</TableCell>
+              <TableCell>{expense.paidTo}</TableCell>
+              <TableCell>{expense.reason}</TableCell>
+              <TableCell className="text-right font-medium tabular-nums">
+                {formatCurrency(expense.amount)}
+              </TableCell>
+            </TableRow>
+          ))}
+          <TableRow className="bg-muted/20 font-semibold">
+            <TableCell colSpan={3}>Total Expenses</TableCell>
+            <TableCell className="text-right tabular-nums text-destructive">
+              {formatCurrency(total)}
+            </TableCell>
+          </TableRow>
         </TableBody>
       </Table>
     </div>
@@ -217,49 +168,39 @@ function CollectionHistoryTable({
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead className="font-semibold">Date</TableHead>
             <TableHead className="font-semibold">Status</TableHead>
-            <TableHead className="text-right font-semibold">Net Collection</TableHead>
-            <TableHead className="font-semibold">Cash</TableHead>
+            <TableHead className="text-right font-semibold">Net</TableHead>
+            <TableHead className="text-right font-semibold">Cash</TableHead>
+            <TableHead className="text-right font-semibold">UPI</TableHead>
             <TableHead className="text-right font-semibold">Action</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((row) => {
-            const cash = row.cashReconciliation;
-            const diffStatus =
-              cash != null ? formatCashDifference(cash.cashDifference) : null;
-
-            return (
-              <TableRow key={row.date}>
-                <TableCell className="font-medium">{row.label}</TableCell>
-                <TableCell>
-                  {row.collected ? (
-                    <Badge variant="success">Collected ✓</Badge>
-                  ) : (
-                    <Badge variant="secondary">Not Collected</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {row.snapshot ? formatCurrency(row.snapshot.netCollection) : "—"}
-                </TableCell>
-                <TableCell>
-                  {!row.collected || !cash ? (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  ) : diffStatus?.reconciled ? (
-                    <Badge variant="success">Reconciled ✓</Badge>
-                  ) : (
-                    <span className="text-sm font-medium text-destructive">
-                      Mismatch ⚠
-                    </span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => onSelectDate(row.date)}>
-                    View
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
+          {rows.map((row) => (
+            <TableRow key={row.date}>
+              <TableCell className="font-medium">{row.label}</TableCell>
+              <TableCell>
+                {row.collected ? (
+                  <Badge variant="success">Collected</Badge>
+                ) : (
+                  <Badge variant="secondary">Pending</Badge>
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.snapshot ? formatCurrency(row.snapshot.netCollection) : "—"}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.snapshot ? formatCurrency(row.snapshot.cashCollected) : "—"}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {row.snapshot ? formatCurrency(row.snapshot.upiCollected) : "—"}
+              </TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => onSelectDate(row.date)}>
+                  View
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </div>
@@ -351,13 +292,16 @@ export function DailyCollectionPanel() {
 
   const collected = !!sheet?.collection;
   const acknowledgementLocked = collected;
+  const { paymentBreakdown } = sheet ?? {
+    paymentBreakdown: { cash: 0, upi: 0, netCash: 0 },
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="mx-auto max-w-5xl space-y-6">
       <Card className={sectionCard}>
         <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div className="space-y-2">
-            <Label htmlFor="collection-date">Date</Label>
+            <Label htmlFor="collection-date">Collection Date</Label>
             <div className="flex items-center gap-2">
               <Input
                 id="collection-date"
@@ -384,7 +328,7 @@ export function DailyCollectionPanel() {
             {sheet?.isSnapshot && (
               <Badge variant="outline" className="gap-1">
                 <Lock className="h-3 w-3" />
-                Saved Report
+                Saved
               </Badge>
             )}
             {collected ? (
@@ -402,147 +346,131 @@ export function DailyCollectionPanel() {
       </Card>
 
       {loading || !sheet ? (
-        <div className="flex min-h-[320px] items-center justify-center text-muted-foreground">
+        <div className="flex min-h-[280px] items-center justify-center text-muted-foreground">
           <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-          Loading daily collection report…
+          Loading daily collection…
         </div>
       ) : (
         <>
-          {/* 1. Revenue Earned Today */}
-          <section className="space-y-4">
-            <SectionHeader title="Revenue Earned Today" />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <SummaryKpi label="Total Revenue" value={sheet.totalRevenue} />
-              <SummaryKpi label="Subscription Revenue" value={sheet.subscriptionRevenue} />
-              <SummaryKpi label="Product Revenue" value={sheet.productRevenue} />
-            </div>
-            <RevenueBreakdownTable sheet={sheet} />
-          </section>
+          <Card className={cn(sectionCard, "border-primary/30 bg-primary/5")}>
+            <CardHeader className="border-b border-primary/15 px-5 py-4">
+              <CardTitle className="text-base text-primary">Net Amount To Be Collected</CardTitle>
+              <p className="text-sm text-muted-foreground">Revenue earned minus expenses given</p>
+            </CardHeader>
+            <CardContent className="space-y-5 p-5">
+              <p className="text-4xl font-bold tabular-nums text-primary sm:text-5xl">
+                {formatCurrency(sheet.netCollection)}
+              </p>
 
-          {/* 2. Expenses Given Today */}
-          <section className="space-y-4">
-            <SectionHeader title="Expenses Given Today" />
-            <SummaryKpi label="Total Expenses" value={sheet.totalExpenses} />
-            <ExpenseTable expenses={sheet.expenses} />
-          </section>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <SummaryStat label="Revenue Earned" value={formatCurrency(sheet.totalRevenue)} />
+                <SummaryStat
+                  label="Expenses Given"
+                  value={formatCurrency(sheet.totalExpenses)}
+                  className="[&_p:last-child]:text-destructive"
+                />
+                <SummaryStat
+                  label="Cash Collected"
+                  value={formatCurrency(paymentBreakdown.cash)}
+                  className="border-emerald-500/30 bg-emerald-500/5 [&_p:first-child]:text-emerald-700 dark:[&_p:first-child]:text-emerald-400"
+                />
+                <SummaryStat
+                  label="UPI / PhonePe"
+                  value={formatCurrency(paymentBreakdown.upi)}
+                  className="border-sky-500/30 bg-sky-500/5 [&_p:first-child]:text-sky-700 dark:[&_p:first-child]:text-sky-400"
+                />
+              </div>
 
-          {/* 3. Collections Breakdown */}
-          <section className="space-y-4">
-            <SectionHeader title="Collections Breakdown" />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <SummaryKpi label="Cash Collected" value={sheet.paymentBreakdown.cash} />
-              <SummaryKpi label="PhonePe / UPI Collected" value={sheet.paymentBreakdown.upi} />
-              <SummaryKpi
-                label="Total Collections"
-                value={sheet.paymentBreakdown.grossCollected}
-              />
-            </div>
-          </section>
+              {sheet.totalExpenses > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Cash in drawer after expenses: {formatCurrency(paymentBreakdown.netCash)}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-          {/* 4. Net Amount To Be Collected */}
-          <section className="space-y-4">
-            <SectionHeader
-              title="Net Amount To Be Collected"
-              description="Total Revenue − Total Expenses"
-            />
-            <Card className={cn(sectionCard, "border-primary/40 bg-primary/5 ring-1 ring-primary/20")}>
-              <CardContent className="grid gap-4 p-5 sm:grid-cols-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Revenue</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums">
-                    {formatCurrency(sheet.totalRevenue)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Expenses</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-destructive">
-                    − {formatCurrency(sheet.totalExpenses)}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-primary/40 bg-background/80 p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-primary">Net Collection</p>
-                  <p className="mt-1 text-4xl font-bold tabular-nums text-primary">
-                    {formatCurrency(sheet.netCollection)}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
-
-          {/* 5. Cash Reconciliation */}
-          <section className="space-y-4">
-            <CashDenominationSection
-              systemCash={sheet.paymentBreakdown.netCash}
-              denominations={denominations}
-              onDenominationsChange={setDenominations}
-              denominationsLocked={collected}
-              storedReconciliation={sheet.collection?.cashReconciliation}
-            />
-          </section>
-
-          {/* 6. Mark Collection As Collected */}
-          <section className="space-y-4">
+          {(sheet.revenueBreakdown.length > 0 || sheet.expenses.length > 0) && (
             <Card className={sectionCard}>
-              <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
-                <CardTitle className="text-base">Mark Collection As Collected</CardTitle>
-                {acknowledgementLocked && (
-                  <Badge variant="outline" className="gap-1">
-                    <Lock className="h-3 w-3" />
-                    Locked
-                  </Badge>
-                )}
+              <CardHeader className="border-b border-border px-5 py-4">
+                <CardTitle className="text-base">Breakdown</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4 p-5">
-                {acknowledgementLocked && (
-                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
-                    <p className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
-                      <CheckCircle2 className="h-5 w-5" />
-                      Collection recorded and locked
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Collected at {formatDateTime(sheet.collection!.collectedAt)}
-                    </p>
+              <CardContent className="space-y-6 p-5">
+                {sheet.revenueBreakdown.length > 0 && (
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold">Revenue</h3>
+                    <RevenueBreakdownTable sheet={sheet} />
                   </div>
                 )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="collected-by">Collected By</Label>
-                  <Input
-                    id="collected-by"
-                    value={collectorName}
-                    onChange={(e) => setCollectorName(e.target.value)}
-                    placeholder="Owner or collector name"
-                    readOnly={acknowledgementLocked}
-                    disabled={acknowledgementLocked}
-                    className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
-                  />
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Expenses</h3>
+                  <ExpenseTable expenses={sheet.expenses} total={sheet.totalExpenses} />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="collection-notes">Owner Notes</Label>
-                  <Textarea
-                    id="collection-notes"
-                    rows={4}
-                    placeholder="Collected all cash and verified PhonePe settlement."
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    readOnly={acknowledgementLocked}
-                    disabled={acknowledgementLocked}
-                    className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
-                  />
-                </div>
-
-                {!acknowledgementLocked && (
-                  <Button
-                    onClick={handleMarkCollected}
-                    disabled={saving || !collectorName.trim()}
-                  >
-                    {saving ? "Saving…" : "Mark Collection As Collected"}
-                  </Button>
-                )}
               </CardContent>
             </Card>
-          </section>
+          )}
+
+          <CashDenominationSection
+            systemCash={paymentBreakdown.netCash}
+            denominations={denominations}
+            onDenominationsChange={setDenominations}
+            denominationsLocked={collected}
+            storedReconciliation={sheet.collection?.cashReconciliation}
+          />
+
+          <Card className={sectionCard}>
+            <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
+              <CardTitle className="text-base">Mark Collection As Collected</CardTitle>
+              {acknowledgementLocked && (
+                <Badge variant="outline" className="gap-1">
+                  <Lock className="h-3 w-3" />
+                  Locked
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              {acknowledgementLocked && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                  <p className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
+                    <CheckCircle2 className="h-5 w-5" />
+                    Recorded at {formatDateTime(sheet.collection!.collectedAt)}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="collected-by">Collected By</Label>
+                <Input
+                  id="collected-by"
+                  value={collectorName}
+                  onChange={(e) => setCollectorName(e.target.value)}
+                  placeholder="Owner or collector name"
+                  readOnly={acknowledgementLocked}
+                  disabled={acknowledgementLocked}
+                  className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="collection-notes">Owner Notes</Label>
+                <Textarea
+                  id="collection-notes"
+                  rows={3}
+                  placeholder="Collected all cash and verified PhonePe settlement."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  readOnly={acknowledgementLocked}
+                  disabled={acknowledgementLocked}
+                  className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
+                />
+              </div>
+
+              {!acknowledgementLocked && (
+                <Button onClick={handleMarkCollected} disabled={saving || !collectorName.trim()}>
+                  {saving ? "Saving…" : "Mark Collection As Collected"}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
@@ -551,7 +479,7 @@ export function DailyCollectionPanel() {
           open={historyOpen}
           onClose={() => setHistoryOpen(false)}
           title="Collection History"
-          description="Review previous days — select a date to load its saved report"
+          description="Select a date to view its report"
           maxWidth="lg"
         >
           <CollectionHistoryTable

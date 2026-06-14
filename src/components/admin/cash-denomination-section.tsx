@@ -71,9 +71,9 @@ export function CashDenominationSection({
   return (
     <Card className={glassCard}>
       <CardHeader className="border-b border-border px-5 py-4">
-        <CardTitle className="text-base">Physical Cash Verification</CardTitle>
+        <CardTitle className="text-base">Cash Reconciliation</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Count physical cash in the drawer and reconcile with net cash after today&apos;s expenses
+          Count physical cash and match with net cash after today&apos;s expenses
         </p>
       </CardHeader>
       <CardContent className="space-y-5 p-5">
