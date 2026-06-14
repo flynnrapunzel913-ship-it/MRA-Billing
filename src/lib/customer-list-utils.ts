@@ -1,4 +1,5 @@
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
+import { formatDateInput } from "@/lib/utils";
 
 export type StatusFilter = "all" | "active" | "passed_out" | "pending_payment";
 
@@ -228,6 +229,12 @@ export function matchesCustomerSearch(customer: CustomerListRow, search: string)
   );
 }
 
+export function matchesJoinedDate(customer: CustomerListRow, joinedDate: string) {
+  if (!joinedDate) return true;
+  if (!customer.dateJoined) return false;
+  return formatDateInput(customer.dateJoined) === joinedDate;
+}
+
 export function filterCustomers(
   customers: CustomerListRow[],
   options: {
@@ -235,11 +242,13 @@ export function filterCustomers(
     statusFilter: StatusFilter;
     serviceFilter: ServiceFilter;
     invoiceIndex: Map<string, InvoiceIndexEntry>;
+    joinedDate?: string;
   }
 ) {
   return customers.filter((customer) => {
     const index = options.invoiceIndex.get(customer.id);
 
+    if (!matchesJoinedDate(customer, options.joinedDate ?? "")) return false;
     if (!matchesStatusFilter(customer, options.statusFilter, index)) return false;
     if (!matchesServiceFilter(options.serviceFilter, options.statusFilter, index)) return false;
     if (!matchesCustomerSearch(customer, options.search)) return false;

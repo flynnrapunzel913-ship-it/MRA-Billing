@@ -1,13 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Calendar, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { ListPageSkeleton } from "@/components/ui/skeletons";
-import { cn } from "@/lib/utils";
+import { cn, formatDate, formatDateInput } from "@/lib/utils";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
@@ -20,6 +20,7 @@ import {
   buildCustomerInvoiceIndex,
   filterCustomers,
   getCustomerCountLabel,
+  matchesJoinedDate,
   type CustomerListRow,
   type ServiceFilter,
   type StatusFilter,
@@ -36,6 +37,7 @@ const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
 
 export default function CustomersPage() {
   const [directoryView, setDirectoryView] = useState<CustomerDirectoryView>("active");
+  const [joinedDate, setJoinedDate] = useState(formatDateInput(new Date()));
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [serviceFilter, setServiceFilter] = useState<ServiceFilter>("all");
@@ -85,32 +87,37 @@ export default function CustomersPage() {
     const rows = customers ?? [];
     if (directoryView === "deleted") {
       const q = debouncedSearch.trim().toLowerCase();
-      if (!q) return rows;
-      return rows.filter(
-        (customer) =>
+      return rows.filter((customer) => {
+        if (!matchesJoinedDate(customer, joinedDate)) return false;
+        if (!q) return true;
+        return (
           customer.name.toLowerCase().includes(q) || (customer.mobile ?? "").includes(q)
-      );
+        );
+      });
     }
     return filterCustomers(rows, {
       search: debouncedSearch,
       statusFilter,
       serviceFilter,
       invoiceIndex,
+      joinedDate,
     });
-  }, [customers, debouncedSearch, statusFilter, serviceFilter, invoiceIndex, directoryView]);
+  }, [customers, debouncedSearch, statusFilter, serviceFilter, invoiceIndex, directoryView, joinedDate]);
 
   const countLabel = useMemo(() => {
+    const dateSuffix = joinedDate ? ` registered on ${formatDate(joinedDate)}` : "";
     if (directoryView === "deleted") {
       const count = filtered.length;
-      return `${count} deleted customer${count === 1 ? "" : "s"}`;
+      return `${count} deleted customer${count === 1 ? "" : "s"}${dateSuffix}`;
     }
-    return getCustomerCountLabel({
+    const base = getCustomerCountLabel({
       count: filtered.length,
       statusFilter,
       serviceFilter,
       search: debouncedSearch,
     });
-  }, [filtered.length, statusFilter, serviceFilter, debouncedSearch, directoryView]);
+    return `${base}${dateSuffix}`;
+  }, [filtered.length, statusFilter, serviceFilter, debouncedSearch, directoryView, joinedDate]);
 
   const handleCreated = () => {
     setFormOpen(false);
@@ -175,6 +182,20 @@ export default function CustomersPage() {
 
   return (
     <div className="mx-auto w-full space-y-4">
+      <div className="flex flex-col items-center gap-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Calendar className="h-4 w-4 shrink-0" />
+          Registered on
+        </label>
+        <Input
+          type="date"
+          className="h-11 w-full max-w-xs"
+          value={joinedDate}
+          max={formatDateInput(new Date())}
+          onChange={(e) => setJoinedDate(e.target.value)}
+        />
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -268,8 +289,8 @@ export default function CustomersPage() {
         <div className="glass-panel rounded-[20px] px-6 py-16 text-center">
           <p className="text-sm font-medium text-foreground">
             {directoryView === "deleted"
-              ? "No deleted customers match your search."
-              : "No customers match your search."}
+              ? `No deleted customers registered on ${formatDate(joinedDate)}.`
+              : `No customers registered on ${formatDate(joinedDate)}.`}
           </p>
         </div>
       ) : (
