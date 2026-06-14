@@ -134,7 +134,7 @@ const s = StyleSheet.create({
     fontFamily: "Helvetica",
     color: TEXT_PRIMARY,
     backgroundColor: "#ffffff",
-    paddingBottom: 70,
+    paddingBottom: 58,
   },
   headerWrap: {
     backgroundColor: "#ffffff",
@@ -221,16 +221,16 @@ const s = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    paddingTop: 8,
+    paddingTop: 6,
   },
   titleBand: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: BRAND,
-    paddingVertical: 8,
+    paddingVertical: 7,
     borderRadius: 4,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   titleText: {
     fontSize: 13,
@@ -242,8 +242,8 @@ const s = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 14,
-    gap: 12,
+    marginBottom: 10,
+    gap: 10,
   },
   metaLeft: {
     flex: 1,
@@ -308,7 +308,7 @@ const s = StyleSheet.create({
     borderColor: BORDER,
     borderRadius: 4,
     overflow: "hidden",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   tableHeader: {
     flexDirection: "row",
@@ -356,7 +356,7 @@ const s = StyleSheet.create({
   totalsWrap: {
     alignSelf: "flex-end",
     width: 240,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   totalRow: {
     flexDirection: "row",
@@ -415,7 +415,7 @@ const s = StyleSheet.create({
   infoRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 16,
+    marginBottom: 10,
   },
   infoBox: {
     flex: 1,
@@ -463,7 +463,7 @@ const s = StyleSheet.create({
   footerRow: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 28,
+    marginTop: 8,
   },
   footerLeft: {
     flex: 2,
@@ -492,7 +492,7 @@ const s = StyleSheet.create({
     objectFit: "contain",
   },
   signatureArea: {
-    height: 80,
+    height: 48,
     width: 140,
     justifyContent: "flex-end",
     alignItems: "center",
@@ -763,13 +763,9 @@ export function InvoicePDFDocument({
                 ) : null}
               </View>
               <Text style={s.signatureLine}>Authorized Signature</Text>
-              <Text style={[s.genNote, { marginTop: 6 }]}>{settings.academyName}</Text>
+              <Text style={[s.genNote, { marginTop: 4 }]}>{settings.academyName}</Text>
             </View>
           </View>
-
-          <Text style={s.genNote}>
-            This is a computer-generated invoice. No signature required if digitally stamped.
-          </Text>
         </View>
       </Page>
     </Document>

@@ -31,6 +31,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
+        suppressHydrationWarning
         onWheel={(event) => {
           blockWheelOnNumberInput(event);
           onWheel?.(event);
