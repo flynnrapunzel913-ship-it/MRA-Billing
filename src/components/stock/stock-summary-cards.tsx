@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, IndianRupee, CalendarDays, Boxes } from "lucide-react";
+import { Package, IndianRupee, CalendarDays } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { KpiCardsSkeleton } from "@/components/ui/skeletons";
 
@@ -39,16 +39,6 @@ const allCards = [
     accent: "from-amber-500/15 to-amber-400/5",
     iconBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
-  {
-    key: "units" as const,
-    label: "Total Items Purchased",
-    icon: Boxes,
-    adminOnly: false,
-    format: (s: StockSummary) =>
-      `${s.totalUnitsPurchased.toLocaleString("en-IN")} Units`,
-    accent: "from-[#00E5D4]/15 to-[#00C2FF]/5",
-    iconBg: "bg-[#00E5D4]/15 text-[#0096a8] dark:text-[#00E5D4]",
-  },
 ] as const;
 
 export function StockSummaryCards({
@@ -71,7 +61,7 @@ export function StockSummaryCards({
     <div
       className={cn(
         "grid gap-4 sm:grid-cols-2",
-        cards.length > 2 ? "xl:grid-cols-4" : "lg:max-w-2xl"
+        cards.length > 2 ? "xl:grid-cols-3" : "lg:max-w-2xl"
       )}
     >
       {cards.map((card) => {
