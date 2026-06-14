@@ -387,6 +387,7 @@ function mapSubscriptionPlan(row: Record<string, unknown>): Prisma.SubscriptionP
     durationUnit:
       (optionalString(row.durationUnit) as Prisma.SubscriptionPlanCreateManyInput["durationUnit"]) ??
       "MONTHS",
+    usageDays: row.usageDays == null ? null : requireInt(row, "usageDays"),
     fees: requireNumber(row, "fees"),
     isActive: requireBoolean(row, "isActive"),
     createdAt: parseDateValue(row.createdAt, "createdAt"),
@@ -474,6 +475,8 @@ function mapInvoiceItem(row: Record<string, unknown>): Prisma.InvoiceItemCreateM
       row.durationValueSnapshot == null ? null : requireInt(row, "durationValueSnapshot"),
     durationUnitSnapshot:
       optionalString(row.durationUnitSnapshot) as Prisma.InvoiceItemCreateManyInput["durationUnitSnapshot"],
+    usageDaysSnapshot:
+      row.usageDaysSnapshot == null ? null : requireInt(row, "usageDaysSnapshot"),
     feesSnapshot:
       row.feesSnapshot === null || row.feesSnapshot === undefined
         ? null

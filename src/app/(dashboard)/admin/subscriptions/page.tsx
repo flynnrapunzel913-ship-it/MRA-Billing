@@ -20,6 +20,7 @@ import { readApiResponse } from "@/lib/api-error";
 import { formatCurrency, cn } from "@/lib/utils";
 import type { CatalogProduct } from "@/lib/catalog";
 import type { SubscriptionPlanRow } from "@/lib/subscription-plans";
+import { formatDurationLabel } from "@/lib/subscription-duration";
 import { SubscriptionPlanFormDialog } from "@/components/admin/subscription-plan-form-dialog";
 import { ProductFormDialog } from "@/components/admin/product-form-dialog";
 
@@ -130,6 +131,7 @@ export default function SubscriptionManagementPage() {
         description: record.description,
         durationValue: record.durationValue,
         durationUnit: record.durationUnit,
+        usageDays: record.usageDays,
         fees: record.fees,
         isActive: !record.isActive,
       }),
@@ -251,7 +253,8 @@ export default function SubscriptionManagementPage() {
                 <TableRow>
                   <TableHead>Plan Name</TableHead>
                   <TableHead>Description</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <TableHead>Usage Days</TableHead>
+                  <TableHead>Validity</TableHead>
                   <TableHead className="text-right">Fees</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -260,7 +263,7 @@ export default function SubscriptionManagementPage() {
               <TableBody>
                 {plans.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                       No subscription plans yet. Click Add Plan to create one.
                     </TableCell>
                   </TableRow>
@@ -271,7 +274,10 @@ export default function SubscriptionManagementPage() {
                       <TableCell className="text-muted-foreground">
                         {plan.description || "—"}
                       </TableCell>
-                      <TableCell>{plan.duration}</TableCell>
+                      <TableCell>{plan.usageDays ?? "Unlimited"}</TableCell>
+                      <TableCell>
+                        {formatDurationLabel(plan.durationValue, plan.durationUnit)}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {formatCurrency(plan.fees)}
                       </TableCell>

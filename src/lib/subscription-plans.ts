@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 import {
   formatDurationLabel,
+  formatPlanCoverageSummary,
   type SubscriptionDurationUnit,
 } from "@/lib/subscription-duration";
 
@@ -12,6 +13,7 @@ export type SubscriptionPlanRow = {
   duration: string;
   durationValue: number;
   durationUnit: SubscriptionDurationUnit;
+  usageDays: number | null;
   fees: number;
   isActive: boolean;
   createdAt: string;
@@ -21,11 +23,13 @@ export type SubscriptionPlanRow = {
 export function planInvoiceDescription(plan: {
   planName: string;
   description?: string | null;
-  duration?: string;
+  usageDays?: number | null;
+  durationValue: number;
+  durationUnit: SubscriptionDurationUnit;
 }) {
   const parts = [plan.planName.trim()];
   if (plan.description?.trim()) parts.push(plan.description.trim());
-  if (plan.duration?.trim()) parts.push(`(${plan.duration.trim()})`);
+  parts.push(`(${formatPlanCoverageSummary(plan)})`);
   return parts.join(" — ");
 }
 
@@ -36,6 +40,7 @@ export function serializeSubscriptionPlan(row: {
   duration: string;
   durationValue: number;
   durationUnit: SubscriptionDurationUnit;
+  usageDays: number | null;
   fees: unknown;
   isActive: boolean;
   createdAt: Date;
@@ -48,6 +53,7 @@ export function serializeSubscriptionPlan(row: {
     duration: row.duration,
     durationValue: row.durationValue,
     durationUnit: row.durationUnit,
+    usageDays: row.usageDays,
     fees: toJsonNumber(row.fees),
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),

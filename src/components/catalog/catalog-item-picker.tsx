@@ -15,6 +15,7 @@ type SubscriptionOption = {
   duration: string;
   durationValue?: number;
   durationUnit?: string;
+  usageDays?: number | null;
   price: number;
   description?: string | null;
 };

@@ -30,6 +30,24 @@ export function formatDurationLabel(
   return n === 1 ? `1 ${singular}` : `${n} ${plural}`;
 }
 
+export function formatUsageDaysLabel(usageDays: number): string {
+  const n = Math.max(1, Math.floor(usageDays));
+  return n === 1 ? "1 day" : `${n} days`;
+}
+
+/** Human-readable plan coverage, e.g. "21 days within 1 Month". */
+export function formatPlanCoverageSummary(input: {
+  usageDays?: number | null;
+  durationValue: number;
+  durationUnit: SubscriptionDurationUnit;
+}): string {
+  const validity = formatDurationLabel(input.durationValue, input.durationUnit);
+  if (input.usageDays != null && input.usageDays > 0) {
+    return `${formatUsageDaysLabel(input.usageDays)} within ${validity}`;
+  }
+  return validity;
+}
+
 /** Inclusive membership end date: start + duration, last valid day. */
 export function calculatePackageEndDate(
   startDateStr: string,

@@ -8,6 +8,7 @@ import type { InvoiceLineItem } from "@/lib/invoice-utils";
 import {
   packageEndDateForLineItem,
   resolveLineItemDuration,
+  formatUsageDaysLabel,
 } from "@/lib/subscription-duration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,6 +98,11 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
               disabled={hasAutoEndDate}
               onChange={(e) => update({ ...item, packageEndDate: e.target.value })}
             />
+            {item.usageDaysSnapshot != null && item.usageDaysSnapshot > 0 && (
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Includes {formatUsageDaysLabel(item.usageDaysSnapshot)}
+              </p>
+            )}
           </div>
         </>
       )}

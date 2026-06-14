@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculatePackageEndDate,
   formatDurationLabel,
+  formatPlanCoverageSummary,
   packageEndDateForLineItem,
   parseDurationLabel,
 } from "@/lib/subscription-duration";
@@ -11,6 +12,30 @@ describe("subscription duration", () => {
     expect(formatDurationLabel(1, "MONTHS")).toBe("1 Month");
     expect(formatDurationLabel(3, "MONTHS")).toBe("3 Months");
     expect(formatDurationLabel(30, "DAYS")).toBe("30 Days");
+  });
+
+  it("formats plan coverage with usage days and validity", () => {
+    expect(
+      formatPlanCoverageSummary({
+        usageDays: 21,
+        durationValue: 1,
+        durationUnit: "MONTHS",
+      })
+    ).toBe("21 days within 1 Month");
+    expect(
+      formatPlanCoverageSummary({
+        usageDays: 320,
+        durationValue: 1,
+        durationUnit: "YEARS",
+      })
+    ).toBe("320 days within 1 Year");
+    expect(
+      formatPlanCoverageSummary({
+        usageDays: null,
+        durationValue: 1,
+        durationUnit: "MONTHS",
+      })
+    ).toBe("1 Month");
   });
 
   it("calculates inclusive end dates", () => {

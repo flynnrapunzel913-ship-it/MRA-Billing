@@ -4,7 +4,7 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { listSubscriptionPlans, serializeSubscriptionPlan } from "@/lib/subscription-plans";
 import { subscriptionPlanSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
-import { formatDurationLabel } from "@/lib/subscription-duration";
+import { formatPlanCoverageSummary } from "@/lib/subscription-duration";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +35,12 @@ export async function POST(request: NextRequest) {
       data: {
         planName: data.planName.trim(),
         description: data.description?.trim() || null,
-        duration: formatDurationLabel(data.durationValue, data.durationUnit),
+        usageDays: data.usageDays ?? null,
+        duration: formatPlanCoverageSummary({
+          usageDays: data.usageDays,
+          durationValue: data.durationValue,
+          durationUnit: data.durationUnit,
+        }),
         durationValue: data.durationValue,
         durationUnit: data.durationUnit,
         fees: data.fees,

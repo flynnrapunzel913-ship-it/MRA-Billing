@@ -231,6 +231,7 @@ export async function POST(request: NextRequest) {
               durationSnapshot: item.durationSnapshot || null,
               durationValueSnapshot: item.durationValueSnapshot ?? null,
               durationUnitSnapshot: item.durationUnitSnapshot ?? null,
+              usageDaysSnapshot: item.usageDaysSnapshot ?? null,
               feesSnapshot: item.feesSnapshot ?? item.unitPrice,
             })),
           },

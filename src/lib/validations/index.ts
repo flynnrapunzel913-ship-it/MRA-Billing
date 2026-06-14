@@ -50,6 +50,7 @@ export const invoiceItemSchema = z.object({
   durationSnapshot: z.string().optional(),
   durationValueSnapshot: z.number().int().positive().optional(),
   durationUnitSnapshot: z.enum(SUBSCRIPTION_DURATION_UNITS).optional(),
+  usageDaysSnapshot: z.number().int().positive().optional(),
   feesSnapshot: z.number().nonnegative().optional(),
 });
 
@@ -168,7 +169,8 @@ export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 export const subscriptionPlanSchema = z.object({
   planName: z.string().min(1, "Plan name is required"),
   description: z.string().optional().nullable(),
-  durationValue: z.number().int().positive("Duration must be at least 1"),
+  usageDays: z.number().int().positive().optional().nullable(),
+  durationValue: z.number().int().positive("Validity must be at least 1"),
   durationUnit: z.enum(SUBSCRIPTION_DURATION_UNITS),
   fees: z.number().nonnegative("Fees must be zero or greater"),
   isActive: z.boolean(),

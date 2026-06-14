@@ -18,6 +18,7 @@ interface InvoiceItem {
   amount: number;
   packageStartDate?: Date | string | null;
   packageEndDate?: Date | string | null;
+  usageDaysSnapshot?: number | null;
 }
 
 interface InvoiceData {
@@ -593,6 +594,10 @@ function ItemRow({ item, index }: { item: InvoiceItem; index: number }) {
   const period = isCoachingPackage(item.itemType)
     ? formatPackagePeriod(item.packageStartDate, item.packageEndDate)
     : null;
+  const usageDays =
+    item.usageDaysSnapshot != null && item.usageDaysSnapshot > 0
+      ? `${item.usageDaysSnapshot} day${item.usageDaysSnapshot === 1 ? "" : "s"} included`
+      : null;
 
   return (
     <View style={[s.tableRow, index % 2 !== 0 ? s.tableRowAlt : {}]} wrap={false}>
@@ -601,6 +606,7 @@ function ItemRow({ item, index }: { item: InvoiceItem; index: number }) {
         <Text style={s.tdBold}>{item.description}</Text>
         {item.itemType ? <Text style={s.tdMuted}>{item.itemType}</Text> : null}
         {period ? <Text style={s.tdMuted}>{period}</Text> : null}
+        {usageDays ? <Text style={s.tdMuted}>{usageDays}</Text> : null}
       </View>
       <Text style={[s.tdCell, s.cQty]}>{item.quantity}</Text>
       <Text style={[s.tdCell, s.cRate]}>{formatMoney(item.unitPrice)}</Text>

@@ -24,6 +24,7 @@ import {
   paymentMethodLabel,
   isCoachingPackage,
 } from "@/lib/constants";
+import { formatUsageDaysLabel } from "@/lib/subscription-duration";
 
 export interface InvoiceDetailItem {
   id: string;
@@ -35,6 +36,7 @@ export interface InvoiceDetailItem {
   amount: string | number;
   packageStartDate?: string | null;
   packageEndDate?: string | null;
+  usageDaysSnapshot?: number | null;
 }
 
 export interface InvoiceDetail {
@@ -314,6 +316,9 @@ export function InvoiceDetailView({
                         {item.packageStartDate ? formatDate(item.packageStartDate) : "—"}
                         {" → "}
                         {item.packageEndDate ? formatDate(item.packageEndDate) : "—"}
+                        {item.usageDaysSnapshot != null && item.usageDaysSnapshot > 0
+                          ? ` · ${formatUsageDaysLabel(item.usageDaysSnapshot)} included`
+                          : ""}
                       </span>
                     ) : null;
 

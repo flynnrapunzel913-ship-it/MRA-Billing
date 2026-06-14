@@ -12,7 +12,7 @@ import type { CustomerSearchResult } from "@/lib/customer-search";
 import { planInvoiceDescription, type SubscriptionPlanRow } from "@/lib/subscription-plans";
 import {
   calculatePackageEndDate,
-  formatDurationLabel,
+  formatPlanCoverageSummary,
 } from "@/lib/subscription-duration";
 
 interface InvoiceFormState {
@@ -167,9 +167,14 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
         subscriptionPlanId: item.id,
         planNameSnapshot: item.planName,
         descriptionSnapshot: item.description ?? undefined,
-        durationSnapshot: formatDurationLabel(item.durationValue, item.durationUnit),
+        durationSnapshot: formatPlanCoverageSummary({
+          usageDays: item.usageDays,
+          durationValue: item.durationValue,
+          durationUnit: item.durationUnit,
+        }),
         durationValueSnapshot: item.durationValue,
         durationUnitSnapshot: item.durationUnit,
+        usageDaysSnapshot: item.usageDays ?? undefined,
         feesSnapshot: item.fees,
       });
       if (!next) return state;
@@ -203,6 +208,7 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
         next.packageEndDate = "";
         next.durationValueSnapshot = undefined;
         next.durationUnitSnapshot = undefined;
+        next.usageDaysSnapshot = undefined;
       } else if (next.packageStartDate && next.durationValueSnapshot && next.durationUnitSnapshot) {
         next.packageEndDate = calculatePackageEndDate(
           next.packageStartDate,

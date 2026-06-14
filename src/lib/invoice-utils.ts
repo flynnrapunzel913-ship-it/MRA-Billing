@@ -15,6 +15,7 @@ export interface InvoiceLineItem {
   durationSnapshot?: string;
   durationValueSnapshot?: number;
   durationUnitSnapshot?: SubscriptionDurationUnit;
+  usageDaysSnapshot?: number;
   feesSnapshot?: number;
 }
 

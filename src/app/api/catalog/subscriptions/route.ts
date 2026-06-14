@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
         duration: row.duration,
         durationValue: row.durationValue,
         durationUnit: row.durationUnit,
+        usageDays: row.usageDays,
         price: row.fees,
         fees: row.fees,
       }))
