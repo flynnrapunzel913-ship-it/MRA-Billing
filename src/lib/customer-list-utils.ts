@@ -1,5 +1,5 @@
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
-import { formatDateInput } from "@/lib/utils";
+import { formatDate, formatDateInput } from "@/lib/utils";
 
 export type StatusFilter = "all" | "active" | "passed_out" | "pending_payment";
 
@@ -229,10 +229,37 @@ export function matchesCustomerSearch(customer: CustomerListRow, search: string)
   );
 }
 
-export function matchesJoinedDate(customer: CustomerListRow, joinedDate: string) {
-  if (!joinedDate) return true;
-  if (!customer.dateJoined) return false;
-  return formatDateInput(customer.dateJoined) === joinedDate;
+export function sortCustomersByJoinDateNewestFirst(customers: CustomerListRow[]) {
+  return [...customers].sort(
+    (a, b) => new Date(b.dateJoined).getTime() - new Date(a.dateJoined).getTime()
+  );
+}
+
+export type CustomerDateGroup = {
+  dateKey: string;
+  dateLabel: string;
+  customers: CustomerListRow[];
+};
+
+export function groupCustomersByDate(customers: CustomerListRow[]): CustomerDateGroup[] {
+  const groups: CustomerDateGroup[] = [];
+  let currentKey: string | null = null;
+
+  for (const customer of sortCustomersByJoinDateNewestFirst(customers)) {
+    const key = formatDateInput(customer.dateJoined);
+    if (key !== currentKey) {
+      groups.push({
+        dateKey: key,
+        dateLabel: formatDate(customer.dateJoined),
+        customers: [customer],
+      });
+      currentKey = key;
+    } else {
+      groups[groups.length - 1].customers.push(customer);
+    }
+  }
+
+  return groups;
 }
 
 export function filterCustomers(
@@ -242,13 +269,11 @@ export function filterCustomers(
     statusFilter: StatusFilter;
     serviceFilter: ServiceFilter;
     invoiceIndex: Map<string, InvoiceIndexEntry>;
-    joinedDate?: string;
   }
 ) {
   return customers.filter((customer) => {
     const index = options.invoiceIndex.get(customer.id);
 
-    if (!matchesJoinedDate(customer, options.joinedDate ?? "")) return false;
     if (!matchesStatusFilter(customer, options.statusFilter, index)) return false;
     if (!matchesServiceFilter(options.serviceFilter, options.statusFilter, index)) return false;
     if (!matchesCustomerSearch(customer, options.search)) return false;
