@@ -1,5 +1,6 @@
 import { numberToIndianWords } from "./number-to-words";
 import type { PaymentStatusType } from "./constants";
+import type { SubscriptionDurationUnit } from "./subscription-duration";
 
 export interface InvoiceLineItem {
   itemType: string;
@@ -12,6 +13,8 @@ export interface InvoiceLineItem {
   planNameSnapshot?: string;
   descriptionSnapshot?: string;
   durationSnapshot?: string;
+  durationValueSnapshot?: number;
+  durationUnitSnapshot?: SubscriptionDurationUnit;
   feesSnapshot?: number;
 }
 

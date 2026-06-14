@@ -16,6 +16,12 @@ import {
 } from "@/components/ui/select";
 import { readApiResponse } from "@/lib/api-error";
 import type { SubscriptionPlanRow } from "@/lib/subscription-plans";
+import {
+  SUBSCRIPTION_DURATION_UNITS,
+  SUBSCRIPTION_DURATION_UNIT_LABELS,
+  formatDurationLabel,
+  type SubscriptionDurationUnit,
+} from "@/lib/subscription-duration";
 
 interface SubscriptionPlanFormDialogProps {
   open: boolean;
@@ -32,7 +38,8 @@ export function SubscriptionPlanFormDialog({
 }: SubscriptionPlanFormDialogProps) {
   const [planName, setPlanName] = useState("");
   const [description, setDescription] = useState("");
-  const [duration, setDuration] = useState("");
+  const [durationValue, setDurationValue] = useState("1");
+  const [durationUnit, setDurationUnit] = useState<SubscriptionDurationUnit>("MONTHS");
   const [fees, setFees] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -42,25 +49,33 @@ export function SubscriptionPlanFormDialog({
     if (edit) {
       setPlanName(edit.planName);
       setDescription(edit.description ?? "");
-      setDuration(edit.duration);
+      setDurationValue(String(edit.durationValue));
+      setDurationUnit(edit.durationUnit);
       setFees(String(edit.fees));
       setIsActive(edit.isActive);
     } else {
       setPlanName("");
       setDescription("");
-      setDuration("");
+      setDurationValue("1");
+      setDurationUnit("MONTHS");
       setFees("");
       setIsActive(true);
     }
   }, [open, edit]);
+
+  const durationPreview = formatDurationLabel(
+    Math.max(1, Number(durationValue) || 1),
+    durationUnit
+  );
 
   const submit = async () => {
     if (!planName.trim()) {
       toast.error("Plan name is required");
       return;
     }
-    if (!duration.trim()) {
-      toast.error("Duration is required");
+    const durationNum = Number(durationValue);
+    if (!Number.isFinite(durationNum) || durationNum < 1) {
+      toast.error("Enter a valid duration");
       return;
     }
     const feesNum = Number(fees);
@@ -74,7 +89,8 @@ export function SubscriptionPlanFormDialog({
       const body = {
         planName: planName.trim(),
         description: description.trim() || null,
-        duration: duration.trim(),
+        durationValue: Math.floor(durationNum),
+        durationUnit,
         fees: feesNum,
         isActive,
       };
@@ -141,10 +157,29 @@ export function SubscriptionPlanFormDialog({
         <div className="space-y-2">
           <Label>Duration *</Label>
           <Input
-            value={duration}
-            onChange={(e) => setDuration(e.target.value)}
-            placeholder="1 Month"
+            type="number"
+            min={1}
+            step={1}
+            value={durationValue}
+            onChange={(e) => setDurationValue(e.target.value)}
+            placeholder="1"
           />
+        </div>
+        <div className="space-y-2">
+          <Label>Duration Unit *</Label>
+          <Select value={durationUnit} onValueChange={(v) => setDurationUnit(v as SubscriptionDurationUnit)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUBSCRIPTION_DURATION_UNITS.map((unit) => (
+                <SelectItem key={unit} value={unit}>
+                  {SUBSCRIPTION_DURATION_UNIT_LABELS[unit]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Invoice end date uses {durationPreview}</p>
         </div>
         <div className="space-y-2">
           <Label>Fees (₹) *</Label>

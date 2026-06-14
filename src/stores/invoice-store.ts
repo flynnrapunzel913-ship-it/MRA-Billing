@@ -10,6 +10,10 @@ import {
 } from "@/lib/constants";
 import type { CustomerSearchResult } from "@/lib/customer-search";
 import { planInvoiceDescription, type SubscriptionPlanRow } from "@/lib/subscription-plans";
+import {
+  calculatePackageEndDate,
+  formatDurationLabel,
+} from "@/lib/subscription-duration";
 
 interface InvoiceFormState {
   customerId: string | null;
@@ -148,17 +152,24 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
   addSubscriptionFromCatalog: (item) => {
     let added = false;
     set((state) => {
+      const startDate = state.invoiceDate;
       const next = applyCatalogItem(state.items, {
         itemType: COACHING_PACKAGE_TYPE,
         description: planInvoiceDescription(item),
         quantity: 1,
         unitPrice: item.fees,
-        packageStartDate: state.invoiceDate,
-        packageEndDate: "",
+        packageStartDate: startDate,
+        packageEndDate: calculatePackageEndDate(
+          startDate,
+          item.durationValue,
+          item.durationUnit
+        ),
         subscriptionPlanId: item.id,
         planNameSnapshot: item.planName,
         descriptionSnapshot: item.description ?? undefined,
-        durationSnapshot: item.duration,
+        durationSnapshot: formatDurationLabel(item.durationValue, item.durationUnit),
+        durationValueSnapshot: item.durationValue,
+        durationUnitSnapshot: item.durationUnit,
         feesSnapshot: item.fees,
       });
       if (!next) return state;
@@ -190,6 +201,14 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
       if (!isCoachingPackage(next.itemType)) {
         next.packageStartDate = "";
         next.packageEndDate = "";
+        next.durationValueSnapshot = undefined;
+        next.durationUnitSnapshot = undefined;
+      } else if (next.packageStartDate && next.durationValueSnapshot && next.durationUnitSnapshot) {
+        next.packageEndDate = calculatePackageEndDate(
+          next.packageStartDate,
+          next.durationValueSnapshot,
+          next.durationUnitSnapshot
+        );
       }
       return {
         items: state.items.map((existing, i) => (i === index ? next : existing)),

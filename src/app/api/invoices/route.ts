@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
               planNameSnapshot: item.planNameSnapshot || null,
               descriptionSnapshot: item.descriptionSnapshot || null,
               durationSnapshot: item.durationSnapshot || null,
+              durationValueSnapshot: item.durationValueSnapshot ?? null,
+              durationUnitSnapshot: item.durationUnitSnapshot ?? null,
               feesSnapshot: item.feesSnapshot ?? item.unitPrice,
             })),
           },

@@ -192,6 +192,8 @@ model InvoiceItem {
   planNameSnapshot     String?
   descriptionSnapshot  String?
   durationSnapshot     String?
+  durationValueSnapshot Int?
+  durationUnitSnapshot  SubscriptionDurationUnit?
   feesSnapshot         Decimal? @db.Decimal(10, 2)
   invoice              Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   subscriptionPlan     SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
@@ -230,16 +232,25 @@ model Settings {
   updatedAt          DateTime @updatedAt
 }
 
+enum SubscriptionDurationUnit {
+  DAYS
+  WEEKS
+  MONTHS
+  YEARS
+}
+
 model SubscriptionPlan {
-  id           String   @id @default(cuid())
-  planName     String
-  description  String?
-  duration     String
-  fees         Decimal  @db.Decimal(10, 2)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  invoiceItems InvoiceItem[]
+  id            String                   @id @default(cuid())
+  planName      String
+  description   String?
+  duration      String
+  durationValue Int                      @default(1)
+  durationUnit  SubscriptionDurationUnit @default(MONTHS)
+  fees          Decimal                  @db.Decimal(10, 2)
+  isActive      Boolean                  @default(true)
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+  invoiceItems  InvoiceItem[]
 
   @@index([isActive])
   @@index([planName])

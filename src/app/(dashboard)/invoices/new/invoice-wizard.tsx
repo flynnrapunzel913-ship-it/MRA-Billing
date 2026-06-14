@@ -351,6 +351,8 @@ export default function InvoiceWizard() {
                         planName: item.name,
                         description: item.description ?? null,
                         duration: item.duration,
+                        durationValue: item.durationValue ?? 1,
+                        durationUnit: item.durationUnit ?? "MONTHS",
                         fees: item.price,
                         isActive: true,
                         createdAt: "",

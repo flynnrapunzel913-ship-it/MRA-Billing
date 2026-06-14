@@ -4,6 +4,7 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { serializeSubscriptionPlan } from "@/lib/subscription-plans";
 import { subscriptionPlanSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
+import { formatDurationLabel } from "@/lib/subscription-duration";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,6 +23,8 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const data = parsed.data;
+    const durationValue = data.durationValue ?? undefined;
+    const durationUnit = data.durationUnit ?? undefined;
     const updated = await prisma.subscriptionPlan.update({
       where: { id },
       data: {
@@ -29,7 +32,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         ...(data.description !== undefined
           ? { description: data.description?.trim() || null }
           : {}),
-        ...(data.duration !== undefined ? { duration: data.duration.trim() } : {}),
+        ...(durationValue !== undefined && durationUnit !== undefined
+          ? {
+              durationValue,
+              durationUnit,
+              duration: formatDurationLabel(durationValue, durationUnit),
+            }
+          : {}),
         ...(data.fees !== undefined ? { fees: data.fees } : {}),
         ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
       },

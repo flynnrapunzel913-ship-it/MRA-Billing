@@ -5,6 +5,10 @@ import { ITEM_TYPES, isCoachingPackage } from "@/lib/constants";
 import { lineTotal } from "@/lib/invoice-utils";
 import { useInvoiceStore } from "@/stores/invoice-store";
 import type { InvoiceLineItem } from "@/lib/invoice-utils";
+import {
+  packageEndDateForLineItem,
+  resolveLineItemDuration,
+} from "@/lib/subscription-duration";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QuantityInput } from "@/components/ui/quantity-input";
@@ -35,6 +39,8 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
   });
 
   const lineItemForTotal = { ...item, quantity: quantity.effectiveValue };
+  const hasAutoEndDate = isCoachingPackage(item.itemType) && resolveLineItemDuration(item) != null;
+  const displayedEndDate = packageEndDateForLineItem(item);
 
   return (
     <div className="grid grid-cols-12 items-end gap-2 rounded-lg border border-border bg-card/90 px-2 py-2 shadow-sm">
@@ -86,7 +92,9 @@ export function InvoiceItemRow({ index, item, canRemove }: InvoiceItemRowProps) 
             <Input
               className="h-9 text-sm"
               type="date"
-              value={item.packageEndDate ?? ""}
+              value={displayedEndDate}
+              readOnly={hasAutoEndDate}
+              disabled={hasAutoEndDate}
               onChange={(e) => update({ ...item, packageEndDate: e.target.value })}
             />
           </div>

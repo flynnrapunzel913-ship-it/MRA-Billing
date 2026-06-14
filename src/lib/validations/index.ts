@@ -5,6 +5,7 @@ import {
   PAYMENT_METHODS,
   COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
+import { SUBSCRIPTION_DURATION_UNITS } from "@/lib/subscription-duration";
 
 export const loginSchema = z.object({
   username: z
@@ -47,6 +48,8 @@ export const invoiceItemSchema = z.object({
   planNameSnapshot: z.string().optional(),
   descriptionSnapshot: z.string().optional(),
   durationSnapshot: z.string().optional(),
+  durationValueSnapshot: z.number().int().positive().optional(),
+  durationUnitSnapshot: z.enum(SUBSCRIPTION_DURATION_UNITS).optional(),
   feesSnapshot: z.number().nonnegative().optional(),
 });
 
@@ -165,7 +168,8 @@ export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 export const subscriptionPlanSchema = z.object({
   planName: z.string().min(1, "Plan name is required"),
   description: z.string().optional().nullable(),
-  duration: z.string().min(1, "Duration is required"),
+  durationValue: z.number().int().positive("Duration must be at least 1"),
+  durationUnit: z.enum(SUBSCRIPTION_DURATION_UNITS),
   fees: z.number().nonnegative("Fees must be zero or greater"),
   isActive: z.boolean(),
 });

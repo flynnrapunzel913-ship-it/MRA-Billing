@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
         planName: row.planName,
         description: row.description,
         duration: row.duration,
+        durationValue: row.durationValue,
+        durationUnit: row.durationUnit,
         price: row.fees,
         fees: row.fees,
       }))

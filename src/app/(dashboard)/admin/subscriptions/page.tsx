@@ -128,7 +128,8 @@ export default function SubscriptionManagementPage() {
       body: JSON.stringify({
         planName: record.planName,
         description: record.description,
-        duration: record.duration,
+        durationValue: record.durationValue,
+        durationUnit: record.durationUnit,
         fees: record.fees,
         isActive: !record.isActive,
       }),

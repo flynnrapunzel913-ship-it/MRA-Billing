@@ -13,6 +13,8 @@ type SubscriptionOption = {
   id: string;
   name: string;
   duration: string;
+  durationValue?: number;
+  durationUnit?: string;
   price: number;
   description?: string | null;
 };

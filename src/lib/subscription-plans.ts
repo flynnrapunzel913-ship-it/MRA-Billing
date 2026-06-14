@@ -1,11 +1,17 @@
 import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
+import {
+  formatDurationLabel,
+  type SubscriptionDurationUnit,
+} from "@/lib/subscription-duration";
 
 export type SubscriptionPlanRow = {
   id: string;
   planName: string;
   description: string | null;
   duration: string;
+  durationValue: number;
+  durationUnit: SubscriptionDurationUnit;
   fees: number;
   isActive: boolean;
   createdAt: string;
@@ -28,6 +34,8 @@ export function serializeSubscriptionPlan(row: {
   planName: string;
   description: string | null;
   duration: string;
+  durationValue: number;
+  durationUnit: SubscriptionDurationUnit;
   fees: unknown;
   isActive: boolean;
   createdAt: Date;
@@ -38,6 +46,8 @@ export function serializeSubscriptionPlan(row: {
     planName: row.planName,
     description: row.description,
     duration: row.duration,
+    durationValue: row.durationValue,
+    durationUnit: row.durationUnit,
     fees: toJsonNumber(row.fees),
     isActive: row.isActive,
     createdAt: row.createdAt.toISOString(),
