@@ -28,11 +28,19 @@ import {
 type CustomerDirectoryView = "active" | "deleted";
 
 const STATUS_FILTERS: { id: StatusFilter; label: string }[] = [
-  { id: "all", label: "All Customers" },
+  { id: "all", label: "All" },
   { id: "active", label: "Active" },
   { id: "passed_out", label: "Passed Out" },
-  { id: "pending_payment", label: "Pending Payment" },
+  { id: "pending_payment", label: "Pending" },
 ];
+
+const filterPill = (active: boolean) =>
+  cn(
+    "rounded-full px-3 py-1 text-xs font-semibold transition-all",
+    active
+      ? "nav-pill-active"
+      : "border border-border/60 bg-card/40 text-foreground/80 hover:bg-muted/40"
+  );
 
 export default function CustomersPage() {
   const [directoryView, setDirectoryView] = useState<CustomerDirectoryView>("active");
@@ -175,94 +183,81 @@ export default function CustomersPage() {
 
   return (
     <div className="mx-auto w-full space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            className="h-11 pl-10"
-            placeholder="Search by name or mobile number..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        {directoryView === "active" && (
-          <Button
-            size="lg"
-            className="shrink-0"
-            onClick={() => {
-              setEditCustomer(null);
-              setFormOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Customer
-          </Button>
-        )}
-      </div>
-
-      {isAdmin && (
-        <div className="flex justify-center">
-          <div className="inline-flex rounded-full border border-border/60 bg-card/40 p-1">
-            <button
-              type="button"
-              onClick={() => setDirectoryView("active")}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-semibold transition-all",
-                directoryView === "active"
-                  ? "nav-pill-active"
-                  : "text-foreground/80 hover:bg-muted/40"
-              )}
-            >
-              Active Customers
-            </button>
-            <button
-              type="button"
-              onClick={() => setDirectoryView("deleted")}
-              className={cn(
-                "rounded-full px-4 py-1.5 text-xs font-semibold transition-all",
-                directoryView === "deleted"
-                  ? "nav-pill-active"
-                  : "text-foreground/80 hover:bg-muted/40"
-              )}
-            >
-              Deleted Customers
-            </button>
+      <div className="glass-panel space-y-3 rounded-[20px] p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              className="h-10 pl-10"
+              placeholder="Search by name or mobile..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
+          {directoryView === "active" && (
+            <Button
+              className="h-10 shrink-0"
+              onClick={() => {
+                setEditCustomer(null);
+                setFormOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Customer
+            </Button>
+          )}
         </div>
-      )}
 
-      {directoryView === "active" && (
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex flex-wrap justify-center gap-2">
-            {STATUS_FILTERS.map((pill) => (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+          {isAdmin && (
+            <div className="inline-flex rounded-full border border-border/60 bg-card/40 p-0.5">
               <button
-                key={pill.id}
                 type="button"
-                onClick={() => setStatusFilter(pill.id)}
-                className={cn(
-                  "rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all",
-                  statusFilter === pill.id
-                    ? "nav-pill-active"
-                    : "border border-border/60 bg-card/40 text-foreground/80 hover:bg-muted/40"
-                )}
+                onClick={() => setDirectoryView("active")}
+                className={filterPill(directoryView === "active")}
               >
-                {pill.label}
+                Active
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => setDirectoryView("deleted")}
+                className={filterPill(directoryView === "deleted")}
+              >
+                Deleted
+              </button>
+            </div>
+          )}
 
-          <ServiceFilterSelect
-            value={serviceFilter}
-            onChange={setServiceFilter}
-            subscriptions={subscriptionOptions}
-          />
+          {directoryView === "active" && (
+            <>
+              {isAdmin && <span className="hidden h-4 w-px shrink-0 bg-border/50 sm:block" aria-hidden />}
+              <div className="flex flex-wrap gap-1.5">
+                {STATUS_FILTERS.map((pill) => (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setStatusFilter(pill.id)}
+                    className={filterPill(statusFilter === pill.id)}
+                  >
+                    {pill.label}
+                  </button>
+                ))}
+              </div>
+              <ServiceFilterSelect
+                value={serviceFilter}
+                onChange={setServiceFilter}
+                subscriptions={subscriptionOptions}
+                compact
+              />
+            </>
+          )}
+
+          <span className="ml-auto text-xs text-muted-foreground">
+            {countLabel}
+            {isRefreshing ? " · updating…" : ""}
+          </span>
         </div>
-      )}
-
-      <p className="text-center text-xs text-muted-foreground">
-        {countLabel}
-        {isRefreshing ? " · updating…" : ""}
-      </p>
+      </div>
 
       {filtered.length === 0 ? (
         <div className="glass-panel rounded-[20px] px-6 py-16 text-center">
