@@ -86,10 +86,15 @@ export async function DELETE(
       });
     } catch (updateError) {
       if (isSchemaDriftError(updateError)) {
-        await prisma.invoice.delete({ where: { id: invoice.id } });
-      } else {
-        throw updateError;
+        return NextResponse.json(
+          {
+            error:
+              "Invoice soft-delete is unavailable. Run database migrations: npx prisma migrate deploy",
+          },
+          { status: 503 }
+        );
       }
+      throw updateError;
     }
 
     if (user?.id) {

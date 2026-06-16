@@ -10,6 +10,8 @@ export type CollectionDiffValues = {
   totalExpenses: number | null;
   cashCollected: number | null;
   upiCollected: number | null;
+  cardCollected: number | null;
+  otherCollected: number | null;
   netCollection: number | null;
   cashCountedPhysical: number | null;
   cashDifference: number | null;
@@ -34,6 +36,8 @@ export const COLLECTION_FIELD_LABELS: Record<keyof CollectionDiffValues, string>
   totalExpenses: "Expenses",
   cashCollected: "Cash Collected",
   upiCollected: "UPI Collected",
+  cardCollected: "Card Collected",
+  otherCollected: "Other Collected",
   netCollection: "Net Collection",
   cashCountedPhysical: "Physical Cash Counted",
   cashDifference: "Cash Difference",
@@ -72,6 +76,8 @@ export function extractCollectionDiffValues(
     totalExpenses: toNullableNumber(record.totalExpenses),
     cashCollected: toNullableNumber(record.cashCollectedSystem),
     upiCollected: toNullableNumber(record.upiCollected),
+    cardCollected: null,
+    otherCollected: null,
     netCollection: toNullableNumber(record.netCollection),
     cashCountedPhysical: toNullableNumber(record.cashCountedPhysical),
     cashDifference: toNullableNumber(record.cashDifference),
@@ -119,6 +125,8 @@ export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
     totalExpenses: values.totalExpenses,
     cashCollected: values.cashCollected,
     upiCollected: values.upiCollected,
+    cardCollected: values.cardCollected,
+    otherCollected: values.otherCollected,
     netCollection: values.netCollection,
     subscriptionRevenue: values.subscriptionRevenue,
     productRevenue: values.productRevenue,

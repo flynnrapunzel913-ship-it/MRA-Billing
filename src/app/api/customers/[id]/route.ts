@@ -74,12 +74,21 @@ export async function PUT(
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
+    const existing = await getCustomerWithDetails(id);
+    if (!existing) {
+      return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
     const data = parsed.data;
     const customer = await prisma.customer.update({
       where: { id },
       data: {
         name: data.name,
         mobile: data.mobile,
+        address: data.address?.trim() || null,
+        emergencyContact: data.emergencyContact?.trim() || null,
+        parentName: data.parentName?.trim() || null,
+        gstNumber: data.gstNumber?.trim() || null,
         status: data.status,
       },
     });
@@ -111,9 +120,7 @@ export async function DELETE(
 
     await prisma.customer.update({
       where: { id },
-      data: {
-        deletedAt: new Date(),
-      },
+      data: { deletedAt: new Date() },
     });
 
     return NextResponse.json({ success: true });

@@ -96,17 +96,14 @@ export async function POST(request: NextRequest) {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 });
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
     const { invoiceSchema } = await import("@/lib/validations");
     const parsed = invoiceSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
     const data = parsed.data;
@@ -114,10 +111,7 @@ export async function POST(request: NextRequest) {
     if (data.customerId) {
       const customerAccess = await assertAccessibleCustomer(data.customerId);
       if (!customerAccess.ok) {
-        return NextResponse.json(
-          { success: false, error: "Customer not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Customer not found" }, { status: 404 });
       }
     }
 
@@ -134,7 +128,7 @@ export async function POST(request: NextRequest) {
       data.amountPaid > totals.grandTotal
     ) {
       return NextResponse.json(
-        { success: false, error: "Amount paid cannot exceed grand total" },
+        { error: "Amount paid cannot exceed grand total" },
         { status: 400 }
       );
     }
@@ -149,7 +143,6 @@ export async function POST(request: NextRequest) {
     } catch (e) {
       return NextResponse.json(
         {
-          success: false,
           error: e instanceof Error ? e.message : "Invalid payment amount",
         },
         { status: 400 }
@@ -306,6 +299,6 @@ export async function POST(request: NextRequest) {
     const status =
       error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P1001" ? 503 : 500;
     console.error("API ERROR:", error);
-    return NextResponse.json({ success: false, error: message }, { status });
+    return NextResponse.json({ error: message }, { status });
   }
 }

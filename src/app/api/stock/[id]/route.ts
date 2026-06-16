@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { stockListInclude } from "@/lib/stock-queries";
 import { serializeStockForJson } from "@/lib/stock-utils";
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireAdmin();
     if (error) return error;
 
     const { id: rawId } = await context.params;

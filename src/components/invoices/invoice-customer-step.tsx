@@ -179,7 +179,8 @@ export function InvoiceCustomerStep() {
 
 export function validateCustomerStep(
   customerName: string,
-  customerMobile: string
+  customerMobile: string,
+  customerId?: string | null
 ): boolean {
   const name = customerName.trim();
   const mobile = normalizeMobile(customerMobile);
@@ -188,7 +189,7 @@ export function validateCustomerStep(
     toast.error("Enter customer name");
     return false;
   }
-  if (mobile.length < 10) {
+  if (!customerId?.trim() && mobile.length < 10) {
     toast.error("Enter a valid 10-digit mobile number");
     return false;
   }

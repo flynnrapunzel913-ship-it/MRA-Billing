@@ -9,7 +9,7 @@ import { invalidateCache } from "@/lib/client-cache";
 import { readApiResponse } from "@/lib/api-error";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { toast } from "sonner";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsInput } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ function filenameFromContentDisposition(header: string | null) {
 export default function SettingsPage() {
   const router = useRouter();
   const { data: session } = useSession();
-  const isAdmin = session?.user?.role === "ADMIN";
+  const [isAdmin, setIsAdmin] = useState(session?.user?.role === "ADMIN");
   const [downloadingBackup, setDownloadingBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
@@ -44,6 +44,16 @@ export default function SettingsPage() {
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const { data: settings, isLoading: loading, refetch, setData } =
     useCachedFetch<SettingsInput>("/api/settings");
+
+  useEffect(() => {
+    void (async () => {
+      const res = await fetch("/api/profile");
+      const result = await readApiResponse<{ role: string }>(res, "Failed to load profile");
+      if (result.ok) {
+        setIsAdmin(result.data.role === "ADMIN");
+      }
+    })();
+  }, []);
 
   const {
     register,
@@ -53,7 +63,7 @@ export default function SettingsPage() {
     setValue,
     formState: { isSubmitting, errors },
   } = useForm<SettingsInput>({
-    resolver: zodResolver(settingsSchema),
+    resolver: zodResolver(settingsSchema) as Resolver<SettingsInput>,
     defaultValues: {
       academyName: "MR Academy",
       address: "",

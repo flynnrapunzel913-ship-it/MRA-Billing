@@ -14,6 +14,7 @@ import {
   invoiceForbiddenResponse,
   invoiceNotFoundResponse,
 } from "@/lib/invoices/access";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 
 export async function POST(
   _request: NextRequest,
@@ -67,6 +68,16 @@ export async function POST(
     const invoiceDate = new Date();
     const year = invoiceDate.getFullYear();
 
+    let linkedCustomerId = original.customerId;
+    if (linkedCustomerId) {
+      const customerWhere = await getActiveCustomerWhere();
+      const activeCustomer = await prisma.customer.findFirst({
+        where: { id: linkedCustomerId, ...customerWhere },
+        select: { id: true },
+      });
+      linkedCustomerId = activeCustomer?.id ?? null;
+    }
+
     const duplicate = await prisma.$transaction(async (tx) => {
       const sequence = await tx.invoiceSequence.upsert({
         where: { year },
@@ -82,7 +93,7 @@ export async function POST(
           invoiceNumber: formatInvoiceNumber(year, sequence.lastNumber),
           invoiceDate,
           dueDate,
-          customerId: original.customerId,
+          customerId: linkedCustomerId,
           customerName: original.customerName,
           customerMobile: original.customerMobile,
           customerAddress: original.customerAddress,
@@ -112,6 +123,14 @@ export async function POST(
               amount: item.amount,
               packageStartDate: item.packageStartDate,
               packageEndDate: item.packageEndDate,
+              subscriptionPlanId: item.subscriptionPlanId,
+              planNameSnapshot: item.planNameSnapshot,
+              descriptionSnapshot: item.descriptionSnapshot,
+              durationSnapshot: item.durationSnapshot,
+              durationValueSnapshot: item.durationValueSnapshot,
+              durationUnitSnapshot: item.durationUnitSnapshot,
+              usageDaysSnapshot: item.usageDaysSnapshot,
+              feesSnapshot: item.feesSnapshot,
             })),
           },
         },

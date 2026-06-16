@@ -14,7 +14,9 @@ import { formatKpiValue, normalizeAdminDashboardKpis } from "@/lib/dashboard-kpi
 export interface AdminDashboardData {
   role: "ADMIN";
   invoicesGenerated: number;
-  activeStudents: number;
+  activeCustomers: number;
+  /** @deprecated Use activeCustomers */
+  activeStudents?: number;
   pendingPayments: number;
   recentInvoices: Array<{
     id: string;
@@ -41,7 +43,7 @@ const kpiCards = [
   },
   {
     key: "students",
-    label: "Active Students",
+    label: "Active Customers",
     icon: Users,
     accent: "from-[#0284C7]/15 to-[#38bdf8]/5",
     iconBg: "bg-[#0284C7]/15 text-[#0284C7]",
@@ -69,7 +71,7 @@ export function AdminDashboardView({
 
   const kpiValues = {
     invoices: kpis.invoicesGenerated,
-    students: kpis.activeStudents,
+    students: kpis.activeCustomers,
     pending: kpis.pendingPayments,
   };
 
@@ -87,7 +89,7 @@ export function AdminDashboardView({
     <div className="mx-auto max-w-6xl space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-muted-foreground">
-          Day-to-day overview — invoices, students, and collections
+          Day-to-day overview — invoices, customers, and collections
         </p>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" asChild>

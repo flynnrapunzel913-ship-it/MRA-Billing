@@ -13,6 +13,7 @@ import {
 } from "date-fns";
 import { prisma } from "@/lib/prisma";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { getCollectedInvoiceWhere, invoiceCollectedAmount } from "@/lib/invoice-revenue";
 
 export type RevenuePeriod = "daily" | "weekly" | "monthly";
 
@@ -69,7 +70,7 @@ async function fetchInvoicesBetween(from: Date, to: Date) {
   const invoiceWhere = await getActiveInvoiceWhere();
   return prisma.invoice.findMany({
     where: {
-      ...invoiceWhere,
+      ...getCollectedInvoiceWhere(invoiceWhere),
       invoiceDate: { gte: startOfDay(from), lte: endOfDay(to) },
     },
     select: invoiceSelect,
@@ -96,7 +97,7 @@ function aggregateInvoices(
     }
     const row = map.get(bucket.key)!;
     row.invoiceCount += 1;
-    row.totalRevenue += Number(inv.grandTotal);
+    row.totalRevenue += invoiceCollectedAmount(inv);
     row.customers.add(customerKey(inv.customerId, inv.customerName));
   }
 
@@ -249,7 +250,7 @@ export async function getTransactionsForDay(dateStr: string): Promise<RevenueTra
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       customerName: inv.customerName,
-      amount: Number(inv.grandTotal),
+      amount: invoiceCollectedAmount(inv),
       paymentStatus: inv.paymentStatus,
       paymentMethod: inv.paymentMethod,
       createdBy: inv.createdBy.name,
@@ -278,7 +279,7 @@ export async function getWeekRevenue(): Promise<number> {
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const invoices = await fetchInvoicesBetween(weekStart, now);
-  const total = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+  const total = invoices.reduce((sum, inv) => sum + invoiceCollectedAmount(inv), 0);
   return Math.round(total * 100) / 100;
 }
 
@@ -288,10 +289,8 @@ export async function getYesterdayCollectedRevenue(): Promise<number> {
   const invoiceWhere = await getActiveInvoiceWhere();
   const result = await prisma.invoice.aggregate({
     where: {
-      ...invoiceWhere,
+      ...getCollectedInvoiceWhere(invoiceWhere),
       invoiceDate: { gte: startOfDay(yesterday), lte: endOfDay(yesterday) },
-      paymentStatus: { in: ["FULLY_PAID", "PARTIALLY_PAID"] },
-      amountPaid: { gt: 0 },
     },
     _sum: { amountPaid: true },
   });
@@ -302,7 +301,7 @@ export async function getYesterdayCollectedRevenue(): Promise<number> {
 export async function getRecentTransactions(limit = 10): Promise<RevenueTransaction[]> {
   const invoiceWhere = await getActiveInvoiceWhere();
   const invoices = await prisma.invoice.findMany({
-    where: invoiceWhere,
+    where: getCollectedInvoiceWhere(invoiceWhere),
     take: limit,
     orderBy: { createdAt: "desc" },
     select: invoiceSelect,
@@ -312,7 +311,7 @@ export async function getRecentTransactions(limit = 10): Promise<RevenueTransact
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
     customerName: inv.customerName,
-    amount: Number(inv.grandTotal),
+    amount: invoiceCollectedAmount(inv),
     paymentStatus: inv.paymentStatus,
     paymentMethod: inv.paymentMethod,
     createdBy: inv.createdBy.name,
@@ -335,7 +334,7 @@ export async function getExportRows(fromStr: string, toStr: string) {
     invoiceNumber: inv.invoiceNumber,
     date: format(new Date(inv.invoiceDate), "dd-MM-yyyy"),
     customerName: inv.customerName,
-    amount: Number(inv.grandTotal),
+    amount: invoiceCollectedAmount(inv),
     paymentStatus: inv.paymentStatus,
     createdBy: inv.createdBy.name,
     paymentMethod: inv.paymentMethod,

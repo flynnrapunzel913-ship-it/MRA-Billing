@@ -183,8 +183,8 @@ export async function POST(request: NextRequest) {
         cashDifference: cash.cashDifference,
         cashDifferenceNotes: cash.cashDifferenceNotes,
         cashDenominations: cash.cashDenominations,
-        originalSnapshotJson: buildOriginalSnapshotJson(
-          extractCollectionDiffValues({
+        originalSnapshotJson: buildOriginalSnapshotJson({
+          ...extractCollectionDiffValues({
             notes: parsed.data.notes?.trim() || null,
             collectedByName,
             totalRevenue: snapshot.totalRevenue,
@@ -197,8 +197,10 @@ export async function POST(request: NextRequest) {
             cashCountedPhysical: cash.cashCountedPhysical,
             cashDifference: cash.cashDifference,
             cashDifferenceNotes: cash.cashDifferenceNotes,
-          })
-        ),
+          }),
+          cardCollected: snapshot.cardCollected ?? null,
+          otherCollected: snapshot.otherCollected ?? null,
+        }),
       },
       include: {
         collectedBy: { select: { id: true, name: true, username: true } },

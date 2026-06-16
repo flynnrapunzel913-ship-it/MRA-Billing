@@ -55,6 +55,8 @@ export type CollectionSnapshot = {
   totalExpenses: number;
   cashCollected: number;
   upiCollected: number;
+  cardCollected?: number;
+  otherCollected?: number;
   netCollection: number;
 };
 
@@ -123,6 +125,23 @@ function serializeCashReconciliation(row: {
   };
 }
 
+function enrichSnapshotFromOriginal(
+  snapshot: CollectionSnapshot,
+  originalSnapshotJson: unknown
+): CollectionSnapshot {
+  if (!originalSnapshotJson || typeof originalSnapshotJson !== "object" || Array.isArray(originalSnapshotJson)) {
+    return snapshot;
+  }
+  const original = originalSnapshotJson as Record<string, unknown>;
+  return {
+    ...snapshot,
+    cardCollected:
+      typeof original.cardCollected === "number" ? original.cardCollected : snapshot.cardCollected,
+    otherCollected:
+      typeof original.otherCollected === "number" ? original.otherCollected : snapshot.otherCollected,
+  };
+}
+
 function serializeSnapshot(row: {
   totalRevenue: unknown;
   subscriptionRevenue: unknown;
@@ -131,9 +150,10 @@ function serializeSnapshot(row: {
   cashCollectedSystem: unknown;
   upiCollected: unknown;
   netCollection: unknown;
+  originalSnapshotJson?: unknown;
 }): CollectionSnapshot | null {
   if (row.totalRevenue == null) return null;
-  return {
+  const snapshot: CollectionSnapshot = {
     totalRevenue: toJsonNumber(row.totalRevenue),
     subscriptionRevenue: toJsonNumber(row.subscriptionRevenue),
     productRevenue: toJsonNumber(row.productRevenue),
@@ -142,6 +162,7 @@ function serializeSnapshot(row: {
     upiCollected: toJsonNumber(row.upiCollected),
     netCollection: toJsonNumber(row.netCollection),
   };
+  return enrichSnapshotFromOriginal(snapshot, row.originalSnapshotJson);
 }
 
 /** Sum expenses by payment mode for daily collection math. */
@@ -217,15 +238,18 @@ export function buildPaymentBreakdownFromSnapshot(
   const upiExpenses = Math.max(0, grossUpi - netUpi);
   const cashExpenses = Math.max(0, snapshot.totalExpenses - upiExpenses);
   const grossCash = netCash + cashExpenses;
-  const grossCollected = grossCash + grossUpi;
-  const remainder = Math.max(0, snapshot.totalRevenue - grossCollected);
+  const card =
+    snapshot.cardCollected ??
+    Math.max(0, snapshot.totalRevenue - grossCash - grossUpi - (snapshot.otherCollected ?? 0));
+  const other = snapshot.otherCollected ?? 0;
+  const grossCollected = grossCash + grossUpi + card + other;
 
   return {
     cash: grossCash,
     upi: grossUpi,
-    card: remainder,
-    other: 0,
-    grossCollected: grossCash + grossUpi + remainder,
+    card,
+    other,
+    grossCollected,
     cashExpenses,
     upiExpenses,
     netCash,
@@ -361,6 +385,7 @@ export async function getDailyCollectionSheet(
         cashCollectedSystem: true,
         upiCollected: true,
         netCollection: true,
+        originalSnapshotJson: true,
         cashCountedPhysical: true,
         cashDifference: true,
         cashDifferenceNotes: true,
@@ -515,6 +540,8 @@ export function buildCollectionSnapshotFromSheet(
     totalExpenses: sheet.totalExpenses,
     cashCollected: sheet.paymentBreakdown.cash,
     upiCollected: sheet.paymentBreakdown.upi,
+    cardCollected: sheet.paymentBreakdown.card,
+    otherCollected: sheet.paymentBreakdown.other,
     netCollection: sheet.netCollection,
   };
 }

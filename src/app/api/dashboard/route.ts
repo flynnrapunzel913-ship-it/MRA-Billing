@@ -61,7 +61,7 @@ export async function GET() {
       });
     }
 
-    const [invoiceCount, activeStudents, pendingPayments, recentInvoices] = await Promise.all([
+    const [invoiceCount, activeCustomers, pendingPayments, recentInvoices] = await Promise.all([
       prisma.invoice.count({ where: invoiceWhere }),
       prisma.customer.count({ where: { status: "ACTIVE", ...customerWhere } }),
       prisma.invoice.count({
@@ -94,7 +94,9 @@ export async function GET() {
     return NextResponse.json({
       role: "ADMIN",
       invoicesGenerated: toKpiNumber(invoiceCount),
-      activeStudents: toKpiNumber(activeStudents),
+      activeCustomers: toKpiNumber(activeCustomers),
+      /** @deprecated Use activeCustomers */
+      activeStudents: toKpiNumber(activeCustomers),
       pendingPayments: toKpiNumber(pendingPayments),
       recentInvoices: recentInvoices ?? [],
     });

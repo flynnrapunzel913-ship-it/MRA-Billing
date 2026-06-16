@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireAuth } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 import { expenseSchema } from "@/lib/validations";
@@ -32,7 +32,7 @@ export async function GET(_request: NextRequest, context: RouteContext) {
 
 export async function PUT(request: NextRequest, context: RouteContext) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireAdmin();
     if (error) return error;
 
     const { id } = await context.params;
@@ -115,7 +115,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
 export async function DELETE(_request: NextRequest, context: RouteContext) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireAdmin();
     if (error) return error;
 
     const { id } = await context.params;

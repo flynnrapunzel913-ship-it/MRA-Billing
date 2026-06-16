@@ -344,7 +344,7 @@ export default function StockInventoryPage() {
           allSelected={allSelected}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
-          onDelete={directoryView === "active" ? (row) => setDeleteEntry(row) : undefined}
+          onDelete={directoryView === "active" && isAdmin ? (row) => setDeleteEntry(row) : undefined}
           onRestore={isDeletedView ? (row) => setRestoreEntry(row) : undefined}
           onPurge={isDeletedView ? (row) => setPurgeEntry(row) : undefined}
         />
@@ -357,7 +357,7 @@ export default function StockInventoryPage() {
         open={!!deleteEntry}
         onClose={() => setDeleteEntry(null)}
         title="Delete stock entry"
-        description="This action cannot be undone."
+        description="The entry will be moved to deleted stock. An admin can restore it later."
         footer={
           <>
             <Button variant="outline" onClick={() => setDeleteEntry(null)}>
@@ -370,9 +370,9 @@ export default function StockInventoryPage() {
         }
       >
         <p className="text-sm text-muted-foreground">
-          Delete this stock entry?
+          Soft-delete this stock entry?
           <br />
-          This action cannot be undone.
+          It can be restored from the deleted view by an admin.
           {deleteEntry && (
             <>
               <br />

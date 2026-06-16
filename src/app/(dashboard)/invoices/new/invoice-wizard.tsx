@@ -35,6 +35,7 @@ import {
 } from "@/components/invoices/invoice-customer-step";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { CatalogItemPicker } from "@/components/catalog/catalog-item-picker";
+import type { SubscriptionDurationUnit } from "@/lib/subscription-duration";
 
 const STEPS = ["Customer", "Items", "Payment", "Review"] as const;
 type Step = 0 | 1 | 2 | 3;
@@ -139,7 +140,7 @@ export default function InvoiceWizard() {
   const goTo = (next: Step) => setStep(next);
 
   const validateStep = (s: Step): boolean => {
-    if (s === 0 && !validateCustomerStep(customerName, customerMobile)) {
+    if (s === 0 && !validateCustomerStep(customerName, customerMobile, customerId)) {
       return false;
     }
     if (s === 1) {
@@ -155,8 +156,8 @@ export default function InvoiceWizard() {
         toast.error("Enter quantity of at least 1 for all items");
         return false;
       }
-      if (items.some((item) => item.unitPrice <= 0)) {
-        toast.error("Enter price for all items");
+      if (items.some((item) => item.unitPrice < 0)) {
+        toast.error("Price cannot be negative");
         return false;
       }
     }
@@ -187,7 +188,7 @@ export default function InvoiceWizard() {
   };
 
   const submitInvoice = async () => {
-    if (!validateCustomerStep(customerName, customerMobile) || !validateStep(1) || !validateStep(2)) {
+    if (!validateCustomerStep(customerName, customerMobile, customerId) || !validateStep(1) || !validateStep(2)) {
       return;
     }
 
@@ -355,7 +356,7 @@ export default function InvoiceWizard() {
                         description: item.description ?? null,
                         duration: item.duration,
                         durationValue: item.durationValue ?? 1,
-                        durationUnit: item.durationUnit ?? "MONTHS",
+                        durationUnit: (item.durationUnit ?? "MONTHS") as SubscriptionDurationUnit,
                         usageDays: item.usageDays ?? null,
                         fees: item.price,
                         isActive: true,

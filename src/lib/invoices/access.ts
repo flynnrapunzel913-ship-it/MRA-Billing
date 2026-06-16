@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 
 /** Prisma cuid() — reject malformed IDs early (enumeration / injection hardening). */
 const CUID_PATTERN = /^c[a-z0-9]{24}$/i;
@@ -114,8 +115,9 @@ export async function assertAccessibleCustomer(
     return { ok: false, status: 404 };
   }
 
-  const customer = await prisma.customer.findUnique({
-    where: { id: customerId },
+  const customerWhere = await getActiveCustomerWhere();
+  const customer = await prisma.customer.findFirst({
+    where: { id: customerId, ...customerWhere },
     select: { id: true },
   });
 

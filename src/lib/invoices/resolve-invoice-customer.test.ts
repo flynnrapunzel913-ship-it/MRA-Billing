@@ -1,15 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { resolveInvoiceCustomer } from "./resolve-invoice-customer";
 
+vi.mock("@/lib/customer-filters", () => ({
+  getActiveCustomerWhere: vi.fn().mockResolvedValue({ deletedAt: null }),
+}));
+
 function createMockTx(overrides: {
-  findUnique?: ReturnType<typeof vi.fn>;
   findFirst?: ReturnType<typeof vi.fn>;
   create?: ReturnType<typeof vi.fn>;
   update?: ReturnType<typeof vi.fn>;
 }) {
   return {
     customer: {
-      findUnique: overrides.findUnique ?? vi.fn(),
       findFirst: overrides.findFirst ?? vi.fn(),
       create: overrides.create ?? vi.fn(),
       update: overrides.update ?? vi.fn(),
@@ -19,7 +21,7 @@ function createMockTx(overrides: {
 
 describe("resolveInvoiceCustomer", () => {
   it("links an explicitly selected customer without creating a new row", async () => {
-    const findUnique = vi.fn().mockResolvedValue({
+    const findFirst = vi.fn().mockResolvedValue({
       id: "cust-existing",
       name: "Ravi Kumar",
       mobile: "9876543210",
@@ -27,7 +29,7 @@ describe("resolveInvoiceCustomer", () => {
       gstNumber: null,
     });
     const create = vi.fn();
-    const tx = createMockTx({ findUnique, create });
+    const tx = createMockTx({ findFirst, create });
 
     const result = await resolveInvoiceCustomer(tx as never, {
       customerId: "cust-existing",
@@ -35,6 +37,9 @@ describe("resolveInvoiceCustomer", () => {
       customerMobile: "9876543210",
     });
 
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: "cust-existing", deletedAt: null },
+    });
     expect(result.customerId).toBe("cust-existing");
     expect(result.customerJustCreated).toBeNull();
     expect(create).not.toHaveBeenCalled();
@@ -56,7 +61,9 @@ describe("resolveInvoiceCustomer", () => {
       customerMobile: "91234 56789",
     });
 
-    expect(findFirst).toHaveBeenCalledWith({ where: { mobile: "9123456789" } });
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { mobile: "9123456789", deletedAt: null },
+    });
     expect(create).toHaveBeenCalledOnce();
     expect(result.customerId).toBe("cust-new");
     expect(result.customerJustCreated).toEqual({ id: "cust-new", name: "Sanjana" });

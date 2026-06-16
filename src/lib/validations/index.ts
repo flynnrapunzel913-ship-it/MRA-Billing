@@ -104,13 +104,7 @@ const settingsOptionalString = z
   .optional()
   .transform((value) => (value == null ? undefined : value));
 
-const settingsNumber = z.preprocess(
-  (value) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : 0;
-  },
-  z.number().min(0).max(100)
-);
+const settingsNumber = z.coerce.number().min(0).max(100);
 
 export const settingsSchema = z.object({
   academyName: z.string().min(2, "Academy name must be at least 2 characters"),

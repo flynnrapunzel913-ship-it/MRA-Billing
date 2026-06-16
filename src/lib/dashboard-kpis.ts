@@ -11,7 +11,9 @@ export function formatKpiValue(value: unknown): string {
 
 export interface AdminDashboardKpis {
   invoicesGenerated: number;
-  activeStudents: number;
+  activeCustomers: number;
+  /** @deprecated Use activeCustomers */
+  activeStudents?: number;
   pendingPayments: number;
 }
 
@@ -38,9 +40,11 @@ export function normalizeFinancialSummary(data: Record<string, unknown>): Financ
 }
 
 export function normalizeAdminDashboardKpis(data: Record<string, unknown>): AdminDashboardKpis {
+  const activeCustomers = toKpiNumber(data.activeCustomers ?? data.activeStudents);
   return {
     invoicesGenerated: toKpiNumber(data.invoicesGenerated ?? data.invoiceCount),
-    activeStudents: toKpiNumber(data.activeStudents),
+    activeCustomers,
+    activeStudents: activeCustomers,
     pendingPayments: toKpiNumber(data.pendingPayments),
   };
 }

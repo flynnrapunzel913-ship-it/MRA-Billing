@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
+import { getCollectedInvoiceWhere } from "@/lib/invoice-revenue";
 import { netProfit, sumExpenses, sumInvoiceRevenue } from "@/lib/expenses/expense-totals";
 import {
   startOfDay,
@@ -50,9 +51,10 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (type === "revenue") {
+      const collectedWhere = getCollectedInvoiceWhere(invoiceWhere);
       const [invoices, totalRevenue, totalExpenses] = await Promise.all([
         prisma.invoice.findMany({
-          where: { ...invoiceWhere, invoiceDate: { gte: start, lte: end } },
+          where: { ...collectedWhere, invoiceDate: { gte: start, lte: end } },
           orderBy: { invoiceDate: "desc" },
         }),
         sumInvoiceRevenue(invoiceWhere, { from: start, to: end }),
@@ -96,7 +98,14 @@ export async function GET(request: NextRequest) {
     if (type === "customers") {
       const customers = await prisma.customer.findMany({
         where: { dateJoined: { gte: start, lte: end }, ...customerWhere },
-        include: { _count: { select: { invoices: true } } },
+        include: {
+          _count: {
+            select: {
+              invoices:
+                Object.keys(invoiceWhere).length > 0 ? { where: invoiceWhere } : true,
+            },
+          },
+        },
         orderBy: { dateJoined: "desc" },
       });
       return NextResponse.json({ type, period, start, end, rows: customers });

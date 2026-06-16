@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
+import { getCollectedInvoiceWhere } from "@/lib/invoice-revenue";
 
 export type ExpenseDateRange = {
   from?: Date;
@@ -38,7 +39,7 @@ export async function sumInvoiceRevenue(
       : {};
 
   const result = await prisma.invoice.aggregate({
-    where: { ...invoiceWhere, ...dateFilter },
+    where: getCollectedInvoiceWhere({ ...invoiceWhere, ...dateFilter }),
     _sum: { amountPaid: true },
   });
   return toJsonNumber(result._sum.amountPaid);
