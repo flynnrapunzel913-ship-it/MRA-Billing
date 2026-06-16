@@ -73,7 +73,7 @@ function isPlaceholderItem(item: InvoiceLineItem): boolean {
 function applyCatalogItem(
   items: InvoiceLineItem[],
   newItem: InvoiceLineItem
-): InvoiceLineItem[] | null {
+): InvoiceLineItem[] {
   if (items.length === 0) {
     return [newItem];
   }
@@ -81,7 +81,7 @@ function applyCatalogItem(
   if (placeholderIndex >= 0) {
     return items.map((item, index) => (index === placeholderIndex ? newItem : item));
   }
-  return null;
+  return [...items, newItem];
 }
 
 export const useInvoiceStore = create<InvoiceFormState>((set) => ({
@@ -177,7 +177,6 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
         usageDaysSnapshot: item.usageDays ?? undefined,
         feesSnapshot: item.fees,
       });
-      if (!next) return state;
       added = true;
       return { items: next };
     });
@@ -194,7 +193,6 @@ export const useInvoiceStore = create<InvoiceFormState>((set) => ({
         packageStartDate: "",
         packageEndDate: "",
       });
-      if (!next) return state;
       added = true;
       return { items: next };
     });

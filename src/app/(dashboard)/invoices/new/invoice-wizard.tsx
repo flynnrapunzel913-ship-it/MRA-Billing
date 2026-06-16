@@ -340,7 +340,7 @@ export default function InvoiceWizard() {
             {step === 1 && (
               <StepCard
                 title="Invoice Items"
-                description="Pick a subscription or product first. Use Add Custom Item for each additional line."
+                description="Pick a subscription or product to add a line. Each selection adds a new row automatically."
               >
                 <div className="mb-4 grid gap-4 sm:grid-cols-2">
                   <CatalogItemPicker
@@ -349,7 +349,7 @@ export default function InvoiceWizard() {
                     placeholder="Search subscription plans…"
                     onSelect={(item) => {
                       if (!("duration" in item)) return;
-                      const added = addSubscriptionFromCatalog({
+                      addSubscriptionFromCatalog({
                         id: item.id,
                         planName: item.name,
                         description: item.description ?? null,
@@ -362,10 +362,6 @@ export default function InvoiceWizard() {
                         createdAt: "",
                         updatedAt: "",
                       });
-                      if (!added) {
-                        toast.error("Press Add Custom Item before adding another line");
-                        return;
-                      }
                       toast.success(`Added ${item.name}`);
                     }}
                   />
@@ -374,14 +370,10 @@ export default function InvoiceWizard() {
                     label="Add Product"
                     placeholder="Select product…"
                     onSelect={(item) => {
-                      const added = addProductFromCatalog({
+                      addProductFromCatalog({
                         name: item.name,
                         price: item.price,
                       });
-                      if (!added) {
-                        toast.error("Press Add Custom Item before adding another line");
-                        return;
-                      }
                       toast.success(`Added ${item.name}`);
                     }}
                   />

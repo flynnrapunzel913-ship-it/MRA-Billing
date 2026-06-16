@@ -28,6 +28,7 @@ interface UserFormDialogProps {
   onOpenChange: (open: boolean) => void;
   onSuccess: () => void;
   initialData?: UserRecord;
+  currentUserId?: string;
 }
 
 export function UserFormDialog({
@@ -35,8 +36,10 @@ export function UserFormDialog({
   onOpenChange,
   onSuccess,
   initialData,
+  currentUserId,
 }: UserFormDialogProps) {
   const isEdit = Boolean(initialData?.id);
+  const isSelf = Boolean(initialData?.id && currentUserId && initialData.id === currentUserId);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetPassword, setResetPassword] = useState("");
   const [resetting, setResetting] = useState(false);
@@ -88,10 +91,11 @@ export function UserFormDialog({
 
   const onEdit = async (data: UpdateUserInput) => {
     if (!initialData) return;
+    const payload = isSelf ? { ...data, status: "ACTIVE" as const } : data;
     const res = await fetch(`/api/admin/users/${initialData.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
+      body: JSON.stringify(payload),
     });
     const result = await readApiResponse(res, "Failed to update user");
     if (!result.ok) {
@@ -170,17 +174,24 @@ export function UserFormDialog({
                   <option value="ADMIN">Admin</option>
                 </select>
               </div>
-              <div className="space-y-2">
-                <Label>Status</Label>
-                <select
-                  {...register("status")}
-                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="ACTIVE">Active</option>
-                  <option value="DISABLED">Disabled</option>
-                </select>
-              </div>
+              {!isSelf && (
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <select
+                    {...register("status")}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="ACTIVE">Active</option>
+                    <option value="DISABLED">Disabled</option>
+                  </select>
+                </div>
+              )}
             </div>
+            {isSelf ? (
+              <p className="text-xs text-muted-foreground">
+                You cannot disable your own account. Ask another administrator if access needs to change.
+              </p>
+            ) : null}
             <div className="space-y-2">
               <Label>New Password (optional)</Label>
               <Input

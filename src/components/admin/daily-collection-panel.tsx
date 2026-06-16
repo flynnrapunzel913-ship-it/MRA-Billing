@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
+  ChevronDown,
   Loader2,
   Pencil,
 } from "lucide-react";
@@ -73,89 +74,163 @@ function SummaryStat({
   );
 }
 
+function BreakdownToggle({
+  label,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+        aria-expanded={open}
+      >
+        <span className="text-sm font-semibold">{label}</span>
+        <ChevronDown
+          className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+        />
+      </button>
+      {open ? <div className="border-t border-border/60">{children}</div> : null}
+    </div>
+  );
+}
+
 function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
+  const [open, setOpen] = useState(false);
+
   if (sheet.revenueBreakdown.length === 0) {
     return null;
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border/60">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="font-semibold">Revenue Source</TableHead>
-            <TableHead className="text-right font-semibold">Count</TableHead>
-            <TableHead className="text-right font-semibold">Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sheet.revenueBreakdown.map((row) => (
-            <TableRow key={row.name}>
-              <TableCell className="font-medium">{row.name}</TableCell>
-              <TableCell className="text-right tabular-nums">{row.count}</TableCell>
-              <TableCell className="text-right font-medium tabular-nums">
-                {formatCurrency(row.amount)}
-              </TableCell>
-            </TableRow>
-          ))}
-          <TableRow className="bg-muted/20 font-semibold">
-            <TableCell>
-              Total
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
-                (Subscription {formatCurrency(sheet.subscriptionRevenue)} · Products{" "}
-                {formatCurrency(sheet.productRevenue)})
-              </span>
-            </TableCell>
-            <TableCell className="text-right">—</TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatCurrency(sheet.totalRevenue)}
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold">Total Revenue</p>
+          <p className="text-xs text-muted-foreground">
+            Subscription {formatCurrency(sheet.subscriptionRevenue)} · Products{" "}
+            {formatCurrency(sheet.productRevenue)}
+          </p>
+        </div>
+        <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.totalRevenue)}</p>
+      </div>
+      <BreakdownToggle
+        label={`View ${sheet.revenueBreakdown.length} revenue record${sheet.revenueBreakdown.length === 1 ? "" : "s"}`}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      >
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="font-semibold">Revenue Source</TableHead>
+                <TableHead className="text-right font-semibold">Count</TableHead>
+                <TableHead className="text-right font-semibold">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sheet.revenueBreakdown.map((row) => (
+                <TableRow key={row.name}>
+                  <TableCell className="font-medium">{row.name}</TableCell>
+                  <TableCell className="text-right tabular-nums">{row.count}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(row.amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </BreakdownToggle>
     </div>
   );
 }
 
-function ExpenseTable({ expenses, total }: { expenses: DailyCollectionSheet["expenses"]; total: number }) {
+function ExpenseTable({
+  expenses,
+  cashTotal,
+  upiTotal,
+  total,
+}: {
+  expenses: DailyCollectionSheet["expenses"];
+  cashTotal: number;
+  upiTotal: number;
+  total: number;
+}) {
+  const [open, setOpen] = useState(false);
+
   if (expenses.length === 0) {
     return <p className="text-sm text-muted-foreground">No expenses for this date.</p>;
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border/60">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="font-semibold">Time</TableHead>
-            <TableHead className="font-semibold">To Whom</TableHead>
-            <TableHead className="font-semibold">Reason</TableHead>
-            <TableHead className="font-semibold">Mode</TableHead>
-            <TableHead className="text-right font-semibold">Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {expenses.map((expense) => (
-            <TableRow key={expense.id}>
-              <TableCell className="tabular-nums">{formatTime(expense.createdAt)}</TableCell>
-              <TableCell>{expense.paidTo}</TableCell>
-              <TableCell>{expense.reason}</TableCell>
-              <TableCell>
-                <ExpensePaymentModeBadge mode={expense.paymentMode} />
-              </TableCell>
-              <TableCell className="text-right font-medium tabular-nums">
-                {formatCurrency(expense.amount)}
-              </TableCell>
-            </TableRow>
-          ))}
-          <TableRow className="bg-muted/20 font-semibold">
-            <TableCell colSpan={4}>Total Expenses</TableCell>
-            <TableCell className="text-right tabular-nums text-destructive">
-              {formatCurrency(total)}
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
+    <div className="space-y-3">
+      <div className="divide-y divide-border/60 overflow-hidden rounded-lg border border-border/60">
+        <div className="flex items-center justify-between gap-3 bg-muted/20 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ExpensePaymentModeBadge mode="CASH" />
+            <span className="text-sm font-medium">Expense via Cash</span>
+          </div>
+          <span className="font-semibold tabular-nums text-destructive">
+            {formatCurrency(cashTotal)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 bg-muted/20 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <ExpensePaymentModeBadge mode="UPI" />
+            <span className="text-sm font-medium">Expense via UPI</span>
+          </div>
+          <span className="font-semibold tabular-nums text-destructive">
+            {formatCurrency(upiTotal)}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3 px-4 py-3 font-semibold">
+          <span className="text-sm">Total Expenses</span>
+          <span className="tabular-nums text-destructive">{formatCurrency(total)}</span>
+        </div>
+      </div>
+      <BreakdownToggle
+        label={`View ${expenses.length} expense record${expenses.length === 1 ? "" : "s"}`}
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      >
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="font-semibold">Time</TableHead>
+                <TableHead className="font-semibold">To Whom</TableHead>
+                <TableHead className="font-semibold">Reason</TableHead>
+                <TableHead className="font-semibold">Mode</TableHead>
+                <TableHead className="text-right font-semibold">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {expenses.map((expense) => (
+                <TableRow key={expense.id}>
+                  <TableCell className="tabular-nums">{formatTime(expense.createdAt)}</TableCell>
+                  <TableCell>{expense.paidTo}</TableCell>
+                  <TableCell>{expense.reason}</TableCell>
+                  <TableCell>
+                    <ExpensePaymentModeBadge mode={expense.paymentMode} />
+                  </TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">
+                    {formatCurrency(expense.amount)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </BreakdownToggle>
     </div>
   );
 }
@@ -311,7 +386,17 @@ export function DailyCollectionPanel() {
   const collected = !!sheet?.collection;
   const formLocked = collected && !editMode;
   const { paymentBreakdown } = sheet ?? {
-    paymentBreakdown: { cash: 0, upi: 0, netCash: 0 },
+    paymentBreakdown: {
+      cash: 0,
+      upi: 0,
+      card: 0,
+      other: 0,
+      grossCollected: 0,
+      cashExpenses: 0,
+      upiExpenses: 0,
+      netCash: 0,
+      netUpi: 0,
+    },
   };
 
   return (
@@ -401,12 +486,17 @@ export function DailyCollectionPanel() {
                 {formatCurrency(sheet.netCollection)}
               </p>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                 <SummaryStat label="Revenue Earned" value={formatCurrency(sheet.totalRevenue)} />
                 <SummaryStat
-                  label="Expenses Given"
-                  value={formatCurrency(sheet.totalExpenses)}
+                  label="Expense · Cash"
+                  value={formatCurrency(sheet.cashExpenses)}
                   className="[&_p:last-child]:text-destructive"
+                />
+                <SummaryStat
+                  label="Expense · UPI"
+                  value={formatCurrency(sheet.upiExpenses)}
+                  className="border-sky-500/30 bg-sky-500/5 [&_p:first-child]:text-sky-700 dark:[&_p:first-child]:text-sky-400 [&_p:last-child]:text-destructive"
                 />
                 <SummaryStat
                   label="Cash Collected"
@@ -420,10 +510,15 @@ export function DailyCollectionPanel() {
                 />
               </div>
 
-              {sheet.totalExpenses > 0 && (
-                <p className="text-sm text-muted-foreground">
-                  Cash in drawer after expenses: {formatCurrency(paymentBreakdown.netCash)}
-                </p>
+              {(sheet.cashExpenses > 0 || sheet.upiExpenses > 0) && (
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
+                  {sheet.cashExpenses > 0 && (
+                    <p>Cash in drawer after expenses: {formatCurrency(paymentBreakdown.netCash)}</p>
+                  )}
+                  {sheet.upiExpenses > 0 && (
+                    <p>UPI after expenses: {formatCurrency(paymentBreakdown.netUpi)}</p>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -442,7 +537,12 @@ export function DailyCollectionPanel() {
                 )}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold">Expenses</h3>
-                  <ExpenseTable expenses={sheet.expenses} total={sheet.totalExpenses} />
+                  <ExpenseTable
+                    expenses={sheet.expenses}
+                    cashTotal={sheet.cashExpenses}
+                    upiTotal={sheet.upiExpenses}
+                    total={sheet.totalExpenses}
+                  />
                 </div>
               </CardContent>
             </Card>

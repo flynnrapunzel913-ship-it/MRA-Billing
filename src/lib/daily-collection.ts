@@ -30,9 +30,13 @@ export type PaymentBreakdown = {
   other: number;
   /** Gross payments received (all methods, before expenses). */
   grossCollected: number;
-  /** Cash remaining after same-day expenses (expenses assumed paid from cash). */
+  /** Expenses paid from cash. */
+  cashExpenses: number;
+  /** Expenses paid via UPI. */
+  upiExpenses: number;
+  /** Cash remaining after same-day cash expenses. */
   netCash: number;
-  /** UPI collected (expenses are not deducted from UPI). */
+  /** UPI remaining after same-day UPI expenses. */
   netUpi: number;
 };
 
@@ -84,6 +88,8 @@ export type DailyCollectionSheet = {
   productRevenue: number;
   revenueBreakdown: RevenueSourceRow[];
   totalExpenses: number;
+  cashExpenses: number;
+  upiExpenses: number;
   expenses: ExpenseDetailRow[];
   paymentBreakdown: PaymentBreakdown;
   netCollection: number;
@@ -138,6 +144,22 @@ function serializeSnapshot(row: {
   };
 }
 
+/** Sum expenses by payment mode for daily collection math. */
+export function sumExpensesByPaymentMode(
+  expenses: Array<{ amount: number; paymentMode: "CASH" | "UPI" }>
+): { cashExpenses: number; upiExpenses: number; totalExpenses: number } {
+  let cashExpenses = 0;
+  let upiExpenses = 0;
+  for (const row of expenses) {
+    if (row.paymentMode === "UPI") {
+      upiExpenses += row.amount;
+    } else {
+      cashExpenses += row.amount;
+    }
+  }
+  return { cashExpenses, upiExpenses, totalExpenses: cashExpenses + upiExpenses };
+}
+
 /** Pure collection math — used by the daily sheet and unit tests. */
 export function computeCollectionTotals(input: {
   subscriptionRevenue: number;
@@ -146,10 +168,13 @@ export function computeCollectionTotals(input: {
   grossUpi: number;
   grossCard: number;
   grossOther: number;
-  totalExpenses: number;
+  cashExpenses: number;
+  upiExpenses: number;
 }): {
   totalRevenue: number;
   totalExpenses: number;
+  cashExpenses: number;
+  upiExpenses: number;
   netCollection: number;
   paymentBreakdown: PaymentBreakdown;
 } {
@@ -157,13 +182,16 @@ export function computeCollectionTotals(input: {
     input.grossCash + input.grossUpi + input.grossCard + input.grossOther;
   const itemRevenue = input.subscriptionRevenue + input.productRevenue;
   const totalRevenue = grossCollected > 0 ? grossCollected : itemRevenue;
-  const netCash = input.grossCash - input.totalExpenses;
-  const netUpi = input.grossUpi;
-  const netCollection = totalRevenue - input.totalExpenses;
+  const totalExpenses = input.cashExpenses + input.upiExpenses;
+  const netCash = input.grossCash - input.cashExpenses;
+  const netUpi = input.grossUpi - input.upiExpenses;
+  const netCollection = totalRevenue - totalExpenses;
 
   return {
     totalRevenue,
-    totalExpenses: input.totalExpenses,
+    totalExpenses,
+    cashExpenses: input.cashExpenses,
+    upiExpenses: input.upiExpenses,
     netCollection,
     paymentBreakdown: {
       cash: input.grossCash,
@@ -171,6 +199,8 @@ export function computeCollectionTotals(input: {
       card: input.grossCard,
       other: input.grossOther,
       grossCollected,
+      cashExpenses: input.cashExpenses,
+      upiExpenses: input.upiExpenses,
       netCash,
       netUpi,
     },
@@ -179,7 +209,8 @@ export function computeCollectionTotals(input: {
 
 function buildPaymentBreakdown(
   paymentGroups: Array<{ paymentMethod: string; _sum: { amountPaid: unknown } }>,
-  totalExpenses: number,
+  cashExpenses: number,
+  upiExpenses: number,
   subscriptionRevenue: number,
   productRevenue: number
 ): PaymentBreakdown {
@@ -212,7 +243,8 @@ function buildPaymentBreakdown(
     grossUpi,
     grossCard,
     grossOther,
-    totalExpenses,
+    cashExpenses,
+    upiExpenses,
   }).paymentBreakdown;
 }
 
@@ -324,25 +356,6 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
 
   const liveSubscriptionRevenue = subscriptionBreakdown.reduce((s, r) => s + r.amount, 0);
   const liveProductRevenue = productBreakdown.reduce((s, r) => s + r.amount, 0);
-  const liveTotalExpenses = expenseRows.reduce((sum, row) => sum + toJsonNumber(row.amount), 0);
-  const livePaymentBreakdown = buildPaymentBreakdown(
-    paymentGroups,
-    liveTotalExpenses,
-    liveSubscriptionRevenue,
-    liveProductRevenue
-  );
-  const liveTotals = computeCollectionTotals({
-    subscriptionRevenue: liveSubscriptionRevenue,
-    productRevenue: liveProductRevenue,
-    grossCash: livePaymentBreakdown.cash,
-    grossUpi: livePaymentBreakdown.upi,
-    grossCard: livePaymentBreakdown.card,
-    grossOther: livePaymentBreakdown.other,
-    totalExpenses: liveTotalExpenses,
-  });
-  const liveTotalRevenue = liveTotals.totalRevenue;
-  const liveNetCollection = liveTotals.netCollection;
-  const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
 
   const expenses: ExpenseDetailRow[] = expenseRows.map((row) => ({
     id: row.id,
@@ -354,6 +367,30 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     createdBy: row.createdBy.name || row.createdBy.username,
     createdAt: row.createdAt.toISOString(),
   }));
+
+  const { cashExpenses: liveCashExpenses, upiExpenses: liveUpiExpenses, totalExpenses: liveTotalExpenses } =
+    sumExpensesByPaymentMode(expenses);
+
+  const livePaymentBreakdown = buildPaymentBreakdown(
+    paymentGroups,
+    liveCashExpenses,
+    liveUpiExpenses,
+    liveSubscriptionRevenue,
+    liveProductRevenue
+  );
+  const liveTotals = computeCollectionTotals({
+    subscriptionRevenue: liveSubscriptionRevenue,
+    productRevenue: liveProductRevenue,
+    grossCash: livePaymentBreakdown.cash,
+    grossUpi: livePaymentBreakdown.upi,
+    grossCard: livePaymentBreakdown.card,
+    grossOther: livePaymentBreakdown.other,
+    cashExpenses: liveCashExpenses,
+    upiExpenses: liveUpiExpenses,
+  });
+  const liveTotalRevenue = liveTotals.totalRevenue;
+  const liveNetCollection = liveTotals.netCollection;
+  const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
 
   const isSnapshot = collection != null;
 
@@ -392,6 +429,8 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     productRevenue: liveProductRevenue,
     revenueBreakdown: liveRevenueBreakdown,
     totalExpenses: liveTotalExpenses,
+    cashExpenses: liveCashExpenses,
+    upiExpenses: liveUpiExpenses,
     expenses,
     paymentBreakdown: livePaymentBreakdown,
     netCollection: liveNetCollection,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "next-auth/react";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import { TableSkeleton } from "@/components/ui/skeletons";
 import { invalidateCache } from "@/lib/client-cache";
@@ -32,6 +33,8 @@ interface UserRecord {
 }
 
 export default function AdminUsersPage() {
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const { data: users = [], isInitialLoading, refetch } = useCachedFetch<UserRecord[]>(
     "/api/admin/users"
   );
@@ -151,6 +154,12 @@ export default function AdminUsersPage() {
                           size="icon"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => setDeleteUser(user)}
+                          disabled={user.id === currentUserId}
+                          aria-label={
+                            user.id === currentUserId
+                              ? "You cannot delete your own account"
+                              : `Delete ${user.username}`
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -172,6 +181,7 @@ export default function AdminUsersPage() {
           void refetch();
         }}
         initialData={editUser}
+        currentUserId={currentUserId}
       />
 
       <Modal

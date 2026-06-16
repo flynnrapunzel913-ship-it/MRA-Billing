@@ -10,7 +10,8 @@ describe("computeCollectionTotals", () => {
       grossUpi: 1000,
       grossCard: 0,
       grossOther: 0,
-      totalExpenses: 200,
+      cashExpenses: 200,
+      upiExpenses: 0,
     });
 
     expect(result.totalRevenue).toBe(3000);
@@ -21,6 +22,24 @@ describe("computeCollectionTotals", () => {
     expect(result.paymentBreakdown.netCash + result.paymentBreakdown.netUpi).toBe(2800);
   });
 
+  it("deducts UPI expenses from UPI collected only", () => {
+    const result = computeCollectionTotals({
+      subscriptionRevenue: 0,
+      productRevenue: 0,
+      grossCash: 21740,
+      grossUpi: 5900,
+      grossCard: 0,
+      grossOther: 0,
+      cashExpenses: 3000,
+      upiExpenses: 2000,
+    });
+
+    expect(result.totalExpenses).toBe(5000);
+    expect(result.netCollection).toBe(22640);
+    expect(result.paymentBreakdown.netCash).toBe(18740);
+    expect(result.paymentBreakdown.netUpi).toBe(3900);
+  });
+
   it("uses item revenue when no payment totals are recorded", () => {
     const result = computeCollectionTotals({
       subscriptionRevenue: 2500,
@@ -29,7 +48,8 @@ describe("computeCollectionTotals", () => {
       grossUpi: 0,
       grossCard: 0,
       grossOther: 0,
-      totalExpenses: 200,
+      cashExpenses: 200,
+      upiExpenses: 0,
     });
 
     expect(result.totalRevenue).toBe(3000);
@@ -44,7 +64,8 @@ describe("computeCollectionTotals", () => {
       grossUpi: 500,
       grossCard: 1000,
       grossOther: 500,
-      totalExpenses: 200,
+      cashExpenses: 200,
+      upiExpenses: 0,
     });
 
     expect(result.totalRevenue).toBe(3000);
