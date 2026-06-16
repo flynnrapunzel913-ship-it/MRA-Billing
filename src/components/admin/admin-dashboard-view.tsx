@@ -75,12 +75,20 @@ export function AdminDashboardView({
     pending: kpis.pendingPayments,
   };
 
-  const toListRow = (invoice: AdminDashboardData["recentInvoices"][number]): InvoiceListRow => ({
+  const toListRow = (invoice: {
+    id: string;
+    invoiceNumber: string;
+    customerName: string;
+    invoiceDate: string;
+    grandTotal?: string | number;
+    paymentStatus: string;
+    createdById?: string;
+  }): InvoiceListRow => ({
     id: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
     customerName: invoice.customerName,
     invoiceDate: invoice.invoiceDate,
-    grandTotal: invoice.grandTotal,
+    grandTotal: invoice.grandTotal ?? 0,
     paymentStatus: invoice.paymentStatus,
     createdById: invoice.createdById,
   });

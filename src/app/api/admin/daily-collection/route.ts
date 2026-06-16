@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
@@ -91,7 +92,7 @@ function serializeCollectionAuditValues(record: {
       record.cashCountedPhysical != null ? toJsonNumber(record.cashCountedPhysical) : null,
     cashDifference: record.cashDifference != null ? toJsonNumber(record.cashDifference) : null,
     cashDifferenceNotes: record.cashDifferenceNotes,
-    cashDenominations: record.cashDenominations,
+    cashDenominations: (record.cashDenominations ?? null) as Prisma.InputJsonValue | null,
   };
 }
 

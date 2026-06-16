@@ -59,6 +59,8 @@ export function buildVersionHistoryResponse(input: {
     totalExpenses: input.fallbackSnapshot.totalExpenses,
     cashCollected: input.fallbackSnapshot.cashCollected,
     upiCollected: input.fallbackSnapshot.upiCollected,
+    cardCollected: input.fallbackSnapshot.cardCollected,
+    otherCollected: input.fallbackSnapshot.otherCollected,
     netCollection: input.fallbackSnapshot.netCollection,
     subscriptionRevenue: input.fallbackSnapshot.subscriptionRevenue,
     productRevenue: input.fallbackSnapshot.productRevenue,
