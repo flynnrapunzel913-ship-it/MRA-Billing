@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { Role } from "@prisma/client";
 import { applyApiRateLimits } from "@/lib/security/request-rate-limit";
+import { canAccessRoute } from "@/lib/permissions";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -15,8 +16,6 @@ const protectedPrefixes = [
   "/settings",
   "/profile",
 ];
-
-const adminOnlyPrefixes = ["/reports", "/admin", "/settings"];
 
 function isApiPath(pathname: string) {
   return pathname.startsWith("/api/");
@@ -50,9 +49,7 @@ export default auth(async (req) => {
     if (
       isLoggedIn &&
       role === Role.RECEPTIONIST &&
-      adminOnlyPrefixes.some(
-        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
-      )
+      !canAccessRoute(role, pathname)
     ) {
       return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
     }

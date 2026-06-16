@@ -6,6 +6,7 @@ import { ACCOUNT_DISABLED_MESSAGE } from "@/lib/auth/guards";
 import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
 import { getRequestPathname } from "@/lib/auth/request-meta";
 import { loadActiveAccount } from "@/lib/auth/session";
+import { canAccessRoute } from "@/lib/permissions";
 import { AdminDashboardShell } from "@/components/layout/admin-dashboard-shell";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
 
@@ -34,9 +35,14 @@ export default async function DashboardLayout({
     );
   }
 
-  if (session.user.role === Role.ADMIN) {
+  const pathname = await getRequestPathname();
+  if (pathname && !canAccessRoute(account.role, pathname)) {
+    redirect("/dashboard");
+  }
+
+  if (account.role === Role.ADMIN) {
     return <AdminDashboardShell>{children}</AdminDashboardShell>;
   }
 
-  return <DashboardShell user={session.user}>{children}</DashboardShell>;
+  return <DashboardShell user={{ ...session.user, role: account.role }}>{children}</DashboardShell>;
 }
