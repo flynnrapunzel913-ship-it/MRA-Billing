@@ -5,7 +5,7 @@ import {
   Calendar,
   CheckCircle2,
   Loader2,
-  Lock,
+  Pencil,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,8 @@ import {
   emptyCashState,
 } from "@/components/admin/cash-denomination-section";
 import { type CashDenominations } from "@/lib/cash-denominations";
+import { ExpensePaymentModeBadge } from "@/lib/expenses/payment-mode";
+import { DailyCollectionVersionHistory } from "@/components/admin/daily-collection-version-history";
 
 const sectionCard = cn("glass-panel overflow-hidden");
 
@@ -128,6 +130,7 @@ function ExpenseTable({ expenses, total }: { expenses: DailyCollectionSheet["exp
             <TableHead className="font-semibold">Time</TableHead>
             <TableHead className="font-semibold">To Whom</TableHead>
             <TableHead className="font-semibold">Reason</TableHead>
+            <TableHead className="font-semibold">Mode</TableHead>
             <TableHead className="text-right font-semibold">Amount</TableHead>
           </TableRow>
         </TableHeader>
@@ -137,13 +140,16 @@ function ExpenseTable({ expenses, total }: { expenses: DailyCollectionSheet["exp
               <TableCell className="tabular-nums">{formatTime(expense.createdAt)}</TableCell>
               <TableCell>{expense.paidTo}</TableCell>
               <TableCell>{expense.reason}</TableCell>
+              <TableCell>
+                <ExpensePaymentModeBadge mode={expense.paymentMode} />
+              </TableCell>
               <TableCell className="text-right font-medium tabular-nums">
                 {formatCurrency(expense.amount)}
               </TableCell>
             </TableRow>
           ))}
           <TableRow className="bg-muted/20 font-semibold">
-            <TableCell colSpan={3}>Total Expenses</TableCell>
+            <TableCell colSpan={4}>Total Expenses</TableCell>
             <TableCell className="text-right tabular-nums text-destructive">
               {formatCurrency(total)}
             </TableCell>
@@ -217,6 +223,8 @@ export function DailyCollectionPanel() {
   const [profileDefaultName, setProfileDefaultName] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const loadSheet = useCallback(async (date: string) => {
     setLoading(true);
@@ -247,6 +255,7 @@ export function DailyCollectionPanel() {
   }, [profileDefaultName]);
 
   useEffect(() => {
+    setEditMode(false);
     void loadSheet(selectedDate);
   }, [selectedDate, loadSheet]);
 
@@ -265,11 +274,11 @@ export function DailyCollectionPanel() {
     })();
   }, []);
 
-  const handleMarkCollected = async () => {
+  const submitCollection = async (method: "POST" | "PUT") => {
     setSaving(true);
     try {
       const res = await fetch("/api/admin/daily-collection", {
-        method: "POST",
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           date: selectedDate,
@@ -278,20 +287,29 @@ export function DailyCollectionPanel() {
           cashDenominations: denominations,
         }),
       });
-      const result = await readApiResponse(res, "Failed to mark collection");
+      const result = await readApiResponse(res, "Failed to save collection");
       if (!result.ok) {
         toast.error(result.message);
         return;
       }
-      toast.success("Day collection recorded and locked");
+      toast.success(
+        method === "PUT"
+          ? "Daily collection updated successfully"
+          : "Day collection recorded"
+      );
+      setEditMode(false);
+      setHistoryRefreshKey((k) => k + 1);
       await loadSheet(selectedDate);
     } finally {
       setSaving(false);
     }
   };
 
+  const handleMarkCollected = () => submitCollection("POST");
+  const handleSaveChanges = () => submitCollection("PUT");
+
   const collected = !!sheet?.collection;
-  const acknowledgementLocked = collected;
+  const formLocked = collected && !editMode;
   const { paymentBreakdown } = sheet ?? {
     paymentBreakdown: { cash: 0, upi: 0, netCash: 0 },
   };
@@ -327,7 +345,7 @@ export function DailyCollectionPanel() {
           <div className="flex flex-wrap items-center gap-2">
             {sheet?.isSnapshot && (
               <Badge variant="outline" className="gap-1">
-                <Lock className="h-3 w-3" />
+                <CheckCircle2 className="h-3 w-3" />
                 Saved
               </Badge>
             )}
@@ -354,8 +372,29 @@ export function DailyCollectionPanel() {
         <>
           <Card className={cn(sectionCard, "border-primary/30 bg-primary/5")}>
             <CardHeader className="border-b border-primary/15 px-5 py-4">
-              <CardTitle className="text-base text-primary">Net Amount To Be Collected</CardTitle>
-              <p className="text-sm text-muted-foreground">Revenue earned minus expenses given</p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="text-base text-primary">Daily Collection</CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Net Collection: {formatCurrency(sheet.netCollection)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  {collected && !editMode && (
+                    <Button type="button" variant="outline" onClick={() => setEditMode(true)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit Collection
+                    </Button>
+                  )}
+                  {collected && sheet.editMeta && (
+                    <DailyCollectionVersionHistory
+                      date={selectedDate}
+                      lastEditedAt={sheet.editMeta.lastEditedAt}
+                      refreshKey={historyRefreshKey}
+                    />
+                  )}
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="space-y-5 p-5">
               <p className="text-4xl font-bold tabular-nums text-primary sm:text-5xl">
@@ -413,22 +452,19 @@ export function DailyCollectionPanel() {
             systemCash={paymentBreakdown.netCash}
             denominations={denominations}
             onDenominationsChange={setDenominations}
-            denominationsLocked={collected}
+            denominationsLocked={formLocked}
             storedReconciliation={sheet.collection?.cashReconciliation}
           />
 
           <Card className={sectionCard}>
             <CardHeader className="flex flex-row items-center justify-between border-b border-border px-5 py-4">
-              <CardTitle className="text-base">Mark Collection As Collected</CardTitle>
-              {acknowledgementLocked && (
-                <Badge variant="outline" className="gap-1">
-                  <Lock className="h-3 w-3" />
-                  Locked
-                </Badge>
-              )}
+              <CardTitle className="text-base">
+                {collected ? "Collection Record" : "Mark Collection As Collected"}
+              </CardTitle>
+              {editMode && <Badge variant="warning">Editing</Badge>}
             </CardHeader>
             <CardContent className="space-y-4 p-5">
-              {acknowledgementLocked && (
+              {collected && !editMode && (
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
                   <p className="flex items-center gap-2 font-semibold text-emerald-700 dark:text-emerald-400">
                     <CheckCircle2 className="h-5 w-5" />
@@ -444,9 +480,9 @@ export function DailyCollectionPanel() {
                   value={collectorName}
                   onChange={(e) => setCollectorName(e.target.value)}
                   placeholder="Owner or collector name"
-                  readOnly={acknowledgementLocked}
-                  disabled={acknowledgementLocked}
-                  className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
+                  readOnly={formLocked}
+                  disabled={formLocked}
+                  className={cn(formLocked && "cursor-not-allowed opacity-80")}
                 />
               </div>
 
@@ -458,16 +494,35 @@ export function DailyCollectionPanel() {
                   placeholder="Collected all cash and verified PhonePe settlement."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  readOnly={acknowledgementLocked}
-                  disabled={acknowledgementLocked}
-                  className={cn(acknowledgementLocked && "cursor-not-allowed opacity-80")}
+                  readOnly={formLocked}
+                  disabled={formLocked}
+                  className={cn(formLocked && "cursor-not-allowed opacity-80")}
                 />
               </div>
 
-              {!acknowledgementLocked && (
+              {!collected && (
                 <Button onClick={handleMarkCollected} disabled={saving || !collectorName.trim()}>
                   {saving ? "Saving…" : "Mark Collection As Collected"}
                 </Button>
+              )}
+
+              {editMode && (
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={handleSaveChanges} disabled={saving || !collectorName.trim()}>
+                    {saving ? "Saving…" : "Save Changes"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={saving}
+                    onClick={() => {
+                      setEditMode(false);
+                      void loadSheet(selectedDate);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>

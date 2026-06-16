@@ -69,6 +69,11 @@ enum CatalogItemStatus {
   INACTIVE
 }
 
+enum ExpensePaymentMode {
+  CASH
+  UPI
+}
+
 model User {
   id           String          @id @default(cuid())
   username     String          @unique
@@ -87,7 +92,8 @@ model User {
   stockEntries StockEntry[]
   stockLogs    StockActivity[]
   expenses         Expense[]
-  dailyCollections DailyCollection[]
+  dailyCollections       DailyCollection[]
+  dailyCollectionEdits   DailyCollectionHistory[]
   auditLogs        AuditLog[]
 }
 
@@ -324,15 +330,16 @@ model StockActivity {
 }
 
 model Expense {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   expenseDate DateTime
   paidTo      String
   reason      String
-  amount      Decimal  @db.Decimal(10, 2)
+  amount      Decimal            @db.Decimal(10, 2)
+  paymentMode ExpensePaymentMode @default(CASH)
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@index([expenseDate])
 }
@@ -357,10 +364,27 @@ model DailyCollection {
   cashDifference      Decimal? @db.Decimal(12, 2)
   cashDifferenceNotes String?
   cashDenominations   Json?
+  /// Compact baseline snapshot for Version 0 display (set once on create).
+  originalSnapshotJson Json?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  editHistory         DailyCollectionHistory[]
 
   @@index([collectionDate])
+}
+
+/// Edit/version history for a daily collection — stores field diffs only.
+model DailyCollectionHistory {
+  id                String          @id @default(cuid())
+  dailyCollectionId String
+  editedById        String
+  createdAt         DateTime        @default(now())
+  changesJson       Json
+  dailyCollection   DailyCollection @relation(fields: [dailyCollectionId], references: [id], onDelete: Cascade)
+  editedBy          User            @relation(fields: [editedById], references: [id])
+
+  @@index([dailyCollectionId])
+  @@index([createdAt])
 }
 
 /// Central security and business audit trail (S2-01).

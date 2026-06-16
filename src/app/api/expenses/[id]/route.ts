@@ -51,7 +51,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
 
     const existing = await prisma.expense.findUnique({
       where: { id },
-      select: { id: true, paidTo: true, reason: true, amount: true, expenseDate: true },
+      select: {
+        id: true,
+        paidTo: true,
+        reason: true,
+        amount: true,
+        paymentMode: true,
+        expenseDate: true,
+      },
     });
 
     if (!existing) {
@@ -71,6 +78,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
         paidTo: data.paidTo.trim(),
         reason: data.reason.trim(),
         amount: data.amount,
+        paymentMode: data.paymentMode,
       },
       include: expenseListInclude,
     });
@@ -86,12 +94,14 @@ export async function PUT(request: NextRequest, context: RouteContext) {
           paidTo: existing.paidTo,
           reason: existing.reason,
           amount: Number(existing.amount),
+          paymentMode: existing.paymentMode,
           expenseDate: existing.expenseDate.toISOString(),
         },
         after: {
           paidTo: expense.paidTo,
           reason: expense.reason,
           amount: Number(expense.amount),
+          paymentMode: expense.paymentMode,
           expenseDate: expense.expenseDate.toISOString(),
         },
       },
@@ -117,6 +127,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         paidTo: true,
         reason: true,
         amount: true,
+        paymentMode: true,
         expenseDate: true,
       },
     });
@@ -137,6 +148,7 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
         paidTo: expense.paidTo,
         reason: expense.reason,
         amount: Number(expense.amount),
+        paymentMode: expense.paymentMode,
         expenseDate: expense.expenseDate.toISOString(),
       },
     });

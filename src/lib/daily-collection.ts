@@ -18,6 +18,7 @@ export type ExpenseDetailRow = {
   paidTo: string;
   reason: string;
   amount: number;
+  paymentMode: "CASH" | "UPI";
   createdBy: string;
   createdAt: string;
 };
@@ -63,6 +64,10 @@ export type CollectionRecord = {
   cashReconciliation: CashReconciliation | null;
 };
 
+export type CollectionEditMeta = {
+  lastEditedAt: string;
+};
+
 export type CollectionHistoryRow = {
   date: string;
   label: string;
@@ -83,6 +88,7 @@ export type DailyCollectionSheet = {
   paymentBreakdown: PaymentBreakdown;
   netCollection: number;
   collection: CollectionRecord | null;
+  editMeta: CollectionEditMeta | null;
   recentHistory: CollectionHistoryRow[];
 };
 
@@ -210,22 +216,6 @@ function buildPaymentBreakdown(
   }).paymentBreakdown;
 }
 
-function buildSnapshotPaymentBreakdown(
-  snapshot: CollectionSnapshot,
-  liveCard: number,
-  liveOther: number
-): PaymentBreakdown {
-  return computeCollectionTotals({
-    subscriptionRevenue: snapshot.subscriptionRevenue,
-    productRevenue: snapshot.productRevenue,
-    grossCash: snapshot.cashCollected,
-    grossUpi: snapshot.upiCollected,
-    grossCard: liveCard,
-    grossOther: liveOther,
-    totalExpenses: snapshot.totalExpenses,
-  }).paymentBreakdown;
-}
-
 export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCollectionSheet | null> {
   const dayStart = parseCollectionDateInput(dateStr);
   if (!dayStart) return null;
@@ -286,6 +276,12 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
       where: { collectionDate: dayStart },
       include: {
         collectedBy: { select: { id: true, name: true, username: true } },
+        editHistory: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
+        },
+        _count: { select: { editHistory: true } },
       },
     }),
     prisma.dailyCollection.findMany({
@@ -354,20 +350,12 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     paidTo: row.paidTo,
     reason: row.reason,
     amount: toJsonNumber(row.amount),
+    paymentMode: row.paymentMode,
     createdBy: row.createdBy.name || row.createdBy.username,
     createdAt: row.createdAt.toISOString(),
   }));
 
-  const collectionSnapshot = collection ? serializeSnapshot(collection) : null;
-  const isSnapshot = collectionSnapshot != null;
-  const displaySnapshot =
-    collectionSnapshot != null
-      ? {
-          ...collectionSnapshot,
-          cashCollected: livePaymentBreakdown.cash,
-          upiCollected: livePaymentBreakdown.upi,
-        }
-      : null;
+  const isSnapshot = collection != null;
 
   const historyByDate = new Map(
     historyCollections.map((row) => {
@@ -399,22 +387,14 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
   return {
     date: dateStr,
     isSnapshot,
-    totalRevenue: isSnapshot ? collectionSnapshot.totalRevenue : liveTotalRevenue,
-    subscriptionRevenue: isSnapshot
-      ? collectionSnapshot.subscriptionRevenue
-      : liveSubscriptionRevenue,
-    productRevenue: isSnapshot ? collectionSnapshot.productRevenue : liveProductRevenue,
+    totalRevenue: liveTotalRevenue,
+    subscriptionRevenue: liveSubscriptionRevenue,
+    productRevenue: liveProductRevenue,
     revenueBreakdown: liveRevenueBreakdown,
-    totalExpenses: isSnapshot ? collectionSnapshot.totalExpenses : liveTotalExpenses,
+    totalExpenses: liveTotalExpenses,
     expenses,
-    paymentBreakdown: isSnapshot
-      ? buildSnapshotPaymentBreakdown(
-          displaySnapshot!,
-          livePaymentBreakdown.card,
-          livePaymentBreakdown.other
-        )
-      : livePaymentBreakdown,
-    netCollection: isSnapshot ? collectionSnapshot.netCollection : liveNetCollection,
+    paymentBreakdown: livePaymentBreakdown,
+    netCollection: liveNetCollection,
     collection: collection
       ? {
           id: collection.id,
@@ -422,10 +402,22 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
           collectedAt: collection.collectedAt.toISOString(),
           collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
-          snapshot: displaySnapshot,
+          snapshot: {
+            totalRevenue: liveTotalRevenue,
+            subscriptionRevenue: liveSubscriptionRevenue,
+            productRevenue: liveProductRevenue,
+            totalExpenses: liveTotalExpenses,
+            cashCollected: livePaymentBreakdown.cash,
+            upiCollected: livePaymentBreakdown.upi,
+            netCollection: liveNetCollection,
+          },
           cashReconciliation: serializeCashReconciliation(collection),
         }
       : null,
+    editMeta:
+      collection && collection._count.editHistory > 0 && collection.editHistory[0]
+        ? { lastEditedAt: collection.editHistory[0].createdAt.toISOString() }
+        : null,
     recentHistory,
   };
 }

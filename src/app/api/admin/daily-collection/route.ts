@@ -6,6 +6,12 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 import { format } from "date-fns";
 import {
+  buildCollectionChangesJson,
+  buildOriginalSnapshotJson,
+  extractCollectionDiffValues,
+  hasCollectionChanges,
+} from "@/lib/daily-collection-diff";
+import {
   buildCollectionSnapshotFromSheet,
   getDailyCollectionSheet,
   parseCollectionDateInput,
@@ -15,6 +21,7 @@ import {
   calculatePhysicalCash,
   normalizeDenominations,
 } from "@/lib/cash-denominations";
+import { toJsonNumber } from "@/lib/serialize-prisma";
 
 const bodySchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -51,6 +58,41 @@ function auditCashDetails(cash: Awaited<ReturnType<typeof resolveCashReconciliat
     systemCash: cash.cashCollectedSystem,
     physicalCash: cash.cashCountedPhysical,
     difference: cash.cashDifference,
+  };
+}
+
+function serializeCollectionAuditValues(record: {
+  notes: string | null;
+  collectedByName: string | null;
+  totalRevenue: unknown;
+  subscriptionRevenue: unknown;
+  productRevenue: unknown;
+  totalExpenses: unknown;
+  cashCollectedSystem: unknown;
+  upiCollected: unknown;
+  netCollection: unknown;
+  cashCountedPhysical: unknown;
+  cashDifference: unknown;
+  cashDifferenceNotes: string | null;
+  cashDenominations: unknown;
+}) {
+  return {
+    notes: record.notes,
+    collectedByName: record.collectedByName,
+    totalRevenue: record.totalRevenue != null ? toJsonNumber(record.totalRevenue) : null,
+    subscriptionRevenue:
+      record.subscriptionRevenue != null ? toJsonNumber(record.subscriptionRevenue) : null,
+    productRevenue: record.productRevenue != null ? toJsonNumber(record.productRevenue) : null,
+    totalExpenses: record.totalExpenses != null ? toJsonNumber(record.totalExpenses) : null,
+    cashCollectedSystem:
+      record.cashCollectedSystem != null ? toJsonNumber(record.cashCollectedSystem) : null,
+    upiCollected: record.upiCollected != null ? toJsonNumber(record.upiCollected) : null,
+    netCollection: record.netCollection != null ? toJsonNumber(record.netCollection) : null,
+    cashCountedPhysical:
+      record.cashCountedPhysical != null ? toJsonNumber(record.cashCountedPhysical) : null,
+    cashDifference: record.cashDifference != null ? toJsonNumber(record.cashDifference) : null,
+    cashDifferenceNotes: record.cashDifferenceNotes,
+    cashDenominations: record.cashDenominations,
   };
 }
 
@@ -141,6 +183,22 @@ export async function POST(request: NextRequest) {
         cashDifference: cash.cashDifference,
         cashDifferenceNotes: cash.cashDifferenceNotes,
         cashDenominations: cash.cashDenominations,
+        originalSnapshotJson: buildOriginalSnapshotJson(
+          extractCollectionDiffValues({
+            notes: parsed.data.notes?.trim() || null,
+            collectedByName,
+            totalRevenue: snapshot.totalRevenue,
+            subscriptionRevenue: snapshot.subscriptionRevenue,
+            productRevenue: snapshot.productRevenue,
+            totalExpenses: snapshot.totalExpenses,
+            cashCollectedSystem: cash.cashCollectedSystem,
+            upiCollected: snapshot.upiCollected,
+            netCollection: snapshot.netCollection,
+            cashCountedPhysical: cash.cashCountedPhysical,
+            cashDifference: cash.cashDifference,
+            cashDifferenceNotes: cash.cashDifferenceNotes,
+          })
+        ),
       },
       include: {
         collectedBy: { select: { id: true, name: true, username: true } },
@@ -177,13 +235,138 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const { error } = await requireAdmin();
+    const { error, user } = await requireAdmin();
     if (error) return error;
 
-    return NextResponse.json(
-      { error: "This day's collection is locked and cannot be changed" },
-      { status: 409 }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = bodySchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
+
+    const collectionDate = parseCollectionDateInput(parsed.data.date);
+    if (!collectionDate) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+
+    const existing = await prisma.dailyCollection.findUnique({
+      where: { collectionDate },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "No collection record exists for this date" },
+        { status: 404 }
+      );
+    }
+
+    const beforeValues = extractCollectionDiffValues(existing);
+
+    const sheet = await getDailyCollectionSheet(parsed.data.date);
+    if (!sheet) {
+      return NextResponse.json({ error: "Invalid date" }, { status: 400 });
+    }
+
+    const snapshot = buildCollectionSnapshotFromSheet(sheet);
+    const cash = await resolveCashReconciliation(
+      parsed.data.date,
+      parsed.data.cashDenominations,
+      parsed.data.cashDifferenceNotes
     );
+
+    const collectedByName =
+      parsed.data.collectedByName?.trim() ||
+      existing.collectedByName ||
+      user!.name?.trim() ||
+      user!.username?.trim() ||
+      "Admin";
+
+    const afterValues = extractCollectionDiffValues({
+      notes: parsed.data.notes?.trim() || null,
+      collectedByName,
+      totalRevenue: snapshot.totalRevenue,
+      subscriptionRevenue: snapshot.subscriptionRevenue,
+      productRevenue: snapshot.productRevenue,
+      totalExpenses: snapshot.totalExpenses,
+      cashCollectedSystem: cash.cashCollectedSystem,
+      upiCollected: snapshot.upiCollected,
+      netCollection: snapshot.netCollection,
+      cashCountedPhysical: cash.cashCountedPhysical,
+      cashDifference: cash.cashDifference,
+      cashDifferenceNotes: cash.cashDifferenceNotes,
+    });
+
+    const changesJson = buildCollectionChangesJson(beforeValues, afterValues);
+
+    const record = await prisma.$transaction(async (tx) => {
+      const updated = await tx.dailyCollection.update({
+        where: { id: existing.id },
+        data: {
+          notes: parsed.data.notes?.trim() || null,
+          collectedByName,
+          totalRevenue: snapshot.totalRevenue,
+          subscriptionRevenue: snapshot.subscriptionRevenue,
+          productRevenue: snapshot.productRevenue,
+          totalExpenses: snapshot.totalExpenses,
+          cashCollectedSystem: cash.cashCollectedSystem,
+          upiCollected: snapshot.upiCollected,
+          netCollection: snapshot.netCollection,
+          cashCountedPhysical: cash.cashCountedPhysical,
+          cashDifference: cash.cashDifference,
+          cashDifferenceNotes: cash.cashDifferenceNotes,
+          cashDenominations: cash.cashDenominations,
+        },
+        include: {
+          collectedBy: { select: { id: true, name: true, username: true } },
+        },
+      });
+
+      if (hasCollectionChanges(changesJson)) {
+        await tx.dailyCollectionHistory.create({
+          data: {
+            dailyCollectionId: existing.id,
+            editedById: user!.id!,
+            changesJson,
+          },
+        });
+      }
+
+      return updated;
+    });
+
+    const previousValues = serializeCollectionAuditValues(existing);
+
+    const newValues = serializeCollectionAuditValues(record);
+
+    void logAuditEvent({
+      userId: user!.id,
+      username: user!.username,
+      action: AUDIT_ACTIONS.DAILY_COLLECTION_UPDATED,
+      entityType: "DAILY_COLLECTION",
+      entityId: record.id,
+      details: {
+        date: parsed.data.date,
+        previousValues,
+        newValues,
+        ...(hasCollectionChanges(changesJson) ? { changes: changesJson } : {}),
+      },
+    });
+
+    return NextResponse.json({
+      id: record.id,
+      notes: record.notes,
+      collectedAt: record.collectedAt.toISOString(),
+      collectedBy: record.collectedBy,
+      ...(hasCollectionChanges(changesJson)
+        ? { historyRecorded: true }
+        : { historyRecorded: false }),
+    });
   } catch (error) {
     return apiErrorResponse(error, "Failed to update daily collection");
   }

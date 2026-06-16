@@ -10,6 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { ExpensePaymentModeBadge } from "@/lib/expenses/payment-mode";
 
 export type ExpenseListRow = {
   id: string;
@@ -17,6 +18,7 @@ export type ExpenseListRow = {
   paidTo: string;
   reason: string;
   amount: number;
+  paymentMode: "CASH" | "UPI";
   createdBy?: { id: string; name: string; username: string };
 };
 
@@ -35,6 +37,7 @@ export function ExpensesTable({ expenses, onEdit }: ExpensesTableProps) {
               <TableHead className="font-semibold">Date</TableHead>
               <TableHead className="font-semibold">Paid To</TableHead>
               <TableHead className="font-semibold">Reason</TableHead>
+              <TableHead className="font-semibold">Mode</TableHead>
               <TableHead className="font-semibold text-right">Amount</TableHead>
               <TableHead className="font-semibold">Created By</TableHead>
               <TableHead className="text-right font-semibold">Actions</TableHead>
@@ -48,6 +51,9 @@ export function ExpensesTable({ expenses, onEdit }: ExpensesTableProps) {
                 </TableCell>
                 <TableCell className="font-medium">{expense.paidTo}</TableCell>
                 <TableCell>{expense.reason}</TableCell>
+                <TableCell>
+                  <ExpensePaymentModeBadge mode={expense.paymentMode ?? "CASH"} />
+                </TableCell>
                 <TableCell className="text-right font-semibold tabular-nums">
                   {formatCurrency(expense.amount)}
                 </TableCell>

@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
         paidTo: data.paidTo.trim(),
         reason: data.reason.trim(),
         amount: data.amount,
+        paymentMode: data.paymentMode,
         createdById: user!.id!,
       },
       include: expenseListInclude,
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
         paidTo: expense.paidTo,
         reason: expense.reason,
         amount: Number(expense.amount),
+        paymentMode: expense.paymentMode,
         expenseDate: expense.expenseDate.toISOString(),
       },
     });

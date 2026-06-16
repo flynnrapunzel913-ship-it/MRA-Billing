@@ -212,6 +212,7 @@ export const expenseSchema = z.object({
   paidTo: z.string().min(2, "Paid to must be at least 2 characters"),
   reason: z.string().min(3, "Reason must be at least 3 characters"),
   amount: z.number().positive("Amount must be greater than 0"),
+  paymentMode: z.enum(["CASH", "UPI"], { message: "Payment mode is required" }),
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;

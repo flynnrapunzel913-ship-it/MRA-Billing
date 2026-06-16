@@ -231,6 +231,7 @@ export default function ExpensesPage() {
                 paidTo: editExpense.paidTo,
                 reason: editExpense.reason,
                 amount: editExpense.amount,
+                paymentMode: editExpense.paymentMode ?? "CASH",
               }
             : undefined
         }

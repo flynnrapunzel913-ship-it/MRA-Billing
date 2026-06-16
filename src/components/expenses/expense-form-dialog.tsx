@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
-import { formatDateInput } from "@/lib/utils";
+import { formatDateInput, cn } from "@/lib/utils";
+import { EXPENSE_PAYMENT_MODES, expensePaymentModeLabel } from "@/lib/expenses/payment-mode";
 import { toast } from "sonner";
 
 export type ExpenseFormInitialData = Partial<ExpenseInput> & { id?: string };
@@ -42,6 +43,7 @@ export function ExpenseFormDialog({
       paidTo: "",
       reason: "",
       amount: 0,
+      paymentMode: "CASH",
     },
   });
 
@@ -54,6 +56,7 @@ export function ExpenseFormDialog({
         paidTo: initialData?.paidTo ?? "",
         reason: initialData?.reason ?? "",
         amount: initialData?.amount ?? 0,
+        paymentMode: initialData?.paymentMode ?? "CASH",
       });
     }
   }, [initialData, open, reset]);
@@ -120,6 +123,40 @@ export function ExpenseFormDialog({
           <Label>Reason *</Label>
           <Input {...register("reason")} placeholder="Why this expense was made" className="h-11" />
           {errors.reason && <p className="text-sm text-destructive">{errors.reason.message}</p>}
+        </div>
+        <div className="space-y-2">
+          <Label>Payment Mode *</Label>
+          <Controller
+            name="paymentMode"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-6">
+                {EXPENSE_PAYMENT_MODES.map((mode) => (
+                  <label
+                    key={mode}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 text-sm font-medium",
+                      field.value === mode ? "text-foreground" : "text-muted-foreground"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name={field.name}
+                      value={mode}
+                      checked={field.value === mode}
+                      onChange={() => field.onChange(mode)}
+                      onBlur={field.onBlur}
+                      className="h-4 w-4 accent-primary"
+                    />
+                    {expensePaymentModeLabel(mode)}
+                  </label>
+                ))}
+              </div>
+            )}
+          />
+          {errors.paymentMode && (
+            <p className="text-sm text-destructive">{errors.paymentMode.message}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label>Amount *</Label>

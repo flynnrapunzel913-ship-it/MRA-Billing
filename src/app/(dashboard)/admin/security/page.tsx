@@ -40,6 +40,8 @@ const ACTION_FILTER_OPTIONS = [
   { value: "DISABLED_USER_ACCESS_ATTEMPT", label: "Disabled user access" },
   { value: "ADMIN_ACCESS_VIOLATION", label: "Admin access violation" },
   { value: "RATE_LIMIT_EXCEEDED", label: "Rate limit exceeded" },
+  { value: "DAILY_COLLECTION_MARKED", label: "Daily collection marked" },
+  { value: "DAILY_COLLECTION_UPDATED", label: "Daily collection updated" },
 ] as const;
 
 type AuditEventRow = {
