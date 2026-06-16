@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { sanitizeMobileInput } from "@/lib/mobile-input";
 import { generateMembershipId } from "@/lib/utils";
 
@@ -33,9 +34,12 @@ export async function resolveInvoiceCustomer(
   let customerAddress = data.customerAddress?.trim() || null;
   let customerGst = data.customerGst?.trim() || null;
   let customerJustCreated: { id: string; name: string } | null = null;
+  const activeCustomerWhere = await getActiveCustomerWhere();
 
   if (customerId) {
-    const customer = await tx.customer.findUnique({ where: { id: customerId } });
+    const customer = await tx.customer.findFirst({
+      where: { id: customerId, ...activeCustomerWhere },
+    });
     if (!customer) {
       throw new Error("Selected customer not found");
     }
@@ -51,7 +55,9 @@ export async function resolveInvoiceCustomer(
 
   const mobile = data.customerMobile ? sanitizeMobileInput(data.customerMobile) : "";
   if (mobile) {
-    const existing = await tx.customer.findFirst({ where: { mobile } });
+    const existing = await tx.customer.findFirst({
+      where: { mobile, ...activeCustomerWhere },
+    });
     if (existing) {
       if (existing.name !== data.customerName) {
         await tx.customer.update({

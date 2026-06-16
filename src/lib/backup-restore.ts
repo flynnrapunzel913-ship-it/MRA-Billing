@@ -26,6 +26,9 @@ const DATA_KEYS = [
   "stockSequences",
   "stockEntries",
   "stockActivities",
+  "expenses",
+  "dailyCollections",
+  "dailyCollectionHistories",
   "auditLogs",
 ] as const;
 
@@ -53,6 +56,14 @@ function requireNumber(row: Record<string, unknown>, field: string): number {
   const value = row[field];
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new BackupRestoreError(`Invalid backup: missing or invalid ${field}`);
+  }
+  return value;
+}
+
+function optionalNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new BackupRestoreError("Invalid backup: expected number or null");
   }
   return value;
 }
@@ -169,6 +180,9 @@ export function parseBackupFile(raw: string): DatabaseBackup {
     stockSequences: [],
     stockEntries: [],
     stockActivities: [],
+    expenses: [],
+    dailyCollections: [],
+    dailyCollectionHistories: [],
     auditLogs: [],
   };
 
@@ -274,6 +288,40 @@ export function validateBackupForRestore(backup: DatabaseBackup): void {
     }
     if (!userIds.has(userId)) {
       throw new BackupRestoreError("Invalid backup: stock activity references unknown user");
+    }
+  }
+
+  collectIds(backup.data.expenses as Record<string, unknown>[], "expense");
+  for (const row of backup.data.expenses as Record<string, unknown>[]) {
+    const createdById = requireString(row, "createdById");
+    if (!userIds.has(createdById)) {
+      throw new BackupRestoreError("Invalid backup: expense references unknown user");
+    }
+  }
+
+  const dailyCollections = backup.data.dailyCollections as Record<string, unknown>[];
+  const dailyCollectionIds = collectIds(dailyCollections, "dailyCollection");
+  assertUniqueField(dailyCollections, "collectionDate", "dailyCollection");
+  for (const row of dailyCollections) {
+    const collectedByUserId = requireString(row, "collectedByUserId");
+    if (!userIds.has(collectedByUserId)) {
+      throw new BackupRestoreError("Invalid backup: daily collection references unknown user");
+    }
+  }
+
+  collectIds(backup.data.dailyCollectionHistories as Record<string, unknown>[], "dailyCollectionHistory");
+  for (const row of backup.data.dailyCollectionHistories as Record<string, unknown>[]) {
+    const dailyCollectionId = requireString(row, "dailyCollectionId");
+    const editedById = requireString(row, "editedById");
+    if (!dailyCollectionIds.has(dailyCollectionId)) {
+      throw new BackupRestoreError(
+        "Invalid backup: daily collection history references unknown daily collection"
+      );
+    }
+    if (!userIds.has(editedById)) {
+      throw new BackupRestoreError(
+        "Invalid backup: daily collection history references unknown user"
+      );
     }
   }
 
@@ -551,6 +599,63 @@ function mapAuditLog(row: Record<string, unknown>): Prisma.AuditLogCreateManyInp
   };
 }
 
+function mapExpense(row: Record<string, unknown>): Prisma.ExpenseCreateManyInput {
+  return {
+    id: requireString(row, "id"),
+    expenseDate: parseDateValue(row.expenseDate, "expenseDate"),
+    paidTo: requireString(row, "paidTo"),
+    reason: requireString(row, "reason"),
+    amount: requireNumber(row, "amount"),
+    paymentMode: requireString(row, "paymentMode") as Prisma.ExpenseCreateManyInput["paymentMode"],
+    createdById: requireString(row, "createdById"),
+    createdAt: parseDateValue(row.createdAt, "createdAt"),
+    updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
+  };
+}
+
+function mapDailyCollection(row: Record<string, unknown>): Prisma.DailyCollectionCreateManyInput {
+  return {
+    id: requireString(row, "id"),
+    collectionDate: parseDateValue(row.collectionDate, "collectionDate"),
+    notes: optionalString(row.notes),
+    collectedAt: parseDateValue(row.collectedAt, "collectedAt"),
+    collectedByUserId: requireString(row, "collectedByUserId"),
+    collectedByName: optionalString(row.collectedByName),
+    totalRevenue: optionalNumber(row.totalRevenue),
+    subscriptionRevenue: optionalNumber(row.subscriptionRevenue),
+    productRevenue: optionalNumber(row.productRevenue),
+    totalExpenses: optionalNumber(row.totalExpenses),
+    cashCollectedSystem: optionalNumber(row.cashCollectedSystem),
+    upiCollected: optionalNumber(row.upiCollected),
+    netCollection: optionalNumber(row.netCollection),
+    cashCountedPhysical: optionalNumber(row.cashCountedPhysical),
+    cashDifference: optionalNumber(row.cashDifference),
+    cashDifferenceNotes: optionalString(row.cashDifferenceNotes),
+    cashDenominations:
+      row.cashDenominations === null || row.cashDenominations === undefined
+        ? undefined
+        : (row.cashDenominations as Prisma.InputJsonValue),
+    originalSnapshotJson:
+      row.originalSnapshotJson === null || row.originalSnapshotJson === undefined
+        ? undefined
+        : (row.originalSnapshotJson as Prisma.InputJsonValue),
+    createdAt: parseDateValue(row.createdAt, "createdAt"),
+    updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
+  };
+}
+
+function mapDailyCollectionHistory(
+  row: Record<string, unknown>
+): Prisma.DailyCollectionHistoryCreateManyInput {
+  return {
+    id: requireString(row, "id"),
+    dailyCollectionId: requireString(row, "dailyCollectionId"),
+    editedById: requireString(row, "editedById"),
+    createdAt: parseDateValue(row.createdAt, "createdAt"),
+    changesJson: row.changesJson as Prisma.InputJsonValue,
+  };
+}
+
 const RESTORE_TX_OPTIONS = { maxWait: 30_000, timeout: 120_000 } as const;
 
 export async function restoreDatabaseFromBackup(
@@ -561,6 +666,9 @@ export async function restoreDatabaseFromBackup(
   const rows = backup.data;
 
   await prisma.$transaction(async (tx) => {
+    await tx.dailyCollectionHistory.deleteMany();
+    await tx.dailyCollection.deleteMany();
+    await tx.expense.deleteMany();
     await tx.stockActivity.deleteMany();
     await tx.customerActivity.deleteMany();
     await tx.userActivity.deleteMany();
@@ -626,6 +734,23 @@ export async function restoreDatabaseFromBackup(
     const stockEntries = rows.stockEntries as Record<string, unknown>[];
     if (stockEntries.length > 0) {
       await tx.stockEntry.createMany({ data: stockEntries.map(mapStockEntry) });
+    }
+
+    const expenses = rows.expenses as Record<string, unknown>[];
+    if (expenses.length > 0) {
+      await tx.expense.createMany({ data: expenses.map(mapExpense) });
+    }
+
+    const dailyCollections = rows.dailyCollections as Record<string, unknown>[];
+    if (dailyCollections.length > 0) {
+      await tx.dailyCollection.createMany({ data: dailyCollections.map(mapDailyCollection) });
+    }
+
+    const dailyCollectionHistories = rows.dailyCollectionHistories as Record<string, unknown>[];
+    if (dailyCollectionHistories.length > 0) {
+      await tx.dailyCollectionHistory.createMany({
+        data: dailyCollectionHistories.map(mapDailyCollectionHistory),
+      });
     }
 
     const userActivities = rows.userActivities as Record<string, unknown>[];

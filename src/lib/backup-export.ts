@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 
-export const BACKUP_SCHEMA_VERSION = "S2-18";
+export const BACKUP_SCHEMA_VERSION = "S2-19";
 
 export type DatabaseBackup = {
   exportedAt: string;
@@ -20,6 +20,9 @@ export type DatabaseBackup = {
     stockSequences: number;
     stockEntries: number;
     stockActivities: number;
+    expenses: number;
+    dailyCollections: number;
+    dailyCollectionHistories: number;
     auditLogs: number;
   };
   data: {
@@ -36,6 +39,9 @@ export type DatabaseBackup = {
     stockSequences: unknown[];
     stockEntries: unknown[];
     stockActivities: unknown[];
+    expenses: unknown[];
+    dailyCollections: unknown[];
+    dailyCollectionHistories: unknown[];
     auditLogs: unknown[];
   };
 };
@@ -79,6 +85,9 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     stockSequences,
     stockEntries,
     stockActivities,
+    expenses,
+    dailyCollections,
+    dailyCollectionHistories,
     auditLogs,
   ] = await Promise.all([
     prisma.user.findMany(),
@@ -94,6 +103,9 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     prisma.stockSequence.findMany(),
     prisma.stockEntry.findMany(),
     prisma.stockActivity.findMany(),
+    prisma.expense.findMany(),
+    prisma.dailyCollection.findMany(),
+    prisma.dailyCollectionHistory.findMany(),
     prisma.auditLog.findMany(),
   ]);
 
@@ -111,6 +123,9 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     stockSequences: stockSequences.length,
     stockEntries: stockEntries.length,
     stockActivities: stockActivities.length,
+    expenses: expenses.length,
+    dailyCollections: dailyCollections.length,
+    dailyCollectionHistories: dailyCollectionHistories.length,
     auditLogs: auditLogs.length,
   };
 
@@ -132,6 +147,9 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
       stockSequences: serializeForBackup(stockSequences) as unknown[],
       stockEntries: serializeForBackup(stockEntries) as unknown[],
       stockActivities: serializeForBackup(stockActivities) as unknown[],
+      expenses: serializeForBackup(expenses) as unknown[],
+      dailyCollections: serializeForBackup(dailyCollections) as unknown[],
+      dailyCollectionHistories: serializeForBackup(dailyCollectionHistories) as unknown[],
       auditLogs: serializeForBackup(auditLogs) as unknown[],
     },
   };
