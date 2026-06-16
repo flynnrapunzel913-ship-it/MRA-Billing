@@ -11,14 +11,16 @@ export function formatKpiValue(value: unknown): string {
 
 export interface AdminDashboardKpis {
   invoicesGenerated: number;
-  activeCustomers: number;
-  /** @deprecated Use activeCustomers */
-  activeStudents?: number;
+  activeStudents: number;
+  /** @deprecated Use activeStudents */
+  activeCustomers?: number;
   pendingPayments: number;
 }
 
 export interface ReceptionistDashboardKpis {
-  activeCustomers: number;
+  activeStudents: number;
+  /** @deprecated Use activeStudents */
+  activeCustomers?: number;
   invoicesToday: number;
   pendingPayments: number;
 }
@@ -40,11 +42,11 @@ export function normalizeFinancialSummary(data: Record<string, unknown>): Financ
 }
 
 export function normalizeAdminDashboardKpis(data: Record<string, unknown>): AdminDashboardKpis {
-  const activeCustomers = toKpiNumber(data.activeCustomers ?? data.activeStudents);
+  const activeStudents = toKpiNumber(data.activeStudents ?? data.activeCustomers);
   return {
     invoicesGenerated: toKpiNumber(data.invoicesGenerated ?? data.invoiceCount),
-    activeCustomers,
-    activeStudents: activeCustomers,
+    activeStudents,
+    activeCustomers: activeStudents,
     pendingPayments: toKpiNumber(data.pendingPayments),
   };
 }
@@ -52,8 +54,10 @@ export function normalizeAdminDashboardKpis(data: Record<string, unknown>): Admi
 export function normalizeReceptionistDashboardKpis(
   data: Record<string, unknown>
 ): ReceptionistDashboardKpis {
+  const activeStudents = toKpiNumber(data.activeStudents ?? data.activeCustomers);
   return {
-    activeCustomers: toKpiNumber(data.activeCustomers ?? data.activeStudents),
+    activeStudents,
+    activeCustomers: activeStudents,
     invoicesToday: toKpiNumber(data.invoicesToday ?? data.invoicesGenerated),
     pendingPayments: toKpiNumber(data.pendingPayments),
   };

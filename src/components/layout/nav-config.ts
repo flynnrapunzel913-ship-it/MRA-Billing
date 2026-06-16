@@ -44,7 +44,7 @@ export const navGroups: NavGroup[] = [
       },
       {
         href: "/customers",
-        label: "Customers",
+        label: "Students",
         icon: Users,
         roles: ["ADMIN", "RECEPTIONIST"],
       },

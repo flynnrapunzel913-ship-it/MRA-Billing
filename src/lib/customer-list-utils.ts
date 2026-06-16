@@ -1,4 +1,5 @@
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
+import { studentNoun } from "@/lib/academy-labels";
 import { formatDate, formatDateInput } from "@/lib/utils";
 
 export type StatusFilter = "all" | "active" | "passed_out" | "pending_payment";
@@ -319,7 +320,7 @@ export function getCustomerCountLabel(options: {
   search: string;
 }) {
   const { count, statusFilter, serviceFilter, search } = options;
-  const noun = count === 1 ? "Customer" : "Customers";
+  const noun = studentNoun(count);
   const hasSearch = search.trim().length > 0;
   const hasService = serviceFilter !== "all";
   const hasStatus = statusFilter !== "all";

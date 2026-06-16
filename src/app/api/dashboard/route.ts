@@ -20,7 +20,7 @@ export async function GET() {
     const { start: todayStart, end: todayEnd } = getTodayRange();
 
     if (user!.role === Role.RECEPTIONIST) {
-      const [activeCustomers, invoicesToday, pendingPayments, recentInvoices] = await Promise.all([
+      const [activeStudents, invoicesToday, pendingPayments, recentInvoices] = await Promise.all([
         prisma.customer.count({ where: { status: "ACTIVE", ...customerWhere } }),
         prisma.invoice.count({
           where: {
@@ -54,14 +54,15 @@ export async function GET() {
 
       return NextResponse.json({
         role: "RECEPTIONIST",
-        activeCustomers: toKpiNumber(activeCustomers),
+        activeStudents: toKpiNumber(activeStudents),
+        activeCustomers: toKpiNumber(activeStudents),
         invoicesToday: toKpiNumber(invoicesToday),
         pendingPayments: toKpiNumber(pendingPayments),
         recentInvoices: recentInvoices ?? [],
       });
     }
 
-    const [invoiceCount, activeCustomers, pendingPayments, recentInvoices] = await Promise.all([
+    const [invoiceCount, activeStudents, pendingPayments, recentInvoices] = await Promise.all([
       prisma.invoice.count({ where: invoiceWhere }),
       prisma.customer.count({ where: { status: "ACTIVE", ...customerWhere } }),
       prisma.invoice.count({
@@ -94,9 +95,8 @@ export async function GET() {
     return NextResponse.json({
       role: "ADMIN",
       invoicesGenerated: toKpiNumber(invoiceCount),
-      activeCustomers: toKpiNumber(activeCustomers),
-      /** @deprecated Use activeCustomers */
-      activeStudents: toKpiNumber(activeCustomers),
+      activeStudents: toKpiNumber(activeStudents),
+      activeCustomers: toKpiNumber(activeStudents),
       pendingPayments: toKpiNumber(pendingPayments),
       recentInvoices: recentInvoices ?? [],
     });

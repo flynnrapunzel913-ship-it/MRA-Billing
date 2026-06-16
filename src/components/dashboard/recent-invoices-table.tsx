@@ -43,7 +43,7 @@ export function RecentInvoicesTable({
         <TableHeader>
           <TableRow className="bg-muted/30 hover:bg-muted/30">
             <TableHead className="font-semibold">Invoice No</TableHead>
-            <TableHead className="font-semibold">Customer</TableHead>
+            <TableHead className="font-semibold">Student</TableHead>
             <TableHead className="font-semibold">Subscription / Product</TableHead>
             {showAmount && (
               <TableHead className="text-right font-semibold">Amount</TableHead>

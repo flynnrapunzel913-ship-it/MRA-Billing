@@ -27,7 +27,9 @@ import {
 
 interface ReceptionistDashboardData {
   role: "RECEPTIONIST";
-  activeCustomers: number;
+  activeStudents: number;
+  /** @deprecated Use activeStudents */
+  activeCustomers?: number;
   invoicesToday: number;
   pendingPayments: number;
   recentInvoices: Array<{
@@ -50,8 +52,8 @@ const glassCard = cn("glass-panel transition-all duration-200");
 
 const receptionistKpiCards = [
   {
-    key: "customers" as const,
-    label: "Active Customers",
+    key: "students" as const,
+    label: "Active Students",
     icon: Users,
     accent: "from-[#0284C7]/15 to-[#38bdf8]/5",
     iconBg: "bg-[#0284C7]/15 text-[#0284C7]",
@@ -76,7 +78,7 @@ function ReceptionistDashboard({ data }: { data: ReceptionistDashboardData }) {
   const kpis = normalizeReceptionistDashboardKpis(data as unknown as Record<string, unknown>);
 
   const kpiValues = {
-    customers: kpis.activeCustomers,
+    students: kpis.activeStudents,
     invoicesToday: kpis.invoicesToday,
     pending: kpis.pendingPayments,
   };

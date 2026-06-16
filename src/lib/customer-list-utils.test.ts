@@ -160,7 +160,7 @@ describe("getCustomerCountLabel", () => {
   it("returns status-specific labels", () => {
     expect(
       getCustomerCountLabel({ count: 15, statusFilter: "active", serviceFilter: "all", search: "" })
-    ).toBe("15 Active Customers");
+    ).toBe("15 Active Students");
   });
 
   it("returns combined filter label", () => {
@@ -171,7 +171,7 @@ describe("getCustomerCountLabel", () => {
         serviceFilter: "Summer Camp",
         search: "",
       })
-    ).toBe("8 Customers Found");
+    ).toBe("8 Students Found");
   });
 });
 
