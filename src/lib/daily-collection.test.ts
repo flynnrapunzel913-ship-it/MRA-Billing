@@ -1,5 +1,46 @@
 import { describe, expect, it } from "vitest";
-import { computeCollectionTotals } from "@/lib/daily-collection";
+import {
+  buildPaymentBreakdownFromSnapshot,
+  computeCollectionTotals,
+} from "@/lib/daily-collection";
+
+describe("buildPaymentBreakdownFromSnapshot", () => {
+  it("reconstructs gross cash and expense split from persisted net figures", () => {
+    const breakdown = buildPaymentBreakdownFromSnapshot({
+      totalRevenue: 3000,
+      subscriptionRevenue: 2500,
+      productRevenue: 500,
+      totalExpenses: 500,
+      cashCollected: 1800,
+      upiCollected: 1000,
+      netCollection: 2300,
+    });
+
+    expect(breakdown.netCash).toBe(1800);
+    expect(breakdown.netUpi).toBe(500);
+    expect(breakdown.upiExpenses).toBe(500);
+    expect(breakdown.cashExpenses).toBe(0);
+    expect(breakdown.cash).toBe(1800);
+    expect(breakdown.cashExpenses + breakdown.upiExpenses).toBe(500);
+    expect(breakdown.netCash + breakdown.netUpi).toBe(2300);
+  });
+
+  it("allocates remainder revenue to card when cash and UPI do not cover total", () => {
+    const breakdown = buildPaymentBreakdownFromSnapshot({
+      totalRevenue: 3000,
+      subscriptionRevenue: 0,
+      productRevenue: 0,
+      totalExpenses: 200,
+      cashCollected: 1800,
+      upiCollected: 1000,
+      netCollection: 2800,
+    });
+
+    expect(breakdown.cash).toBe(2000);
+    expect(breakdown.card).toBe(0);
+    expect(breakdown.grossCollected).toBe(3000);
+  });
+});
 
 describe("computeCollectionTotals", () => {
   it("computes net collection as revenue minus expenses", () => {

@@ -32,12 +32,11 @@ const bodySchema = z.object({
 });
 
 async function resolveCashReconciliation(
-  dateStr: string,
+  sheet: Awaited<ReturnType<typeof getDailyCollectionSheet>>,
   denominationsInput: unknown,
   cashDifferenceNotes?: string | null,
   systemCashOverride?: number | null
 ) {
-  const sheet = await getDailyCollectionSheet(dateStr);
   const cashCollectedSystem =
     systemCashOverride ?? sheet?.paymentBreakdown.netCash ?? 0;
   const cashDenominations = normalizeDenominations(denominationsInput);
@@ -102,8 +101,9 @@ export async function GET(request: NextRequest) {
     if (error) return error;
 
     const dateStr = request.nextUrl.searchParams.get("date") || format(new Date(), "yyyy-MM-dd");
+    const preferLiveTotals = request.nextUrl.searchParams.get("live") === "1";
 
-    const sheet = await getDailyCollectionSheet(dateStr);
+    const sheet = await getDailyCollectionSheet(dateStr, { preferLiveTotals });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
@@ -147,14 +147,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sheet = await getDailyCollectionSheet(parsed.data.date);
+    const sheet = await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
     const snapshot = buildCollectionSnapshotFromSheet(sheet);
     const cash = await resolveCashReconciliation(
-      parsed.data.date,
+      sheet,
       parsed.data.cashDenominations,
       parsed.data.cashDifferenceNotes
     );
@@ -268,14 +268,14 @@ export async function PUT(request: NextRequest) {
 
     const beforeValues = extractCollectionDiffValues(existing);
 
-    const sheet = await getDailyCollectionSheet(parsed.data.date);
+    const sheet = await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
     const snapshot = buildCollectionSnapshotFromSheet(sheet);
     const cash = await resolveCashReconciliation(
-      parsed.data.date,
+      sheet,
       parsed.data.cashDenominations,
       parsed.data.cashDifferenceNotes
     );

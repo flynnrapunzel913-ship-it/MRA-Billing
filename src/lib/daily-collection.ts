@@ -207,6 +207,32 @@ export function computeCollectionTotals(input: {
   };
 }
 
+/** Reconstruct payment breakdown from persisted collection snapshot fields. */
+export function buildPaymentBreakdownFromSnapshot(
+  snapshot: CollectionSnapshot
+): PaymentBreakdown {
+  const netCash = snapshot.cashCollected;
+  const grossUpi = snapshot.upiCollected;
+  const netUpi = snapshot.netCollection - netCash;
+  const upiExpenses = Math.max(0, grossUpi - netUpi);
+  const cashExpenses = Math.max(0, snapshot.totalExpenses - upiExpenses);
+  const grossCash = netCash + cashExpenses;
+  const grossCollected = grossCash + grossUpi;
+  const remainder = Math.max(0, snapshot.totalRevenue - grossCollected);
+
+  return {
+    cash: grossCash,
+    upi: grossUpi,
+    card: remainder,
+    other: 0,
+    grossCollected: grossCash + grossUpi + remainder,
+    cashExpenses,
+    upiExpenses,
+    netCash,
+    netUpi,
+  };
+}
+
 function buildPaymentBreakdown(
   paymentGroups: Array<{ paymentMethod: string; _sum: { amountPaid: unknown } }>,
   cashExpenses: number,
@@ -248,7 +274,15 @@ function buildPaymentBreakdown(
   }).paymentBreakdown;
 }
 
-export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCollectionSheet | null> {
+export type DailyCollectionSheetOptions = {
+  /** When true, always use live invoice/expense totals (mark-collected / edit save). */
+  preferLiveTotals?: boolean;
+};
+
+export async function getDailyCollectionSheet(
+  dateStr: string,
+  options?: DailyCollectionSheetOptions
+): Promise<DailyCollectionSheet | null> {
   const dayStart = parseCollectionDateInput(dateStr);
   if (!dayStart) return null;
 
@@ -393,6 +427,12 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
   const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
 
   const isSnapshot = collection != null;
+  const persistedSnapshot =
+    collection && !options?.preferLiveTotals ? serializeSnapshot(collection) : null;
+  const usePersistedTotals = persistedSnapshot != null;
+  const persistedPaymentBreakdown = persistedSnapshot
+    ? buildPaymentBreakdownFromSnapshot(persistedSnapshot)
+    : null;
 
   const historyByDate = new Map(
     historyCollections.map((row) => {
@@ -421,19 +461,30 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
     });
   }
 
+  const displayTotalRevenue = persistedSnapshot?.totalRevenue ?? liveTotalRevenue;
+  const displaySubscriptionRevenue =
+    persistedSnapshot?.subscriptionRevenue ?? liveSubscriptionRevenue;
+  const displayProductRevenue = persistedSnapshot?.productRevenue ?? liveProductRevenue;
+  const displayTotalExpenses = persistedSnapshot?.totalExpenses ?? liveTotalExpenses;
+  const displayCashExpenses =
+    persistedPaymentBreakdown?.cashExpenses ?? liveCashExpenses;
+  const displayUpiExpenses = persistedPaymentBreakdown?.upiExpenses ?? liveUpiExpenses;
+  const displayPaymentBreakdown = persistedPaymentBreakdown ?? livePaymentBreakdown;
+  const displayNetCollection = persistedSnapshot?.netCollection ?? liveNetCollection;
+
   return {
     date: dateStr,
     isSnapshot,
-    totalRevenue: liveTotalRevenue,
-    subscriptionRevenue: liveSubscriptionRevenue,
-    productRevenue: liveProductRevenue,
-    revenueBreakdown: liveRevenueBreakdown,
-    totalExpenses: liveTotalExpenses,
-    cashExpenses: liveCashExpenses,
-    upiExpenses: liveUpiExpenses,
-    expenses,
-    paymentBreakdown: livePaymentBreakdown,
-    netCollection: liveNetCollection,
+    totalRevenue: displayTotalRevenue,
+    subscriptionRevenue: displaySubscriptionRevenue,
+    productRevenue: displayProductRevenue,
+    revenueBreakdown: usePersistedTotals ? [] : liveRevenueBreakdown,
+    totalExpenses: displayTotalExpenses,
+    cashExpenses: displayCashExpenses,
+    upiExpenses: displayUpiExpenses,
+    expenses: usePersistedTotals ? [] : expenses,
+    paymentBreakdown: displayPaymentBreakdown,
+    netCollection: displayNetCollection,
     collection: collection
       ? {
           id: collection.id,
@@ -441,15 +492,7 @@ export async function getDailyCollectionSheet(dateStr: string): Promise<DailyCol
           collectedAt: collection.collectedAt.toISOString(),
           collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
-          snapshot: {
-            totalRevenue: liveTotalRevenue,
-            subscriptionRevenue: liveSubscriptionRevenue,
-            productRevenue: liveProductRevenue,
-            totalExpenses: liveTotalExpenses,
-            cashCollected: livePaymentBreakdown.cash,
-            upiCollected: livePaymentBreakdown.upi,
-            netCollection: liveNetCollection,
-          },
+          snapshot: persistedSnapshot ?? serializeSnapshot(collection),
           cashReconciliation: serializeCashReconciliation(collection),
         }
       : null,

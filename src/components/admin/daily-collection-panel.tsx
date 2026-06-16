@@ -301,10 +301,12 @@ export function DailyCollectionPanel() {
   const [editMode, setEditMode] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
-  const loadSheet = useCallback(async (date: string) => {
+  const loadSheet = useCallback(async (date: string, preferLive = false) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/daily-collection?date=${date}`);
+      const params = new URLSearchParams({ date });
+      if (preferLive) params.set("live", "1");
+      const res = await fetch(`/api/admin/daily-collection?${params.toString()}`);
       const result = await readApiResponse<DailyCollectionSheet>(res, "Failed to load collection");
       if (!result.ok) {
         toast.error(result.message);
@@ -331,8 +333,11 @@ export function DailyCollectionPanel() {
 
   useEffect(() => {
     setEditMode(false);
-    void loadSheet(selectedDate);
-  }, [selectedDate, loadSheet]);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    void loadSheet(selectedDate, editMode);
+  }, [selectedDate, editMode, loadSheet]);
 
   useEffect(() => {
     void (async () => {
