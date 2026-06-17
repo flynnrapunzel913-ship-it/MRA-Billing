@@ -2,44 +2,47 @@ import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/render
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import {
   buildCasualSwimReceiptBreakdown,
-  CASUAL_SWIM_RECEIPT_WIDTH_MM,
   formatReceiptLineItem,
   formatReceiptTimestamp,
   formatTicketNumberDisplay,
 } from "@/lib/casual-swim-receipt-format";
+import {
+  CASUAL_SWIM_RECEIPT_PDF_WIDTH_PT,
+  estimateCasualSwimReceiptPdfHeightPt,
+} from "@/lib/casual-swim-receipt-pdf-size";
 import { formatCurrency } from "@/lib/utils";
-
-const RECEIPT_WIDTH_PT = CASUAL_SWIM_RECEIPT_WIDTH_MM * 2.83465; // mm → pt
 
 const styles = StyleSheet.create({
   page: {
-    width: RECEIPT_WIDTH_PT,
+    width: CASUAL_SWIM_RECEIPT_PDF_WIDTH_PT,
     paddingHorizontal: 8,
     paddingVertical: 8,
-    fontSize: 7.5,
+    fontSize: 8,
     fontFamily: "Helvetica",
     color: "#111",
   },
   center: { textAlign: "center", alignItems: "center" },
-  logo: { width: 52, height: 52, objectFit: "contain", marginBottom: 4, alignSelf: "center" },
+  logo: { width: 46, height: 46, objectFit: "contain", marginBottom: 2, alignSelf: "center" },
   title: { fontSize: 10, fontWeight: 700, textAlign: "center" },
-  subtitle: { fontSize: 7, textAlign: "center", marginBottom: 4, color: "#444" },
+  subtitle: { fontSize: 7, textAlign: "center", marginBottom: 2, color: "#444" },
   ticketNo: {
     fontSize: 11,
     fontWeight: 700,
     textAlign: "center",
-    marginBottom: 4,
+    marginVertical: 3,
     letterSpacing: 0.5,
   },
-  divider: { borderBottomWidth: 1, borderBottomColor: "#ccc", marginVertical: 4 },
+  divider: { borderBottomWidth: 1, borderBottomColor: "#bbb", marginVertical: 4 },
+  dividerStrong: { borderBottomWidth: 1.5, borderBottomColor: "#111", marginVertical: 4 },
   row: { flexDirection: "row", justifyContent: "space-between", marginBottom: 1 },
-  meta: { fontSize: 7, color: "#333" },
-  sectionTitle: { fontSize: 7, fontWeight: 700, marginTop: 2, marginBottom: 2 },
-  lineItem: { fontSize: 7, marginBottom: 1 },
-  subtotal: { fontSize: 7, fontWeight: 600, marginTop: 2, marginBottom: 2 },
-  total: { fontSize: 12, fontWeight: 700, textAlign: "center", marginVertical: 4 },
-  footer: { fontSize: 7, textAlign: "center", marginTop: 2, color: "#444" },
-  footerBold: { fontSize: 7, textAlign: "center", fontWeight: 600 },
+  meta: { fontSize: 7.5, color: "#222" },
+  sectionTitle: { fontSize: 7.5, fontWeight: 700, marginBottom: 2, letterSpacing: 0.3 },
+  lineItem: { fontSize: 7.5, marginBottom: 1 },
+  subtotal: { fontSize: 7.5, fontWeight: 600, marginTop: 1, marginBottom: 1 },
+  total: { fontSize: 14, fontWeight: 700, textAlign: "center", marginVertical: 3 },
+  footer: { fontSize: 7.5, textAlign: "center", color: "#444" },
+  footerBold: { fontSize: 7.5, textAlign: "center", fontWeight: 600 },
+  footerBlock: { alignItems: "center", marginTop: 2 },
 });
 
 function metaRow(label: string, value: string) {
@@ -51,20 +54,22 @@ function metaRow(label: string, value: string) {
   );
 }
 
-export function CasualSwimReceiptPDF({
-  bill,
-  logoSrc,
-}: {
+export type ReceiptPdfDocumentProps = {
   bill: CasualSwimBillDto;
   logoSrc: string;
-}) {
+};
+
+/**
+ * Dedicated thermal receipt PDF — receipt fields only, single page.
+ */
+export function ReceiptPdfDocument({ bill, logoSrc }: ReceiptPdfDocumentProps) {
   const created = formatReceiptTimestamp(new Date(bill.createdAt));
-  const printed = formatReceiptTimestamp(new Date());
   const { swimmingLines, rentalLines } = buildCasualSwimReceiptBreakdown(bill);
+  const pageHeightPt = estimateCasualSwimReceiptPdfHeightPt(bill);
 
   return (
     <Document>
-      <Page size={[RECEIPT_WIDTH_PT, 720]} style={styles.page}>
+      <Page size={[CASUAL_SWIM_RECEIPT_PDF_WIDTH_PT, pageHeightPt]} style={styles.page} wrap={false}>
         <View style={styles.center}>
           <Image src={logoSrc} style={styles.logo} />
           <Text style={styles.title}>MR Academy</Text>
@@ -72,6 +77,7 @@ export function CasualSwimReceiptPDF({
         </View>
 
         <View style={styles.divider} />
+
         <Text style={styles.ticketNo}>{formatTicketNumberDisplay(bill.ticketNumber)}</Text>
         {metaRow("Date", created.date)}
         {metaRow("Time", created.time)}
@@ -105,18 +111,15 @@ export function CasualSwimReceiptPDF({
           </>
         )}
 
-        <View style={styles.divider} />
+        <View style={styles.dividerStrong} />
         <Text style={styles.total}>TOTAL {formatCurrency(bill.totalAmount)}</Text>
+        <View style={styles.dividerStrong} />
 
-        <View style={styles.divider} />
-        <Text style={styles.meta}>Printed At:</Text>
-        <Text style={styles.meta}>{printed.date}</Text>
-        <Text style={styles.meta}>{printed.time}</Text>
-
-        <View style={styles.divider} />
-        <Text style={styles.footerBold}>Thank You</Text>
-        <Text style={styles.footer}>MR Academy Swimming Pool & Spa</Text>
-        <Text style={styles.footer}>Generated By: {bill.createdByUsername}</Text>
+        <View style={styles.footerBlock}>
+          <Text style={styles.footerBold}>Thank You</Text>
+          <Text style={styles.footer}>MR Academy Swimming Pool & Spa</Text>
+          <Text style={styles.footer}>Generated By: {bill.createdByUsername}</Text>
+        </View>
       </Page>
     </Document>
   );

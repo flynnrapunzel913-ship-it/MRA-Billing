@@ -1,5 +1,5 @@
 import { renderToBuffer } from "@react-pdf/renderer";
-import { CasualSwimReceiptPDF } from "@/components/pdf/casual-swim-receipt-pdf";
+import { ReceiptPdfDocument } from "@/components/pdf/casual-swim-receipt-pdf-document";
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import { CASUAL_SWIM_RECEIPT_LOGO } from "@/lib/casual-swim-bill";
 import { getAcademyLogoForPdf, type PdfImageSource } from "@/lib/pdf-image";
@@ -19,7 +19,7 @@ export async function generateCasualSwimReceiptPdfBuffer(
     logoFromReceipt ??
     (typeof fallback === "string" ? fallback : pdfImageSrcToString(fallback));
 
-  return renderToBuffer(<CasualSwimReceiptPDF bill={bill} logoSrc={logoSrc} />);
+  return renderToBuffer(<ReceiptPdfDocument bill={bill} logoSrc={logoSrc} />);
 }
 
 async function resolveReceiptLogo(): Promise<string | null> {

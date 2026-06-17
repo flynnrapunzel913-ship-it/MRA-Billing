@@ -6,6 +6,7 @@ import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { CasualSwimReceiptActions } from "@/components/casual-swim/casual-swim-receipt-actions";
+import { CASUAL_SWIM_RECEIPT_WIDTH_MM } from "@/lib/casual-swim-receipt-pdf-size";
 
 export default function CasualSwimReceiptPage() {
   const params = useParams<{ id: string }>();
@@ -21,31 +22,17 @@ export default function CasualSwimReceiptPage() {
 
   if (isInitialLoading || !bill) {
     return (
-      <div className="print:hidden">
+      <div className="casual-swim-receipt-print-hidden">
         <PageSkeleton className="mx-auto max-w-md" />
       </div>
     );
   }
 
   return (
-    <div className="mx-auto space-y-4 py-4 print:py-0" style={{ maxWidth: "58mm" }}>
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #casual-swim-receipt,
-          #casual-swim-receipt * {
-            visibility: visible;
-          }
-          #casual-swim-receipt {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 58mm;
-          }
-        }
-      `}</style>
+    <div
+      className="mx-auto space-y-4 py-4 print:py-0"
+      style={{ maxWidth: `${CASUAL_SWIM_RECEIPT_WIDTH_MM}mm` }}
+    >
       <CasualSwimReceiptActions bill={bill} />
     </div>
   );

@@ -1,9 +1,6 @@
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import { formatCurrency } from "@/lib/utils";
 
-/** Thermal receipt width — 58mm suits common POS printers; scales on screen. */
-export const CASUAL_SWIM_RECEIPT_WIDTH_MM = 58;
-
 export function formatTicketNumberDisplay(ticketNumber: number): string {
   return `TICKET #${String(ticketNumber).padStart(3, "0")}`;
 }

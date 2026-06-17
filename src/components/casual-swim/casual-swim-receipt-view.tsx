@@ -1,68 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
 import { formatCurrency } from "@/lib/utils";
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import { CASUAL_SWIM_RECEIPT_LOGO } from "@/lib/casual-swim-bill";
 import {
   buildCasualSwimReceiptBreakdown,
-  CASUAL_SWIM_RECEIPT_WIDTH_MM,
   formatReceiptLineItem,
   formatReceiptTimestamp,
   formatTicketNumberDisplay,
 } from "@/lib/casual-swim-receipt-format";
+import { CASUAL_SWIM_RECEIPT_WIDTH_MM } from "@/lib/casual-swim-receipt-pdf-size";
 
-export function CasualSwimReceiptView({
-  bill,
-  printedAt: printedAtProp,
-}: {
-  bill: CasualSwimBillDto;
-  printedAt?: { date: string; time: string } | null;
-}) {
+export function CasualSwimReceiptView({ bill }: { bill: CasualSwimBillDto }) {
   const { date, time } = formatReceiptTimestamp(new Date(bill.createdAt));
   const { swimmingLines, rentalLines } = buildCasualSwimReceiptBreakdown(bill);
-  const [printStamp, setPrintStamp] = useState<{ date: string; time: string } | null>(null);
-  const displayedPrintAt = printedAtProp ?? printStamp;
-
-  useEffect(() => {
-    const onBeforePrint = () => {
-      setPrintStamp(formatReceiptTimestamp(new Date()));
-    };
-    window.addEventListener("beforeprint", onBeforePrint);
-    return () => window.removeEventListener("beforeprint", onBeforePrint);
-  }, []);
 
   return (
     <div
       id="casual-swim-receipt"
-      className="mx-auto bg-white px-2 py-2 font-mono text-[10px] leading-tight text-black print:shadow-none"
+      className="mx-auto bg-white px-2 py-1 font-mono text-[10px] leading-tight text-black"
       style={{ width: `${CASUAL_SWIM_RECEIPT_WIDTH_MM}mm`, maxWidth: "100%" }}
     >
       <div className="text-center">
         <Image
           src={CASUAL_SWIM_RECEIPT_LOGO}
           alt="MR Academy"
-          width={68}
-          height={68}
-          className="mx-auto mb-1 h-[68px] w-[68px] object-contain"
+          width={52}
+          height={52}
+          className="mx-auto mb-0.5 h-[52px] w-[52px] object-contain"
         />
         <p className="text-xs font-bold leading-tight">MR Academy</p>
         <p className="text-[9px] leading-tight text-gray-600">Swimming Pool & Spa</p>
       </div>
 
-      <hr className="my-1.5 border-dashed border-gray-400" />
+      <hr className="my-1 border-dashed border-gray-400" />
 
       <p className="text-center text-sm font-extrabold tracking-wide">
         {formatTicketNumberDisplay(bill.ticketNumber)}
       </p>
-      <div className="mt-1 space-y-0.5">
+      <div className="mt-0.5 space-y-0.5">
         <ReceiptRow label="Date" value={date} />
         <ReceiptRow label="Time" value={time} />
         <ReceiptRow label="Cashier" value={bill.createdBy} />
       </div>
 
-      <hr className="my-1.5 border-dashed border-gray-400" />
+      <hr className="my-1 border-dashed border-gray-400" />
 
       {swimmingLines.length > 0 && (
         <>
@@ -74,7 +57,7 @@ export function CasualSwimReceiptView({
               </p>
             ))}
           </div>
-          <p className="mt-1 text-[9px] font-semibold">
+          <p className="mt-0.5 text-[9px] font-semibold">
             Swimming Total = {formatCurrency(bill.swimmingAmount)}
           </p>
         </>
@@ -82,7 +65,7 @@ export function CasualSwimReceiptView({
 
       {rentalLines.length > 0 && (
         <>
-          <hr className="my-1.5 border-dashed border-gray-400" />
+          <hr className="my-1 border-dashed border-gray-400" />
           <p className="mb-0.5 text-[9px] font-bold uppercase tracking-wide">Rental</p>
           <div className="space-y-0.5">
             {rentalLines.map((line) => (
@@ -91,36 +74,23 @@ export function CasualSwimReceiptView({
               </p>
             ))}
           </div>
-          <p className="mt-1 text-[9px] font-semibold">
+          <p className="mt-0.5 text-[9px] font-semibold">
             Rental Total = {formatCurrency(bill.rentalAmount)}
           </p>
         </>
       )}
 
-      <hr className="my-1.5 border-dashed border-gray-400" />
-
-      <p className="py-1 text-center text-base font-extrabold">
+      <hr className="my-1 border-solid border-gray-800" />
+      <p className="py-1 text-center text-lg font-black tracking-wide">
         TOTAL {formatCurrency(bill.totalAmount)}
       </p>
+      <hr className="my-1 border-solid border-gray-800" />
 
-      {displayedPrintAt && (
-        <>
-          <hr className="my-1.5 border-dashed border-gray-400" />
-          <div className="space-y-0.5 text-[9px]">
-            <p className="font-semibold">Printed At:</p>
-            <p>{displayedPrintAt.date}</p>
-            <p>{displayedPrintAt.time}</p>
-          </div>
-        </>
-      )}
-
-      <hr className="my-1.5 border-dashed border-gray-400" />
-
-      <p className="text-center text-[9px] font-semibold">Thank You</p>
-      <p className="text-center text-[9px] text-gray-600">MR Academy Swimming Pool & Spa</p>
-      <p className="mt-1 text-center text-[9px] text-gray-700">
-        Generated By: {bill.createdByUsername}
-      </p>
+      <div className="pt-0.5 text-center">
+        <p className="text-[9px] font-semibold">Thank You</p>
+        <p className="text-[9px] text-gray-600">MR Academy Swimming Pool & Spa</p>
+        <p className="mt-0.5 text-[9px] text-gray-700">Generated By: {bill.createdByUsername}</p>
+      </div>
     </div>
   );
 }
