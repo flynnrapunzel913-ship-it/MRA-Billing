@@ -1,8 +1,7 @@
-import { auth } from "@/lib/auth/config";
+import { edgeAuth } from "@/lib/auth/edge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { Role } from "@prisma/client";
-import { applyApiRateLimits } from "@/lib/security/request-rate-limit";
+import { applyApiRateLimitsEdge } from "@/lib/security/request-rate-limit-edge";
 import { canAccessRoute } from "@/lib/permissions";
 
 const protectedPrefixes = [
@@ -21,7 +20,7 @@ function isApiPath(pathname: string) {
   return pathname.startsWith("/api/");
 }
 
-export default auth(async (req) => {
+export default edgeAuth(async (req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth?.user?.id;
   const role = req.auth?.user?.role;
@@ -29,7 +28,7 @@ export default auth(async (req) => {
   // --- Rate limiting (login, search, PDF, revenue export) ---
   const rateLimitRequest = req as unknown as NextRequest;
   if (isApiPath(pathname)) {
-    const rateLimited = applyApiRateLimits(rateLimitRequest, { userId });
+    const rateLimited = applyApiRateLimitsEdge(rateLimitRequest, { userId });
     if (rateLimited) return rateLimited;
   }
 
@@ -48,7 +47,7 @@ export default auth(async (req) => {
 
     if (
       isLoggedIn &&
-      role === Role.RECEPTIONIST &&
+      role === "RECEPTIONIST" &&
       !canAccessRoute(role, pathname)
     ) {
       return NextResponse.redirect(new URL("/dashboard", req.nextUrl));

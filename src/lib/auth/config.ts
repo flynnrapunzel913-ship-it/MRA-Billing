@@ -10,6 +10,7 @@ import {
 } from "@/lib/user-queries";
 import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
 import { logLoginFailed, usernameFromCredentials } from "@/lib/auth/login-audit";
+import { authConfig } from "@/lib/auth/auth.config";
 
 const loginSchema = z.object({
   username: z.string().min(3).regex(/^\S+$/),
@@ -17,14 +18,7 @@ const loginSchema = z.object({
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET,
-  // Required in production: Auth.js v5 only auto-trusts host via AUTH_URL / AUTH_TRUST_HOST
-  // (not NEXTAUTH_URL alone). Explicit trustHost is safe behind reverse proxies.
-  trustHost: true,
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/login",
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: "credentials",
@@ -96,28 +90,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      // Edge-safe: no Prisma. DB re-validation runs in Node (guards, dashboard layout).
-      if (user) {
-        token.id = user.id;
-        token.role = user.role;
-        token.username = (user as { username?: string }).username ?? user.name ?? "";
-        token.sessionVersion =
-          (user as { sessionVersion?: number }).sessionVersion ?? 0;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as "ADMIN" | "RECEPTIONIST";
-        session.user.username = token.username as string;
-        session.user.name = token.username as string;
-        session.user.sessionVersion =
-          (token.sessionVersion as number | undefined) ?? 0;
-      }
-      return session;
-    },
-  },
 });
