@@ -75,6 +75,13 @@ enum ExpensePaymentMode {
   UPI
 }
 
+/// Cash / UPI / partial split for walk-in revenue such as casual swimming.
+enum RevenuePaymentMode {
+  CASH
+  UPI
+  PARTIAL
+}
+
 model User {
   id           String          @id @default(cuid())
   username     String          @unique
@@ -423,6 +430,9 @@ model CasualSwimBill {
   swimmingAmount Decimal              @db.Decimal(12, 2)
   rentalAmount   Decimal              @db.Decimal(12, 2)
   totalAmount    Decimal              @db.Decimal(12, 2)
+  paymentMode    RevenuePaymentMode   @default(CASH)
+  cashAmount     Decimal              @db.Decimal(12, 2)
+  upiAmount      Decimal              @db.Decimal(12, 2)
   status         CasualSwimBillStatus @default(COMPLETED)
   createdById    String
   createdBy      User                 @relation(fields: [createdById], references: [id])

@@ -13,6 +13,7 @@ import {
 import { serializeCasualSwimBill } from "@/lib/casual-swim-bill";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 import { casualSwimBillSchema } from "@/lib/validations";
+import { resolveCasualSwimPayment } from "@/lib/casual-swim-payment";
 
 const billInclude = {
   createdBy: { select: { id: true, name: true, username: true } },
@@ -70,6 +71,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Total amount must be greater than zero" }, { status: 400 });
     }
 
+    const paymentResult = resolveCasualSwimPayment(
+      {
+        paymentMode: parsed.data.paymentMode,
+        cashAmount: parsed.data.cashAmount,
+        upiAmount: parsed.data.upiAmount,
+      },
+      breakdown.totalAmount
+    );
+    if (!paymentResult.ok) {
+      return NextResponse.json({ error: paymentResult.message }, { status: 400 });
+    }
+    const payment = paymentResult.payment;
+
     const bill = await prisma.$transaction(async (tx) => {
       const ticketNumber = await allocateCasualSwimTicketNumber(tx);
 
@@ -90,6 +104,9 @@ export async function POST(request: NextRequest) {
           swimmingAmount: breakdown.swimmingAmount,
           rentalAmount: breakdown.rentalAmount,
           totalAmount: breakdown.totalAmount,
+          paymentMode: payment.paymentMode,
+          cashAmount: payment.cashAmount,
+          upiAmount: payment.upiAmount,
           createdById: user!.id!,
         },
         include: billInclude,
@@ -99,13 +116,16 @@ export async function POST(request: NextRequest) {
     void logAuditEvent({
       userId: user!.id,
       username: user!.username,
-      action: AUDIT_ACTIONS.CASUAL_SWIM_BILL_CREATED,
+      action: AUDIT_ACTIONS.CASUAL_SWIM_TICKET_CREATED,
       entityType: "CASUAL_SWIM_BILL",
       entityId: bill.id,
       details: {
         ticketNumber: bill.ticketNumber,
-        amount: toJsonNumber(bill.totalAmount),
-        createdBy: user!.username,
+        totalAmount: toJsonNumber(bill.totalAmount),
+        paymentMode: bill.paymentMode,
+        cashAmount: toJsonNumber(bill.cashAmount),
+        upiAmount: toJsonNumber(bill.upiAmount),
+        cashier: user!.username,
       },
     });
 

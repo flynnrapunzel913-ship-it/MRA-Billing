@@ -7,6 +7,12 @@ import { formatCurrency } from "@/lib/utils";
 import { readApiResponse } from "@/lib/api-error";
 import { calculateCasualSwimBill, type CasualSwimRates } from "@/lib/casual-swim";
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
+import type { RevenuePaymentMode } from "@prisma/client";
+import {
+  CASUAL_SWIM_PAYMENT_MODES,
+  casualSwimPaymentModeLabel,
+  resolveCasualSwimPayment,
+} from "@/lib/casual-swim-payment";
 import { CasualSwimReceiptActions } from "@/components/casual-swim/casual-swim-receipt-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,6 +100,9 @@ export function CasualSwimPanel() {
   const [capQty, setCapQty] = useState(0);
   const [shortsQty, setShortsQty] = useState(0);
   const [gogglesQty, setGogglesQty] = useState(0);
+  const [paymentMode, setPaymentMode] = useState<RevenuePaymentMode>("CASH");
+  const [partialCashAmount, setPartialCashAmount] = useState("");
+  const [partialUpiAmount, setPartialUpiAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdBill, setCreatedBill] = useState<CasualSwimBillDto | null>(null);
   const [todayBills, setTodayBills] = useState<TodayBill[]>([]);
@@ -154,14 +163,37 @@ export function CasualSwimPanel() {
     setCapQty(0);
     setShortsQty(0);
     setGogglesQty(0);
+    setPaymentMode("CASH");
+    setPartialCashAmount("");
+    setPartialUpiAmount("");
   };
 
+  const billTotal = breakdown?.totalAmount ?? 0;
+
+  const paymentValidation = useMemo(() => {
+    if (billTotal <= 0) return { ok: false as const, message: "" };
+    if (paymentMode !== "PARTIAL") {
+      return resolveCasualSwimPayment({ paymentMode }, billTotal);
+    }
+    const cashAmount = Number(partialCashAmount) || 0;
+    const upiAmount = Number(partialUpiAmount) || 0;
+    return resolveCasualSwimPayment(
+      { paymentMode: "PARTIAL", cashAmount, upiAmount },
+      billTotal
+    );
+  }, [billTotal, paymentMode, partialCashAmount, partialUpiAmount]);
   const handleGenerate = async () => {
     if (!breakdown || breakdown.totalAmount <= 0) {
       toast.error("Add swimmers or rental items before generating a ticket");
       return;
     }
 
+    if (!paymentValidation.ok) {
+      toast.error(paymentValidation.message);
+      return;
+    }
+
+    const payment = paymentValidation.payment;
     setSubmitting(true);
     try {
       const res = await fetch("/api/casual-swim/bills", {
@@ -174,6 +206,10 @@ export function CasualSwimPanel() {
           capQty,
           shortsQty,
           gogglesQty,
+          paymentMode: payment.paymentMode,
+          ...(payment.paymentMode === "PARTIAL"
+            ? { cashAmount: payment.cashAmount, upiAmount: payment.upiAmount }
+            : {}),
         }),
       });
       const result = await readApiResponse<CasualSwimBillDto>(res, "Failed to generate ticket");
@@ -339,11 +375,72 @@ export function CasualSwimPanel() {
               </p>
             )}
 
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {CASUAL_SWIM_PAYMENT_MODES.map((mode) => (
+                  <Button
+                    key={mode}
+                    type="button"
+                    variant={paymentMode === mode ? "default" : "outline"}
+                    className="w-full text-xs sm:text-sm"
+                    onClick={() => {
+                      setPaymentMode(mode);
+                      if (mode !== "PARTIAL") {
+                        setPartialCashAmount("");
+                        setPartialUpiAmount("");
+                      }
+                    }}
+                  >
+                    {casualSwimPaymentModeLabel(mode)}
+                  </Button>
+                ))}
+              </div>
+              {paymentMode === "PARTIAL" && (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="partial-cash">Cash Amount</Label>
+                    <Input
+                      id="partial-cash"
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={partialCashAmount}
+                      onChange={(e) => setPartialCashAmount(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="partial-upi">UPI Amount</Label>
+                    <Input
+                      id="partial-upi"
+                      type="number"
+                      min={0}
+                      step="1"
+                      value={partialUpiAmount}
+                      onChange={(e) => setPartialUpiAmount(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                  {!paymentValidation.ok && paymentValidation.message && billTotal > 0 && (
+                    <p className="sm:col-span-2 text-sm text-destructive">
+                      {paymentValidation.message}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <Button
               type="button"
               className="w-full"
               size="lg"
-              disabled={submitting || !breakdown || breakdown.totalAmount <= 0}
+              disabled={
+                submitting ||
+                !breakdown ||
+                breakdown.totalAmount <= 0 ||
+                !paymentValidation.ok
+              }
               onClick={handleGenerate}
             >
               {submitting ? "Generating…" : "Generate Ticket"}

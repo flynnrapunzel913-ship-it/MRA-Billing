@@ -233,6 +233,9 @@ export const casualSwimBillSchema = z
     capQty: z.coerce.number().int().min(0),
     shortsQty: z.coerce.number().int().min(0),
     gogglesQty: z.coerce.number().int().min(0),
+    paymentMode: z.enum(["CASH", "UPI", "PARTIAL"]).default("CASH"),
+    cashAmount: z.coerce.number().nonnegative().optional(),
+    upiAmount: z.coerce.number().nonnegative().optional(),
   })
   .superRefine((data, ctx) => {
     const hasSwimmers = data.adultCount + data.childCount > 0;

@@ -11,6 +11,7 @@ import {
   estimateCasualSwimReceiptPdfHeightPt,
 } from "@/lib/casual-swim-receipt-pdf-size";
 import { formatCurrency } from "@/lib/utils";
+import { getCasualSwimReceiptPaymentLines } from "@/lib/casual-swim-payment";
 
 const styles = StyleSheet.create({
   page: {
@@ -65,6 +66,7 @@ export type ReceiptPdfDocumentProps = {
 export function ReceiptPdfDocument({ bill, logoSrc }: ReceiptPdfDocumentProps) {
   const created = formatReceiptTimestamp(new Date(bill.createdAt));
   const { swimmingLines, rentalLines } = buildCasualSwimReceiptBreakdown(bill);
+  const payment = getCasualSwimReceiptPaymentLines(bill);
   const pageHeightPt = estimateCasualSwimReceiptPdfHeightPt(bill);
 
   return (
@@ -82,6 +84,8 @@ export function ReceiptPdfDocument({ bill, logoSrc }: ReceiptPdfDocumentProps) {
         {metaRow("Date", created.date)}
         {metaRow("Time", created.time)}
         {metaRow("Cashier", bill.createdBy)}
+        {metaRow("Payment Mode", payment.mode)}
+        {payment.lines.map((line) => metaRow(line.label, formatCurrency(line.amount)))}
 
         {swimmingLines.length > 0 && (
           <>

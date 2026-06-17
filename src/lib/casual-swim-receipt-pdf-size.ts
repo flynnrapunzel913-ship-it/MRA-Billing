@@ -1,5 +1,6 @@
 import type { CasualSwimBillDto } from "@/lib/casual-swim-bill";
 import { buildCasualSwimReceiptBreakdown } from "@/lib/casual-swim-receipt-format";
+import { getCasualSwimReceiptPaymentLines } from "@/lib/casual-swim-payment";
 
 /** Thermal receipt width (screen, print, and PDF). */
 export const CASUAL_SWIM_RECEIPT_WIDTH_MM = 80;
@@ -26,8 +27,10 @@ const HEIGHT_BUFFER_PT = 6;
  */
 export function estimateCasualSwimReceiptPdfHeightPt(bill: CasualSwimBillDto): number {
   const { swimmingLines, rentalLines } = buildCasualSwimReceiptBreakdown(bill);
+  const paymentLines = getCasualSwimReceiptPaymentLines(bill).lines;
 
   let lines = 1 + 3; // ticket number + date/time/cashier
+  lines += 1 + paymentLines.length; // payment mode + paid lines
   if (swimmingLines.length > 0) {
     lines += 1 + swimmingLines.length + 1;
   }

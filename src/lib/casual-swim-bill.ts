@@ -1,4 +1,5 @@
-import type { CasualSwimBillStatus } from "@prisma/client";
+import type { CasualSwimBillStatus, RevenuePaymentMode } from "@prisma/client";
+import { normalizeCasualSwimPaymentAmounts } from "@/lib/casual-swim-payment";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 
 export type CasualSwimBillDto = {
@@ -18,6 +19,9 @@ export type CasualSwimBillDto = {
   swimmingAmount: number;
   rentalAmount: number;
   totalAmount: number;
+  paymentMode: RevenuePaymentMode;
+  cashAmount: number;
+  upiAmount: number;
   status: CasualSwimBillStatus;
   createdAt: string;
   createdBy: string;
@@ -42,11 +46,22 @@ export function serializeCasualSwimBill(row: {
   swimmingAmount: unknown;
   rentalAmount: unknown;
   totalAmount: unknown;
+  paymentMode: RevenuePaymentMode;
+  cashAmount?: unknown;
+  upiAmount?: unknown;
   status: CasualSwimBillStatus;
   createdAt: Date;
   createdById: string;
   createdBy: { name: string; username: string };
 }): CasualSwimBillDto {
+  const totalAmount = toJsonNumber(row.totalAmount);
+  const { cashAmount, upiAmount } = normalizeCasualSwimPaymentAmounts({
+    paymentMode: row.paymentMode,
+    totalAmount,
+    cashAmount: row.cashAmount != null ? toJsonNumber(row.cashAmount) : undefined,
+    upiAmount: row.upiAmount != null ? toJsonNumber(row.upiAmount) : undefined,
+  });
+
   return {
     id: row.id,
     ticketNumber: row.ticketNumber,
@@ -63,7 +78,10 @@ export function serializeCasualSwimBill(row: {
     gogglesRate: toJsonNumber(row.gogglesRate),
     swimmingAmount: toJsonNumber(row.swimmingAmount),
     rentalAmount: toJsonNumber(row.rentalAmount),
-    totalAmount: toJsonNumber(row.totalAmount),
+    totalAmount,
+    paymentMode: row.paymentMode,
+    cashAmount,
+    upiAmount,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy.name || row.createdBy.username,

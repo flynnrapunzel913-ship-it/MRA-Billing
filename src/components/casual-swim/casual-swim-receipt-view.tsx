@@ -11,6 +11,7 @@ import {
   formatTicketNumberDisplay,
 } from "@/lib/casual-swim-receipt-format";
 import { CASUAL_SWIM_RECEIPT_WIDTH_MM } from "@/lib/casual-swim-receipt-pdf-size";
+import { CasualSwimReceiptPaymentSection } from "@/components/casual-swim/casual-swim-receipt-payment";
 
 export function CasualSwimReceiptView({ bill }: { bill: CasualSwimBillDto }) {
   const { date, time } = formatReceiptTimestamp(new Date(bill.createdAt));
@@ -43,6 +44,7 @@ export function CasualSwimReceiptView({ bill }: { bill: CasualSwimBillDto }) {
         <ReceiptRow label="Date" value={date} />
         <ReceiptRow label="Time" value={time} />
         <ReceiptRow label="Cashier" value={bill.createdBy} />
+        <CasualSwimReceiptPaymentSection bill={bill} />
       </div>
 
       <hr className="my-1 border-dashed border-gray-400" />

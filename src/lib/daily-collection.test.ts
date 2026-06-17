@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPaymentBreakdownFromSnapshot,
+  buildRevenueSourceChannelBreakdown,
   computeCollectionTotals,
 } from "@/lib/daily-collection";
 
@@ -112,5 +113,31 @@ describe("computeCollectionTotals", () => {
     expect(result.totalRevenue).toBe(3000);
     expect(result.netCollection).toBe(2800);
     expect(result.paymentBreakdown.grossCollected).toBe(3000);
+  });
+});
+
+describe("buildRevenueSourceChannelBreakdown", () => {
+  it("splits combined totals into invoice and casual swim channels", () => {
+    const breakdown = buildRevenueSourceChannelBreakdown(
+      6500,
+      {
+        cash: 4000,
+        upi: 2500,
+        card: 0,
+        other: 0,
+        grossCollected: 6500,
+        cashExpenses: 0,
+        upiExpenses: 0,
+        netCash: 4000,
+        netUpi: 2500,
+      },
+      { total: 1500, cash: 1000, upi: 500 }
+    );
+
+    expect(breakdown.invoices.total).toBe(5000);
+    expect(breakdown.casualSwimming.total).toBe(1500);
+    expect(breakdown.invoices.total + breakdown.casualSwimming.total).toBe(6500);
+    expect(breakdown.invoices.cash + breakdown.casualSwimming.cash).toBe(4000);
+    expect(breakdown.invoices.upi + breakdown.casualSwimming.upi).toBe(2500);
   });
 });
