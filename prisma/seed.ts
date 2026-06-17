@@ -82,8 +82,6 @@ async function main() {
     { id: "spl_month_6", planName: "6 Months Swimming", description: "Monthly Package Without Coaching", duration: "6 Months", fees: 14160 },
     { id: "spl_month_12", planName: "1 Year Swimming", description: "Monthly Package Without Coaching", duration: "1 Year", fees: 21240 },
     { id: "spl_coach_21", planName: "21 Classes Coaching", description: "Within 30 Days", duration: "30 Days", fees: 5000 },
-    { id: "spl_casual_adult", planName: "Casual Swim Adult", description: "Per Hour", duration: "1 Hour", fees: 150 },
-    { id: "spl_casual_child", planName: "Casual Swim Below 5 Years", description: "Per Hour", duration: "1 Hour", fees: 100 },
   ];
   for (const row of plans) {
     await prisma.subscriptionPlan.upsert({

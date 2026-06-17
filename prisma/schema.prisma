@@ -18,6 +18,7 @@ enum CustomerActivityType {
 enum Role {
   ADMIN
   RECEPTIONIST
+  CASHIER
 }
 
 enum UserStatus {
@@ -95,6 +96,7 @@ model User {
   dailyCollections       DailyCollection[]
   dailyCollectionEdits   DailyCollectionHistory[]
   auditLogs        AuditLog[]
+  casualSwimBills  CasualSwimBill[]
 }
 
 model UserActivity {
@@ -236,6 +238,12 @@ model Settings {
   headerImageUrl     String   @default("/branding/address-panel.jpeg")
   brandColor         String   @default("#0070C0")
   termsAndConditions String   @default("1. Fees once paid are non-refundable.\n2. Subject to academy rules.\n3. This is a computer generated invoice.")
+  /// Casual swimming & rental billing (admin-configured; read by cashier module).
+  casualSwimAdultRatePerHour   Decimal @default(150) @db.Decimal(10, 2)
+  casualSwimChildRatePerHour   Decimal @default(100) @db.Decimal(10, 2)
+  casualSwimCapRentalPrice     Decimal @default(150) @db.Decimal(10, 2)
+  casualSwimShortsRentalPrice  Decimal @default(200) @db.Decimal(10, 2)
+  casualSwimGogglesRentalPrice Decimal @default(150) @db.Decimal(10, 2)
   updatedAt          DateTime @updatedAt
 }
 
@@ -385,6 +393,43 @@ model DailyCollectionHistory {
 
   @@index([dailyCollectionId])
   @@index([createdAt])
+}
+
+/// Monotonic ticket counter for casual swim bills — never resets daily.
+model CasualSwimTicketSequence {
+  id         String @id @default("default")
+  lastNumber Int    @default(0)
+}
+
+enum CasualSwimBillStatus {
+  COMPLETED
+}
+
+/// Walk-in casual swimming & rental bill — separate from invoices/subscriptions.
+model CasualSwimBill {
+  id             String               @id @default(cuid())
+  ticketNumber   Int                  @unique
+  hours          Int
+  adultCount     Int                  @default(0)
+  childCount     Int                  @default(0)
+  capQty         Int                  @default(0)
+  shortsQty      Int                  @default(0)
+  gogglesQty     Int                  @default(0)
+  adultRate      Decimal              @db.Decimal(10, 2)
+  childRate      Decimal              @db.Decimal(10, 2)
+  capRate        Decimal              @db.Decimal(10, 2)
+  shortsRate     Decimal              @db.Decimal(10, 2)
+  gogglesRate    Decimal              @db.Decimal(10, 2)
+  swimmingAmount Decimal              @db.Decimal(12, 2)
+  rentalAmount   Decimal              @db.Decimal(12, 2)
+  totalAmount    Decimal              @db.Decimal(12, 2)
+  status         CasualSwimBillStatus @default(COMPLETED)
+  createdById    String
+  createdBy      User                 @relation(fields: [createdById], references: [id])
+  createdAt      DateTime             @default(now())
+
+  @@index([createdAt])
+  @@index([createdById])
 }
 
 /// Central security and business audit trail (S2-01).

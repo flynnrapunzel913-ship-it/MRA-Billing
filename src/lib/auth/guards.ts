@@ -7,6 +7,7 @@ import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
 import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
 import { getRequestPathname } from "@/lib/auth/request-meta";
 import { logSecurityEvent } from "@/lib/security/security-log";
+import { canAccessCasualSwim } from "@/lib/permissions";
 
 export type SessionUser = {
   id: string;
@@ -98,6 +99,23 @@ export async function requireAuth() {
     username: account.username,
     name: session.user.name,
   };
+  return { error: null, user };
+}
+
+/** Admin or cashier — casual swimming module APIs. */
+export async function requireCasualSwimAccess() {
+  const { error, user } = await requireAuth();
+  if (error) return { error, user: null };
+
+  if (!canAccessCasualSwim(user!.role)) {
+    logAdminAccessViolation({
+      userId: user!.id,
+      username: user!.username,
+      actualRole: user!.role,
+    });
+    return { error: forbiddenResponse(), user: null };
+  }
+
   return { error: null, user };
 }
 

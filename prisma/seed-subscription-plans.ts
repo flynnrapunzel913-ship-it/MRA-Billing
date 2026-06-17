@@ -58,24 +58,6 @@ const DEFAULT_PLANS = [
     durationUnit: "MONTHS" as const,
     fees: 5000,
   },
-  {
-    id: "spl_casual_adult",
-    planName: "Casual Swim Adult",
-    description: "Per Hour",
-    usageDays: 1,
-    durationValue: 1,
-    durationUnit: "DAYS" as const,
-    fees: 150,
-  },
-  {
-    id: "spl_casual_child",
-    planName: "Casual Swim Below 5 Years",
-    description: "Per Hour",
-    usageDays: 1,
-    durationValue: 1,
-    durationUnit: "DAYS" as const,
-    fees: 100,
-  },
 ] as const;
 
 async function main() {

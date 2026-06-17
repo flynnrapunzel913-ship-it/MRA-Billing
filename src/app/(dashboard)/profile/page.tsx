@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageSkeleton } from "@/components/ui/page-skeleton";
 import { AppearanceSettings } from "@/components/profile/appearance-settings";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { Role } from "@prisma/client";
 import { roleLabel } from "@/components/layout/nav-config";
 
 type ProfileData = {
   username: string;
   name: string;
   email: string | null;
-  role: "ADMIN" | "RECEPTIONIST";
+  role: Role;
   uiFontFamily: string;
   uiFontSize: string;
 };
@@ -28,7 +29,7 @@ export default function ProfilePage() {
 
   const username = profile?.username ?? session?.user?.username ?? "—";
   const displayName = profile?.name ?? session?.user?.name ?? username;
-  const role = profile?.role ?? session?.user?.role ?? "RECEPTIONIST";
+  const role = profile?.role ?? session?.user?.role ?? Role.RECEPTIONIST;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-8">

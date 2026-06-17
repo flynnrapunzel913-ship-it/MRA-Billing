@@ -10,6 +10,10 @@ import {
   Wallet,
   Settings,
   Shield,
+  Waves,
+  Ticket,
+  History,
+  SlidersHorizontal,
   type LucideIcon,
 } from "lucide-react";
 import { Role } from "@prisma/client";
@@ -59,6 +63,29 @@ export const navGroups: NavGroup[] = [
         label: "Expenses",
         icon: Wallet,
         roles: ["ADMIN", "RECEPTIONIST"],
+      },
+    ],
+  },
+  {
+    label: "Casual Swimming",
+    items: [
+      {
+        href: "/casual-swim",
+        label: "Generate Ticket",
+        icon: Ticket,
+        roles: ["ADMIN", "CASHIER"],
+      },
+      {
+        href: "/casual-swim/history",
+        label: "Ticket History",
+        icon: History,
+        roles: ["ADMIN"],
+      },
+      {
+        href: "/casual-swim/configuration",
+        label: "Configuration",
+        icon: SlidersHorizontal,
+        roles: ["ADMIN"],
       },
     ],
   },
@@ -142,5 +169,7 @@ export function getInitials(name: string) {
 }
 
 export function roleLabel(role: Role) {
-  return role === "ADMIN" ? "Administrator" : "Receptionist";
+  if (role === "ADMIN") return "Administrator";
+  if (role === "CASHIER") return "Cashier";
+  return "Receptionist";
 }

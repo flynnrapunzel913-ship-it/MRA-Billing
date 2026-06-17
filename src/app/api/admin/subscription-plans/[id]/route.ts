@@ -5,6 +5,7 @@ import { serializeSubscriptionPlan } from "@/lib/subscription-plans";
 import { subscriptionPlanSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 import { formatPlanCoverageSummary } from "@/lib/subscription-duration";
+import { isLegacyCasualSubscriptionPlanName } from "@/lib/casual-subscription-exclusions";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -23,6 +24,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
 
     const data = parsed.data;
+
+    if (data.planName !== undefined && isLegacyCasualSubscriptionPlanName(data.planName)) {
+      return NextResponse.json(
+        { error: "Casual swim pricing is managed in Casual Swimming Configuration" },
+        { status: 400 }
+      );
+    }
 
     const existing = await prisma.subscriptionPlan.findUnique({ where: { id } });
     if (!existing) {

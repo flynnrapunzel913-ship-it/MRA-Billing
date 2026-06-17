@@ -18,6 +18,12 @@ const API_BY_ROUTE: Record<string, string | string[] | undefined> = {
   "/admin/users": "/api/admin/users",
   "/admin/security": "/api/admin/security/events?page=1&pageSize=25",
   "/admin/subscriptions": "/api/admin/subscription-plans",
+  "/casual-swim": ["/api/casual-swim/config", "/api/casual-swim/bills"],
+  "/casual-swim/configuration": [
+    "/api/settings/casual-swim",
+    "/api/admin/casual-swim/reset-counter",
+  ],
+  "/casual-swim/history": "/api/casual-swim/bills/history",
 };
 
 export function prefetchRouteData(href: string) {
@@ -53,12 +59,17 @@ export function prefetchAppRoutes(role: Role) {
           "/customers",
           "/stock",
           "/expenses",
+          "/casual-swim",
+          "/casual-swim/history",
+          "/casual-swim/configuration",
           "/reports/revenue",
           "/admin/users",
           "/admin/security",
           "/settings",
         ]
-      : ["/dashboard", "/invoices", "/customers", "/stock", "/expenses"];
+      : role === "CASHIER"
+        ? ["/casual-swim", "/profile"]
+        : ["/dashboard", "/invoices", "/customers", "/stock", "/expenses"];
 
   for (const route of routes) prefetchRouteData(route);
 }

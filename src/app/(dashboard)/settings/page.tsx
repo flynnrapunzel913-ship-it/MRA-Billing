@@ -13,6 +13,7 @@ import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { settingsSchema, type SettingsInput } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
+import { PrefetchLink } from "@/components/ui/prefetch-link";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -357,6 +358,22 @@ export default function SettingsPage() {
                 </ol>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Casual Swimming Configuration</CardTitle>
+            <CardDescription>
+              Configure hourly swim rates and rental prices for the cashier module.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" variant="outline" asChild>
+              <PrefetchLink href="/casual-swim/configuration">Manage Casual Swim Rates</PrefetchLink>
+            </Button>
           </CardContent>
         </Card>
 

@@ -5,6 +5,7 @@ import { listSubscriptionPlans, serializeSubscriptionPlan } from "@/lib/subscrip
 import { subscriptionPlanSchema } from "@/lib/validations";
 import { prisma } from "@/lib/prisma";
 import { formatPlanCoverageSummary } from "@/lib/subscription-duration";
+import { isLegacyCasualSubscriptionPlanName } from "@/lib/casual-subscription-exclusions";
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +32,12 @@ export async function POST(request: NextRequest) {
     }
 
     const data = parsed.data;
+    if (isLegacyCasualSubscriptionPlanName(data.planName)) {
+      return NextResponse.json(
+        { error: "Casual swim pricing is managed in Casual Swimming Configuration" },
+        { status: 400 }
+      );
+    }
     const created = await prisma.subscriptionPlan.create({
       data: {
         planName: data.planName.trim(),

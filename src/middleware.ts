@@ -2,7 +2,8 @@ import { edgeAuth } from "@/lib/auth/edge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { applyApiRateLimitsEdge } from "@/lib/security/request-rate-limit-edge";
-import { canAccessRoute } from "@/lib/permissions";
+import { canAccessApi, canAccessRoute, getHomeRoute } from "@/lib/permissions";
+import type { Role } from "@prisma/client";
 
 const protectedPrefixes = [
   "/dashboard",
@@ -14,6 +15,7 @@ const protectedPrefixes = [
   "/admin",
   "/settings",
   "/profile",
+  "/casual-swim",
 ];
 
 function isApiPath(pathname: string) {
@@ -47,10 +49,10 @@ export default edgeAuth(async (req) => {
 
     if (
       isLoggedIn &&
-      role === "RECEPTIONIST" &&
-      !canAccessRoute(role, pathname)
+      role &&
+      !canAccessRoute(role as Role, pathname)
     ) {
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+      return NextResponse.redirect(new URL(getHomeRoute(role as Role), req.nextUrl));
     }
 
     if (pathname === "/login" && isLoggedIn) {
@@ -58,8 +60,12 @@ export default edgeAuth(async (req) => {
       if (req.nextUrl.searchParams.get("error") === "session_invalid") {
         return NextResponse.next();
       }
-      return NextResponse.redirect(new URL("/dashboard", req.nextUrl));
+      return NextResponse.redirect(new URL(getHomeRoute((role as Role) ?? "RECEPTIONIST"), req.nextUrl));
     }
+  }
+
+  if (isApiPath(pathname) && isLoggedIn && role === "CASHIER" && !canAccessApi(role, pathname)) {
+    return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
   }
 
   const requestHeaders = new Headers(req.headers);
@@ -74,6 +80,7 @@ export const config = {
     "/api/customers",
     "/api/invoices",
     "/api/invoices/:path*",
+    "/api/casual-swim/:path*",
     "/((?!_next/static|_next/image|favicon.ico|backgrounds|.*\\..*).*)",
   ],
 };

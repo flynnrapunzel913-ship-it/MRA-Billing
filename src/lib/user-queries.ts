@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { isSchemaDriftError } from "@/lib/invoice-filters";
 
@@ -101,7 +101,7 @@ export async function createUserRecord(
   data: {
     username: string;
     password: string;
-    role: "ADMIN" | "RECEPTIONIST";
+    role: Role;
   },
   db: Prisma.TransactionClient | typeof prisma = prisma
 ) {
@@ -132,7 +132,7 @@ export async function updateUserRecord(
   id: string,
   data: {
     username: string;
-    role: "ADMIN" | "RECEPTIONIST";
+    role: Role;
     status: "ACTIVE" | "DISABLED";
     password?: string;
   },

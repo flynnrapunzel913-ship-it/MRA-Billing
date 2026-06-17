@@ -1,3 +1,4 @@
+import { Role } from "@prisma/client";
 import { z } from "zod";
 import {
   ITEM_TYPES,
@@ -131,13 +132,18 @@ export const settingsSchema = z.object({
   termsAndConditions: z.string(),
 });
 
+const userRoleSchema = z.nativeEnum(Role).refine(
+  (role) => role === Role.ADMIN || role === Role.RECEPTIONIST || role === Role.CASHIER,
+  { message: "Invalid role" }
+);
+
 export const createUserSchema = z.object({
   username: z
     .string()
     .min(3, "Username must be at least 3 characters")
     .regex(/^\S+$/, "Username cannot contain spaces"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  role: z.enum(["ADMIN", "RECEPTIONIST"]),
+  role: userRoleSchema,
 });
 
 export const updateUserSchema = z.object({
@@ -145,7 +151,7 @@ export const updateUserSchema = z.object({
     .string()
     .min(3, "Username must be at least 3 characters")
     .regex(/^\S+$/, "Username cannot contain spaces"),
-  role: z.enum(["ADMIN", "RECEPTIONIST"]),
+  role: userRoleSchema,
   status: z.enum(["ACTIVE", "DISABLED"]),
   password: z
     .string()
@@ -210,3 +216,35 @@ export const expenseSchema = z.object({
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
+
+export const casualSwimSettingsSchema = z.object({
+  casualSwimAdultRatePerHour: z.coerce.number().nonnegative(),
+  casualSwimChildRatePerHour: z.coerce.number().nonnegative(),
+  casualSwimCapRentalPrice: z.coerce.number().nonnegative(),
+  casualSwimShortsRentalPrice: z.coerce.number().nonnegative(),
+  casualSwimGogglesRentalPrice: z.coerce.number().nonnegative(),
+});
+
+export const casualSwimBillSchema = z
+  .object({
+    hours: z.coerce.number().int().min(1),
+    adultCount: z.coerce.number().int().min(0),
+    childCount: z.coerce.number().int().min(0),
+    capQty: z.coerce.number().int().min(0),
+    shortsQty: z.coerce.number().int().min(0),
+    gogglesQty: z.coerce.number().int().min(0),
+  })
+  .superRefine((data, ctx) => {
+    const hasSwimmers = data.adultCount + data.childCount > 0;
+    const hasRentals = data.capQty + data.shortsQty + data.gogglesQty > 0;
+    if (!hasSwimmers && !hasRentals) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Add at least one swimmer or rental item",
+        path: ["adultCount"],
+      });
+    }
+  });
+
+export type CasualSwimSettingsInput = z.infer<typeof casualSwimSettingsSchema>;
+export type CasualSwimBillInput = z.infer<typeof casualSwimBillSchema>;

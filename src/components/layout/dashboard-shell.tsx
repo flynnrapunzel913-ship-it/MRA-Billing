@@ -18,6 +18,12 @@ interface DashboardShellProps {
 export function DashboardShell({ user, children }: DashboardShellProps) {
   useEffect(() => {
     prefetchAppRoutes(user.role);
+    if (user.role === "CASHIER") {
+      prefetchJson("/api/casual-swim/config");
+      prefetchJson("/api/casual-swim/bills");
+      prefetchJson("/api/profile");
+      return;
+    }
     prefetchJson("/api/dashboard");
     prefetchJson("/api/customers?q=");
     prefetchJson("/api/invoices");

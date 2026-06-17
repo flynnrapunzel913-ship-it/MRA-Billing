@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileText, TrendingUp, UserCircle } from "lucide-react";
+import { LayoutDashboard, Users, FileText, TrendingUp, UserCircle, Waves } from "lucide-react";
 import { Role } from "@prisma/client";
 import { cn } from "@/lib/utils";
 import { PrefetchLink } from "@/components/ui/prefetch-link";
@@ -18,7 +18,8 @@ const tabs: TabItem[] = [
   { href: "/invoices", label: "Invoices", icon: FileText, roles: ["ADMIN", "RECEPTIONIST"] },
   { href: "/customers", label: "Customers", icon: Users, roles: ["ADMIN", "RECEPTIONIST"] },
   { href: "/reports/revenue", label: "Revenue", icon: TrendingUp, roles: ["ADMIN"] },
-  { href: "/profile", label: "Profile", icon: UserCircle, roles: ["ADMIN", "RECEPTIONIST"] },
+  { href: "/casual-swim", label: "Tickets", icon: Waves, roles: ["ADMIN", "CASHIER"] },
+  { href: "/profile", label: "Profile", icon: UserCircle, roles: ["ADMIN", "RECEPTIONIST", "CASHIER"] },
 ];
 
 function isTabActive(pathname: string, href: string) {

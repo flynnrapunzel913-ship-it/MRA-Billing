@@ -15,11 +15,13 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
 } from "@/lib/validations";
+import { USER_ROLE_OPTIONS } from "@/lib/roles";
+import type { Role } from "@prisma/client";
 
 interface UserRecord {
   id: string;
   username: string;
-  role: "ADMIN" | "RECEPTIONIST";
+  role: Role;
   status: "ACTIVE" | "DISABLED";
 }
 
@@ -170,8 +172,11 @@ export function UserFormDialog({
                   {...register("role")}
                   className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="RECEPTIONIST">Receptionist</option>
-                  <option value="ADMIN">Admin</option>
+                  {USER_ROLE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               {!isSelf && (
@@ -275,8 +280,11 @@ export function UserFormDialog({
             {...register("role")}
             className="flex h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
           >
-            <option value="RECEPTIONIST">Receptionist</option>
-            <option value="ADMIN">Admin</option>
+            {USER_ROLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
         <p className="text-xs text-muted-foreground">

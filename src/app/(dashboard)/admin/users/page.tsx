@@ -21,12 +21,13 @@ import {
 import { Modal } from "@/components/ui/modal";
 import { readApiResponse } from "@/lib/api-error";
 import { UserFormDialog } from "@/components/admin/user-form-dialog";
+import { Role } from "@prisma/client";
 import { roleLabel } from "@/components/layout/nav-config";
 
 interface UserRecord {
   id: string;
   username: string;
-  role: "ADMIN" | "RECEPTIONIST";
+  role: Role;
   status: "ACTIVE" | "DISABLED";
   createdAt: string;
   _count?: { invoices: number };

@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import type { Role } from "@prisma/client";
 
 /**
  * Edge-safe Auth.js config — JWT/session callbacks only.
@@ -26,7 +27,7 @@ export const authConfig = {
     async session({ session, token }) {
       if (session.user && token.id) {
         session.user.id = token.id as string;
-        session.user.role = token.role as "ADMIN" | "RECEPTIONIST";
+        session.user.role = token.role as Role;
         session.user.username = token.username as string;
         session.user.name = token.username as string;
         session.user.sessionVersion =

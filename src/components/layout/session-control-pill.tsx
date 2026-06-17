@@ -19,6 +19,9 @@ function RoleIcon({ role }: { role: Role }) {
   if (role === "ADMIN") {
     return <Shield className="h-3.5 w-3.5 text-primary" strokeWidth={2.25} />;
   }
+  if (role === "CASHIER") {
+    return <UserRound className="h-3.5 w-3.5 text-primary" strokeWidth={2.25} />;
+  }
   return <UserRound className="h-3.5 w-3.5 text-primary" strokeWidth={2.25} />;
 }
 
