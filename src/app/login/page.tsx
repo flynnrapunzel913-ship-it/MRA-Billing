@@ -105,9 +105,6 @@ function LoginForm() {
               {loading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-          <p className="mt-4 text-center text-xs text-muted-foreground">
-            Demo: admin / admin123
-          </p>
         </CardContent>
       </Card>
     </div>
