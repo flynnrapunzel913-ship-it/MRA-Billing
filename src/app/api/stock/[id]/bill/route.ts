@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { readStockBill } from "@/lib/stock-storage";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
@@ -10,7 +10,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const { id } = await context.params;

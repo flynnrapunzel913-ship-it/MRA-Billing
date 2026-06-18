@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { savePendingStockBill } from "@/lib/stock-storage";
 
 export async function POST(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const form = await request.formData();

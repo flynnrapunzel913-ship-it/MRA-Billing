@@ -7,7 +7,7 @@ import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
 import { logDisabledUserAccessAttempt } from "@/lib/auth/disabled-access-audit";
 import { getRequestPathname } from "@/lib/auth/request-meta";
 import { logSecurityEvent } from "@/lib/security/security-log";
-import { canAccessCasualSwim } from "@/lib/permissions";
+import { canAccessCasualSwim, canAccessOperationalApis } from "@/lib/permissions";
 
 export type SessionUser = {
   id: string;
@@ -99,6 +99,23 @@ export async function requireAuth() {
     username: account.username,
     name: session.user.name,
   };
+  return { error: null, user };
+}
+
+/** Admin or receptionist — billing, CRM, stock, expenses, dashboard APIs. */
+export async function requireOperationalAccess() {
+  const { error, user } = await requireAuth();
+  if (error) return { error, user: null };
+
+  if (!canAccessOperationalApis(user!.role)) {
+    logSecurityEvent("cashier_forbidden", {
+      userId: user!.id,
+      username: user!.username,
+      role: user!.role,
+    });
+    return { error: forbiddenResponse(), user: null };
+  }
+
   return { error: null, user };
 }
 

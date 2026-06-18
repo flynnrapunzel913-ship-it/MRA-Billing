@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { getCustomerWithDetails } from "@/lib/customer-queries";
@@ -10,7 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const { id } = await params;
@@ -55,7 +55,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const { id } = await params;

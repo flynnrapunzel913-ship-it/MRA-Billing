@@ -155,8 +155,8 @@ export async function updateUserRecord(
   const existing = await db.user.findUnique({
     where: { id },
     select: withStatus
-      ? { status: true, password: true }
-      : { password: true },
+      ? { status: true, password: true, role: true }
+      : { password: true, role: true },
   });
 
   const updated = await db.user.update({
@@ -170,7 +170,8 @@ export async function updateUserRecord(
     existing &&
     "status" in existing &&
     existing.status !== data.status;
-  if (statusChanged || data.password) {
+  const roleChanged = existing != null && existing.role !== data.role;
+  if (statusChanged || data.password || roleChanged) {
     await bumpSessionVersion(id, db);
   }
 

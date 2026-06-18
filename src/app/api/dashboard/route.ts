@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { getActiveCustomerWhere } from "@/lib/customer-filters";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
@@ -10,7 +10,7 @@ import { getTodayRange } from "@/lib/stock-utils";
 
 export async function GET() {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const [invoiceWhere, customerWhere] = await Promise.all([

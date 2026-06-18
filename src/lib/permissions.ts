@@ -53,3 +53,8 @@ export function isCashier(role: AppRole) {
 export function canAccessCasualSwim(role: AppRole) {
   return role === "ADMIN" || role === "CASHIER";
 }
+
+/** Invoices, customers, stock, expenses, dashboard — not cashier. */
+export function canAccessOperationalApis(role: AppRole) {
+  return role === "ADMIN" || role === "RECEPTIONIST";
+}

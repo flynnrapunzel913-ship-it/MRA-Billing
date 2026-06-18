@@ -4,6 +4,7 @@
  */
 export {
   requireAuth,
+  requireOperationalAccess,
   requireAdmin,
   getValidatedSessionUser as getSessionUser,
   unauthorizedResponse,

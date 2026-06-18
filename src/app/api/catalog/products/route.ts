@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { searchProducts, serializeProduct } from "@/lib/catalog";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const q = request.nextUrl.searchParams.get("q") ?? "";

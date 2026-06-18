@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma, Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { stockEntrySchema } from "@/lib/validations";
 import { buildStockWhere, stockListInclude } from "@/lib/stock-queries";
@@ -17,7 +17,7 @@ import { getActiveStockWhere, getDeletedStockWhere } from "@/lib/stock-filters";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const searchParams = request.nextUrl.searchParams;
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     let body: unknown;

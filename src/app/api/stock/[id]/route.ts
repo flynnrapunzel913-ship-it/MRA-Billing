@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { stockListInclude } from "@/lib/stock-queries";
 import { serializeStockForJson } from "@/lib/stock-utils";
@@ -13,7 +13,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const { id } = await context.params;

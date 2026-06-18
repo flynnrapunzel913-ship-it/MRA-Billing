@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 
 /** Minimal billing defaults for invoice creation (all authenticated staff). */
 export async function GET() {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const settings = await prisma.settings.findUnique({

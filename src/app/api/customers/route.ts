@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { logAdminAccessViolation } from "@/lib/auth/admin-access-audit";
 import { apiErrorResponse } from "@/lib/api-error";
 import { recordCustomerActivity } from "@/lib/customer-activity";
@@ -10,7 +10,7 @@ import { listCustomersWithInvoiceCounts } from "@/lib/customer-queries";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const searchParams = request.nextUrl.searchParams;
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     let body: unknown;

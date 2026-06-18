@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { Role } from "@prisma/client";
 import { getActiveStockWhere } from "@/lib/stock-filters";
@@ -8,7 +8,7 @@ import { getActiveStockWhere } from "@/lib/stock-filters";
 /** Distinct filter options for admin stock listing */
 export async function GET() {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     const stockWhere = await getActiveStockWhere();

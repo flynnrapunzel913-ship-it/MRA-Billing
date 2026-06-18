@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { Role } from "@prisma/client";
-import { canAccessApi, canAccessRoute, getHomeRoute } from "@/lib/permissions";
+import {
+  canAccessApi,
+  canAccessOperationalApis,
+  canAccessRoute,
+  getHomeRoute,
+} from "@/lib/permissions";
 
 describe("canAccessRoute", () => {
   it("allows admins on all dashboard paths", () => {
@@ -46,5 +51,59 @@ describe("canAccessRoute", () => {
     expect(canAccessApi(Role.CASHIER, "/api/profile")).toBe(true);
     expect(canAccessApi(Role.CASHIER, "/api/invoices")).toBe(false);
     expect(canAccessApi(Role.RECEPTIONIST, "/api/invoices")).toBe(true);
+  });
+});
+
+describe("cashier security regression", () => {
+  const deniedApis = [
+    "/api/invoices",
+    "/api/invoices/abc",
+    "/api/customers",
+    "/api/customers/abc",
+    "/api/stock",
+    "/api/stock/summary",
+    "/api/expenses",
+    "/api/reports",
+    "/api/dashboard",
+    "/api/settings",
+    "/api/settings/billing-defaults",
+    "/api/admin/users",
+    "/api/catalog/products",
+    "/api/catalog/subscriptions",
+  ];
+
+  it("denies cashier operational APIs", () => {
+    for (const path of deniedApis) {
+      expect(canAccessApi(Role.CASHIER, path)).toBe(false);
+    }
+    expect(canAccessOperationalApis(Role.CASHIER)).toBe(false);
+  });
+
+  it("allows cashier casual swim and profile APIs", () => {
+    expect(canAccessApi(Role.CASHIER, "/api/casual-swim/bills")).toBe(true);
+    expect(canAccessApi(Role.CASHIER, "/api/casual-swim/config")).toBe(true);
+    expect(canAccessApi(Role.CASHIER, "/api/profile")).toBe(true);
+  });
+
+  it("denies cashier restricted pages", () => {
+    expect(canAccessRoute(Role.CASHIER, "/dashboard")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/invoices")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/customers")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/stock")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/expenses")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/reports")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/settings")).toBe(false);
+    expect(canAccessRoute(Role.CASHIER, "/admin/users")).toBe(false);
+  });
+
+  it("allows cashier casual swim pages and profile", () => {
+    expect(canAccessRoute(Role.CASHIER, "/casual-swim")).toBe(true);
+    expect(canAccessRoute(Role.CASHIER, "/casual-swim/receipt/abc")).toBe(true);
+    expect(canAccessRoute(Role.CASHIER, "/profile")).toBe(true);
+  });
+
+  it("allows receptionist and admin on operational APIs", () => {
+    expect(canAccessOperationalApis(Role.RECEPTIONIST)).toBe(true);
+    expect(canAccessOperationalApis(Role.ADMIN)).toBe(true);
   });
 });

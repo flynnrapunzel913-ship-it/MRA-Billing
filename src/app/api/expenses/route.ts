@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/api-auth";
+import { requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 import { expenseSchema } from "@/lib/validations";
@@ -13,7 +13,7 @@ import { serializeExpenseForJson } from "@/lib/expenses/serialize-expense";
 
 export async function GET(request: NextRequest) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const searchParams = request.nextUrl.searchParams;
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { error, user } = await requireAuth();
+    const { error, user } = await requireOperationalAccess();
     if (error) return error;
 
     let body: unknown;

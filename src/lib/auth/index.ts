@@ -2,6 +2,7 @@ export { handlers, auth, signIn, signOut } from "@/lib/auth/config";
 export { loadActiveAccount, isAccountActive } from "@/lib/auth/session";
 export {
   requireAuth,
+  requireOperationalAccess,
   requireAdmin,
   getValidatedSessionUser,
   unauthorizedResponse,

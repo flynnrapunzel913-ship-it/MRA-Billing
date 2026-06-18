@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin, requireAuth } from "@/lib/api-auth";
+import { requireAdmin, requireOperationalAccess } from "@/lib/api-auth";
 import { apiErrorResponse } from "@/lib/api-error";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
 import { expenseSchema } from "@/lib/validations";
@@ -11,7 +11,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, context: RouteContext) {
   try {
-    const { error } = await requireAuth();
+    const { error } = await requireOperationalAccess();
     if (error) return error;
 
     const { id } = await context.params;
