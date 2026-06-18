@@ -27,8 +27,8 @@ const tx = { user: txUser };
 
 const baseUser = {
   id: "user-1",
-  username: "cashier1",
-  role: Role.CASHIER,
+  username: "staff1",
+  role: Role.RECEPTIONIST,
   status: "ACTIVE" as const,
   createdAt: new Date(),
 };
@@ -46,12 +46,12 @@ describe("updateUserRecord session invalidation", () => {
       .mockResolvedValueOnce({ sessionVersion: 2 });
   });
 
-  it("bumps sessionVersion when role changes receptionist → cashier", async () => {
+  it("bumps sessionVersion when role changes receptionist → admin", async () => {
     await updateUserRecord(
       "user-1",
       {
-        username: "cashier1",
-        role: Role.CASHIER,
+        username: "staff1",
+        role: Role.ADMIN,
         status: "ACTIVE",
       },
       tx as never
@@ -64,17 +64,17 @@ describe("updateUserRecord session invalidation", () => {
     });
   });
 
-  it("bumps sessionVersion when role changes cashier → receptionist", async () => {
+  it("bumps sessionVersion when role changes admin → receptionist", async () => {
     txUser.findUnique.mockResolvedValue({
       status: "ACTIVE",
       password: "hash",
-      role: Role.CASHIER,
+      role: Role.ADMIN,
     });
 
     await updateUserRecord(
       "user-1",
       {
-        username: "cashier1",
+        username: "staff1",
         role: Role.RECEPTIONIST,
         status: "ACTIVE",
       },
@@ -88,38 +88,18 @@ describe("updateUserRecord session invalidation", () => {
     });
   });
 
-  it("bumps sessionVersion when role changes admin → cashier", async () => {
-    txUser.findUnique.mockResolvedValue({
-      status: "ACTIVE",
-      password: "hash",
-      role: Role.ADMIN,
-    });
-
-    await updateUserRecord(
-      "user-1",
-      {
-        username: "cashier1",
-        role: Role.CASHIER,
-        status: "ACTIVE",
-      },
-      tx as never
-    );
-
-    expect(txUser.update).toHaveBeenCalledTimes(2);
-  });
-
   it("does not bump sessionVersion when role is unchanged", async () => {
     txUser.findUnique.mockResolvedValue({
       status: "ACTIVE",
       password: "hash",
-      role: Role.CASHIER,
+      role: Role.RECEPTIONIST,
     });
 
     await updateUserRecord(
       "user-1",
       {
-        username: "cashier1",
-        role: Role.CASHIER,
+        username: "staff1",
+        role: Role.RECEPTIONIST,
         status: "ACTIVE",
       },
       tx as never

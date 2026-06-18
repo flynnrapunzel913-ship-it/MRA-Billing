@@ -363,22 +363,6 @@ export default function SettingsPage() {
 
         <Separator />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Casual Swimming Configuration</CardTitle>
-            <CardDescription>
-              Configure hourly swim rates and rental prices for the cashier module.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button type="button" variant="outline" asChild>
-              <PrefetchLink href="/casual-swim/configuration">Manage Casual Swim Rates</PrefetchLink>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Separator />
-
         <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : "Save Settings"}
         </Button>

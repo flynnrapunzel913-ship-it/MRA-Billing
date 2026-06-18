@@ -133,7 +133,7 @@ export const settingsSchema = z.object({
 });
 
 const userRoleSchema = z.nativeEnum(Role).refine(
-  (role) => role === Role.ADMIN || role === Role.RECEPTIONIST || role === Role.CASHIER,
+  (role) => role === Role.ADMIN || role === Role.RECEPTIONIST,
   { message: "Invalid role" }
 );
 
@@ -216,38 +216,3 @@ export const expenseSchema = z.object({
 });
 
 export type ExpenseInput = z.infer<typeof expenseSchema>;
-
-export const casualSwimSettingsSchema = z.object({
-  casualSwimAdultRatePerHour: z.coerce.number().nonnegative(),
-  casualSwimChildRatePerHour: z.coerce.number().nonnegative(),
-  casualSwimCapRentalPrice: z.coerce.number().nonnegative(),
-  casualSwimShortsRentalPrice: z.coerce.number().nonnegative(),
-  casualSwimGogglesRentalPrice: z.coerce.number().nonnegative(),
-});
-
-export const casualSwimBillSchema = z
-  .object({
-    hours: z.coerce.number().int().min(1),
-    adultCount: z.coerce.number().int().min(0),
-    childCount: z.coerce.number().int().min(0),
-    capQty: z.coerce.number().int().min(0),
-    shortsQty: z.coerce.number().int().min(0),
-    gogglesQty: z.coerce.number().int().min(0),
-    paymentMode: z.enum(["CASH", "UPI", "PARTIAL"]).default("CASH"),
-    cashAmount: z.coerce.number().nonnegative().optional(),
-    upiAmount: z.coerce.number().nonnegative().optional(),
-  })
-  .superRefine((data, ctx) => {
-    const hasSwimmers = data.adultCount + data.childCount > 0;
-    const hasRentals = data.capQty + data.shortsQty + data.gogglesQty > 0;
-    if (!hasSwimmers && !hasRentals) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Add at least one swimmer or rental item",
-        path: ["adultCount"],
-      });
-    }
-  });
-
-export type CasualSwimSettingsInput = z.infer<typeof casualSwimSettingsSchema>;
-export type CasualSwimBillInput = z.infer<typeof casualSwimBillSchema>;

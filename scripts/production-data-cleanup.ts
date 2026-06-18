@@ -28,7 +28,6 @@ const KEEP_PASSWORD = "admin@123";
 const TABLES_TO_CLEAR = [
   "DailyCollectionHistory",
   "DailyCollection",
-  "CasualSwimBill",
   "InvoiceItem",
   "Invoice",
   "CustomerActivity",
@@ -43,7 +42,6 @@ const TABLES_TO_CLEAR = [
 const TABLES_TO_RESET = [
   "InvoiceSequence",
   "StockSequence",
-  "CasualSwimTicketSequence",
 ] as const;
 
 const TABLES_PRESERVED = [
@@ -60,7 +58,7 @@ function resolveStorageDriver(): "local" | "r2" {
 }
 
 async function countTable(name: string): Promise<number> {
-  const delegate = (prisma as Record<string, { count: () => Promise<number> }>)[
+  const delegate = (prisma as unknown as Record<string, { count: () => Promise<number> }>)[
     name.charAt(0).toLowerCase() + name.slice(1)
   ];
   if (!delegate?.count) throw new Error(`Unknown Prisma model: ${name}`);
@@ -282,7 +280,6 @@ async function runCleanup(execute: boolean) {
         await tx.dailyCollectionHistory.deleteMany()
       ).count;
       deleted.DailyCollection = (await tx.dailyCollection.deleteMany()).count;
-      deleted.CasualSwimBill = (await tx.casualSwimBill.deleteMany()).count;
       deleted.InvoiceItem = (await tx.invoiceItem.deleteMany()).count;
       deleted.Invoice = (await tx.invoice.deleteMany()).count;
       deleted.CustomerActivity = (await tx.customerActivity.deleteMany()).count;
@@ -307,9 +304,6 @@ async function runCleanup(execute: boolean) {
       ).count;
       deleted.StockSequence = (
         await tx.stockSequence.updateMany({ data: { lastNumber: 0 } })
-      ).count;
-      deleted.CasualSwimTicketSequence = (
-        await tx.casualSwimTicketSequence.updateMany({ data: { lastNumber: 0 } })
       ).count;
     },
     { maxWait: 60_000, timeout: 120_000 }

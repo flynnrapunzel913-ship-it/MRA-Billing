@@ -32,39 +32,11 @@ vi.mock("@/lib/security/security-log", () => ({
   logSecurityEvent: vi.fn(),
 }));
 
-import {
-  requireAuth,
-  requireOperationalAccess,
-} from "@/lib/auth/guards";
-
-const activeCashier = {
-  id: "cashier-1",
-  username: "cashier1",
-  role: Role.CASHIER,
-  disabled: false,
-  sessionVersion: 2,
-};
+import { requireAuth, requireOperationalAccess } from "@/lib/auth/guards";
 
 describe("requireOperationalAccess", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuth.mockResolvedValue({
-      user: {
-        id: "cashier-1",
-        role: Role.CASHIER,
-        sessionVersion: 2,
-        name: "Cashier",
-      },
-    });
-    mockLoadActiveAccount.mockResolvedValue(activeCashier);
-  });
-
-  it("returns 403 for cashier", async () => {
-    const { error, user } = await requireOperationalAccess();
-    expect(user).toBeNull();
-    expect(error?.status).toBe(403);
-    const body = await error!.json();
-    expect(body).toEqual({ error: "Forbidden", code: "FORBIDDEN" });
   });
 
   it("allows receptionist", async () => {
@@ -86,6 +58,27 @@ describe("requireOperationalAccess", () => {
     const { error, user } = await requireOperationalAccess();
     expect(error).toBeNull();
     expect(user?.role).toBe(Role.RECEPTIONIST);
+  });
+
+  it("allows admin", async () => {
+    mockLoadActiveAccount.mockResolvedValue({
+      id: "admin-1",
+      username: "admin1",
+      role: Role.ADMIN,
+      disabled: false,
+      sessionVersion: 1,
+    });
+    mockAuth.mockResolvedValue({
+      user: {
+        id: "admin-1",
+        role: Role.ADMIN,
+        sessionVersion: 1,
+      },
+    });
+
+    const { error, user } = await requireOperationalAccess();
+    expect(error).toBeNull();
+    expect(user?.role).toBe(Role.ADMIN);
   });
 });
 
@@ -122,14 +115,13 @@ describe("requireAuth session version", () => {
     mockAuth.mockResolvedValue({
       user: {
         id: "user-1",
-        role: Role.CASHIER,
+        role: Role.RECEPTIONIST,
         sessionVersion: 2,
       },
     });
-    mockLoadActiveAccount.mockResolvedValue(activeCashier);
 
     const { error, user } = await requireAuth();
     expect(error).toBeNull();
-    expect(user?.role).toBe(Role.CASHIER);
+    expect(user?.role).toBe(Role.RECEPTIONIST);
   });
 });
