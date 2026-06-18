@@ -76,7 +76,7 @@ describe("getCasualSwimReceiptPaymentLines", () => {
       upiAmount: 200,
       totalAmount: 1000,
     });
-    expect(lines.mode).toBe("PARTIAL");
+    expect(lines.mode).toBe("Cash + UPI");
     expect(lines.lines).toEqual([
       { label: "Cash Paid", amount: 800 },
       { label: "UPI Paid", amount: 200 },

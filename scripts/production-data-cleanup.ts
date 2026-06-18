@@ -2,7 +2,7 @@
  * One-time production data cleanup.
  *
  * Preserves: SubscriptionPlan, AcademyProduct, Settings
- * Keeps exactly one admin: Rajesh Shetti / Rajesh.Shitti
+ * Keeps exactly one admin: rajesh.shetti
  *
  * Usage:
  *   npx tsx scripts/production-data-cleanup.ts           # dry-run (default)
@@ -21,13 +21,14 @@ import { PrismaClient, Role, UserStatus } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
-const KEEP_USERNAME = "Rajesh.Shitti";
+const KEEP_USERNAME = "rajesh.shetti";
 const KEEP_NAME = "Rajesh Shetti";
 const KEEP_PASSWORD = "admin@123";
 
 const TABLES_TO_CLEAR = [
   "DailyCollectionHistory",
   "DailyCollection",
+  "CasualSwimBill",
   "InvoiceItem",
   "Invoice",
   "CustomerActivity",
@@ -39,7 +40,11 @@ const TABLES_TO_CLEAR = [
   "UserActivity",
 ] as const;
 
-const TABLES_TO_RESET = ["InvoiceSequence", "StockSequence"] as const;
+const TABLES_TO_RESET = [
+  "InvoiceSequence",
+  "StockSequence",
+  "CasualSwimTicketSequence",
+] as const;
 
 const TABLES_PRESERVED = [
   "SubscriptionPlan",
@@ -277,6 +282,7 @@ async function runCleanup(execute: boolean) {
         await tx.dailyCollectionHistory.deleteMany()
       ).count;
       deleted.DailyCollection = (await tx.dailyCollection.deleteMany()).count;
+      deleted.CasualSwimBill = (await tx.casualSwimBill.deleteMany()).count;
       deleted.InvoiceItem = (await tx.invoiceItem.deleteMany()).count;
       deleted.Invoice = (await tx.invoice.deleteMany()).count;
       deleted.CustomerActivity = (await tx.customerActivity.deleteMany()).count;
@@ -301,6 +307,9 @@ async function runCleanup(execute: boolean) {
       ).count;
       deleted.StockSequence = (
         await tx.stockSequence.updateMany({ data: { lastNumber: 0 } })
+      ).count;
+      deleted.CasualSwimTicketSequence = (
+        await tx.casualSwimTicketSequence.updateMany({ data: { lastNumber: 0 } })
       ).count;
     },
     { maxWait: 60_000, timeout: 120_000 }

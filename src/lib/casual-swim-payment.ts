@@ -8,15 +8,17 @@ export type CasualSwimPaymentMode = (typeof CASUAL_SWIM_PAYMENT_MODES)[number];
 export const PARTIAL_PAYMENT_MISMATCH_MESSAGE =
   "Cash Amount and UPI Amount must equal the total bill amount.";
 
+export const CASH_UPI_SPLIT_LABEL = "Cash + UPI";
+
 export function casualSwimPaymentModeLabel(mode: RevenuePaymentMode | string): string {
   if (mode === "UPI") return "UPI";
-  if (mode === "PARTIAL") return "Partial (Cash + UPI)";
+  if (mode === "PARTIAL") return CASH_UPI_SPLIT_LABEL;
   return "Cash";
 }
 
 export function receiptPaymentModeDisplay(mode: RevenuePaymentMode | string): string {
-  if (mode === "PARTIAL") return "PARTIAL";
-  return mode === "UPI" ? "UPI" : "CASH";
+  if (mode === "PARTIAL") return CASH_UPI_SPLIT_LABEL;
+  return mode === "UPI" ? "UPI" : "Cash";
 }
 
 export type CasualSwimPaymentLine = {
@@ -99,7 +101,7 @@ export function resolveCasualSwimPayment(
   if (cashAmount <= 0 || upiAmount <= 0) {
     return {
       ok: false,
-      message: "Partial payment requires both cash and UPI amounts greater than zero.",
+      message: "Cash + UPI payment requires both cash and UPI amounts greater than zero.",
     };
   }
 
