@@ -15,8 +15,10 @@ import {
 import {
   buildCollectionSnapshotFromSheet,
   getDailyCollectionSheet,
+  getPreviousClosingCoupon,
   parseCollectionDateInput,
 } from "@/lib/daily-collection";
+import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
 import {
   calculateCashDifference,
   calculatePhysicalCash,
@@ -28,6 +30,7 @@ const bodySchema = z.object({
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
   collectedByName: z.string().trim().min(1, "Collected by name is required").optional(),
+  lastCouponNumber: z.number().int().nonnegative(),
   cashDenominations: z.record(z.string(), z.number().int().nonnegative()).optional(),
   cashDifferenceNotes: z.string().optional(),
 });
@@ -65,8 +68,12 @@ function serializeCollectionAuditValues(record: {
   notes: string | null;
   collectedByName: string | null;
   totalRevenue: unknown;
+  invoiceRevenue?: unknown;
   subscriptionRevenue: unknown;
   productRevenue: unknown;
+  casualSwimRevenue?: unknown;
+  casualSwimCouponsUsed?: unknown;
+  lastCouponNumber?: number | null;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
@@ -80,9 +87,14 @@ function serializeCollectionAuditValues(record: {
     notes: record.notes,
     collectedByName: record.collectedByName,
     totalRevenue: record.totalRevenue != null ? toJsonNumber(record.totalRevenue) : null,
+    invoiceRevenue: record.invoiceRevenue != null ? toJsonNumber(record.invoiceRevenue) : null,
     subscriptionRevenue:
       record.subscriptionRevenue != null ? toJsonNumber(record.subscriptionRevenue) : null,
     productRevenue: record.productRevenue != null ? toJsonNumber(record.productRevenue) : null,
+    casualSwimRevenue:
+      record.casualSwimRevenue != null ? toJsonNumber(record.casualSwimRevenue) : null,
+    casualSwimCouponsUsed: record.casualSwimCouponsUsed ?? null,
+    lastCouponNumber: record.lastCouponNumber ?? null,
     totalExpenses: record.totalExpenses != null ? toJsonNumber(record.totalExpenses) : null,
     cashCollectedSystem:
       record.cashCollectedSystem != null ? toJsonNumber(record.cashCollectedSystem) : null,
@@ -137,6 +149,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
+    const previousClosingCoupon = await getPreviousClosingCoupon(collectionDate);
+    const couponRate = (await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true }))
+      ?.casualSwim.couponRate ?? 150;
+    const couponCalc = calculateCasualSwimCouponRevenue(
+      previousClosingCoupon,
+      parsed.data.lastCouponNumber,
+      couponRate
+    );
+    if (!couponCalc.ok) {
+      return NextResponse.json({ error: couponCalc.message }, { status: 400 });
+    }
+
     const existing = await prisma.dailyCollection.findUnique({
       where: { collectionDate },
     });
@@ -148,7 +172,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sheet = await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true });
+    const sheet = await getDailyCollectionSheet(parsed.data.date, {
+      preferLiveTotals: true,
+      lastCouponNumber: parsed.data.lastCouponNumber,
+    });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
@@ -174,8 +201,13 @@ export async function POST(request: NextRequest) {
         collectedByUserId: user!.id!,
         collectedByName,
         totalRevenue: snapshot.totalRevenue,
+        invoiceRevenue: snapshot.invoiceRevenue,
         subscriptionRevenue: snapshot.subscriptionRevenue,
         productRevenue: snapshot.productRevenue,
+        casualSwimRevenue: snapshot.casualSwimRevenue,
+        casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
+        casualSwimCouponRate: snapshot.casualSwimCouponRate,
+        lastCouponNumber: snapshot.lastCouponNumber,
         totalExpenses: snapshot.totalExpenses,
         cashCollectedSystem: cash.cashCollectedSystem,
         upiCollected: snapshot.upiCollected,
@@ -189,8 +221,12 @@ export async function POST(request: NextRequest) {
             notes: parsed.data.notes?.trim() || null,
             collectedByName,
             totalRevenue: snapshot.totalRevenue,
+            invoiceRevenue: snapshot.invoiceRevenue,
             subscriptionRevenue: snapshot.subscriptionRevenue,
             productRevenue: snapshot.productRevenue,
+            casualSwimRevenue: snapshot.casualSwimRevenue,
+            casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
+            lastCouponNumber: snapshot.lastCouponNumber,
             totalExpenses: snapshot.totalExpenses,
             cashCollectedSystem: cash.cashCollectedSystem,
             upiCollected: snapshot.upiCollected,
@@ -258,6 +294,18 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
+    const previousClosingCoupon = await getPreviousClosingCoupon(collectionDate);
+    const couponRate = (await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true }))
+      ?.casualSwim.couponRate ?? 150;
+    const couponCalc = calculateCasualSwimCouponRevenue(
+      previousClosingCoupon,
+      parsed.data.lastCouponNumber,
+      couponRate
+    );
+    if (!couponCalc.ok) {
+      return NextResponse.json({ error: couponCalc.message }, { status: 400 });
+    }
+
     const existing = await prisma.dailyCollection.findUnique({
       where: { collectionDate },
     });
@@ -271,7 +319,10 @@ export async function PUT(request: NextRequest) {
 
     const beforeValues = extractCollectionDiffValues(existing);
 
-    const sheet = await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true });
+    const sheet = await getDailyCollectionSheet(parsed.data.date, {
+      preferLiveTotals: true,
+      lastCouponNumber: parsed.data.lastCouponNumber,
+    });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
@@ -294,8 +345,12 @@ export async function PUT(request: NextRequest) {
       notes: parsed.data.notes?.trim() || null,
       collectedByName,
       totalRevenue: snapshot.totalRevenue,
+      invoiceRevenue: snapshot.invoiceRevenue,
       subscriptionRevenue: snapshot.subscriptionRevenue,
       productRevenue: snapshot.productRevenue,
+      casualSwimRevenue: snapshot.casualSwimRevenue,
+      casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
+      lastCouponNumber: snapshot.lastCouponNumber,
       totalExpenses: snapshot.totalExpenses,
       cashCollectedSystem: cash.cashCollectedSystem,
       upiCollected: snapshot.upiCollected,
@@ -314,8 +369,13 @@ export async function PUT(request: NextRequest) {
           notes: parsed.data.notes?.trim() || null,
           collectedByName,
           totalRevenue: snapshot.totalRevenue,
+          invoiceRevenue: snapshot.invoiceRevenue,
           subscriptionRevenue: snapshot.subscriptionRevenue,
           productRevenue: snapshot.productRevenue,
+          casualSwimRevenue: snapshot.casualSwimRevenue,
+          casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
+          casualSwimCouponRate: snapshot.casualSwimCouponRate,
+          lastCouponNumber: snapshot.lastCouponNumber,
           totalExpenses: snapshot.totalExpenses,
           cashCollectedSystem: cash.cashCollectedSystem,
           upiCollected: snapshot.upiCollected,

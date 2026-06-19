@@ -5,8 +5,12 @@ export type CollectionDiffValues = {
   notes: string | null;
   collectedByName: string | null;
   totalRevenue: number | null;
+  invoiceRevenue: number | null;
   subscriptionRevenue: number | null;
   productRevenue: number | null;
+  casualSwimRevenue: number | null;
+  casualSwimCouponsUsed: number | null;
+  lastCouponNumber: number | null;
   totalExpenses: number | null;
   cashCollected: number | null;
   upiCollected: number | null;
@@ -31,8 +35,12 @@ export const COLLECTION_FIELD_LABELS: Record<keyof CollectionDiffValues, string>
   notes: "Notes",
   collectedByName: "Collected By",
   totalRevenue: "Revenue",
+  invoiceRevenue: "Invoice Revenue",
   subscriptionRevenue: "Subscription Revenue",
   productRevenue: "Product Revenue",
+  casualSwimRevenue: "Casual Swim Revenue",
+  casualSwimCouponsUsed: "Coupons Used",
+  lastCouponNumber: "Today's Last Coupon",
   totalExpenses: "Expenses",
   cashCollected: "Cash Collected",
   upiCollected: "UPI Collected",
@@ -48,8 +56,12 @@ type CollectionRecordLike = {
   notes: string | null;
   collectedByName: string | null;
   totalRevenue: unknown;
+  invoiceRevenue?: unknown;
   subscriptionRevenue: unknown;
   productRevenue: unknown;
+  casualSwimRevenue?: unknown;
+  casualSwimCouponsUsed?: unknown;
+  lastCouponNumber?: number | null;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
@@ -71,8 +83,13 @@ export function extractCollectionDiffValues(
     notes: record.notes,
     collectedByName: record.collectedByName,
     totalRevenue: toNullableNumber(record.totalRevenue),
+    invoiceRevenue: toNullableNumber(record.invoiceRevenue),
     subscriptionRevenue: toNullableNumber(record.subscriptionRevenue),
     productRevenue: toNullableNumber(record.productRevenue),
+    casualSwimRevenue: toNullableNumber(record.casualSwimRevenue),
+    casualSwimCouponsUsed:
+      record.casualSwimCouponsUsed == null ? null : Number(record.casualSwimCouponsUsed),
+    lastCouponNumber: record.lastCouponNumber ?? null,
     totalExpenses: toNullableNumber(record.totalExpenses),
     cashCollected: toNullableNumber(record.cashCollectedSystem),
     upiCollected: toNullableNumber(record.upiCollected),
@@ -122,6 +139,7 @@ export function hasCollectionChanges(changes: CollectionChangesJson): boolean {
 export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
   return {
     totalRevenue: values.totalRevenue,
+    invoiceRevenue: values.invoiceRevenue,
     totalExpenses: values.totalExpenses,
     cashCollected: values.cashCollected,
     upiCollected: values.upiCollected,
@@ -130,6 +148,9 @@ export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
     netCollection: values.netCollection,
     subscriptionRevenue: values.subscriptionRevenue,
     productRevenue: values.productRevenue,
+    casualSwimRevenue: values.casualSwimRevenue,
+    casualSwimCouponsUsed: values.casualSwimCouponsUsed,
+    lastCouponNumber: values.lastCouponNumber,
     notes: values.notes,
     collectedByName: values.collectedByName,
   };

@@ -8,8 +8,14 @@ describe("buildPaymentBreakdownFromSnapshot", () => {
   it("reconstructs gross cash and expense split from persisted net figures", () => {
     const breakdown = buildPaymentBreakdownFromSnapshot({
       totalRevenue: 3000,
+      invoiceRevenue: 3000,
       subscriptionRevenue: 2500,
       productRevenue: 500,
+      casualSwimRevenue: 0,
+      casualSwimCouponsUsed: 0,
+      casualSwimCouponRate: 150,
+      lastCouponNumber: null,
+      previousClosingCoupon: 0,
       totalExpenses: 500,
       cashCollected: 1800,
       upiCollected: 1000,
@@ -28,8 +34,14 @@ describe("buildPaymentBreakdownFromSnapshot", () => {
   it("allocates remainder revenue to card when cash and UPI do not cover total", () => {
     const breakdown = buildPaymentBreakdownFromSnapshot({
       totalRevenue: 3000,
+      invoiceRevenue: 3000,
       subscriptionRevenue: 0,
       productRevenue: 0,
+      casualSwimRevenue: 0,
+      casualSwimCouponsUsed: 0,
+      casualSwimCouponRate: 150,
+      lastCouponNumber: null,
+      previousClosingCoupon: 0,
       totalExpenses: 200,
       cashCollected: 1800,
       upiCollected: 1000,
@@ -112,5 +124,24 @@ describe("computeCollectionTotals", () => {
     expect(result.totalRevenue).toBe(3000);
     expect(result.netCollection).toBe(2800);
     expect(result.paymentBreakdown.grossCollected).toBe(3000);
+  });
+
+  it("includes casual swim revenue in totals and cash collected", () => {
+    const result = computeCollectionTotals({
+      subscriptionRevenue: 2500,
+      productRevenue: 500,
+      grossCash: 2000,
+      grossUpi: 1000,
+      grossCard: 0,
+      grossOther: 0,
+      cashExpenses: 200,
+      upiExpenses: 0,
+      casualSwimRevenue: 3000,
+    });
+
+    expect(result.invoiceRevenue).toBe(3000);
+    expect(result.totalRevenue).toBe(6000);
+    expect(result.paymentBreakdown.cash).toBe(5000);
+    expect(result.netCollection).toBe(5800);
   });
 });

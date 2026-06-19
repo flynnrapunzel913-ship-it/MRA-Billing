@@ -132,6 +132,12 @@ export const settingsSchema = z.object({
   termsAndConditions: z.string(),
 });
 
+export const casualSwimSettingsSchema = z.object({
+  casualSwimCouponRate: z.coerce.number().positive("Coupon rate must be greater than zero"),
+});
+
+export type CasualSwimSettingsInput = z.infer<typeof casualSwimSettingsSchema>;
+
 const userRoleSchema = z.nativeEnum(Role).refine(
   (role) => role === Role.ADMIN || role === Role.RECEPTIONIST,
   { message: "Invalid role" }

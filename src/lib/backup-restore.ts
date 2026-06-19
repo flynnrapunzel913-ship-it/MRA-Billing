@@ -421,6 +421,8 @@ function mapSettings(row: Record<string, unknown>): Prisma.SettingsCreateManyInp
     headerImageUrl: requireString(row, "headerImageUrl"),
     brandColor: requireString(row, "brandColor"),
     termsAndConditions: requireString(row, "termsAndConditions"),
+    casualSwimCouponRate:
+      row.casualSwimCouponRate == null ? 150 : requireNumber(row, "casualSwimCouponRate"),
     updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
   };
 }
@@ -624,6 +626,13 @@ function mapDailyCollection(row: Record<string, unknown>): Prisma.DailyCollectio
     totalRevenue: optionalNumber(row.totalRevenue),
     subscriptionRevenue: optionalNumber(row.subscriptionRevenue),
     productRevenue: optionalNumber(row.productRevenue),
+    invoiceRevenue: optionalNumber(row.invoiceRevenue),
+    casualSwimRevenue: optionalNumber(row.casualSwimRevenue),
+    casualSwimCouponsUsed:
+      row.casualSwimCouponsUsed == null ? undefined : requireInt(row, "casualSwimCouponsUsed"),
+    casualSwimCouponRate: optionalNumber(row.casualSwimCouponRate),
+    lastCouponNumber:
+      row.lastCouponNumber == null ? undefined : requireInt(row, "lastCouponNumber"),
     totalExpenses: optionalNumber(row.totalExpenses),
     cashCollectedSystem: optionalNumber(row.cashCollectedSystem),
     upiCollected: optionalNumber(row.upiCollected),

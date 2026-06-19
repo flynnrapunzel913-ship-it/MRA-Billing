@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Calendar,
   CheckCircle2,
@@ -27,6 +27,7 @@ import {
 import { formatCurrency, formatDateInput, cn } from "@/lib/utils";
 import { readApiResponse } from "@/lib/api-error";
 import type { CollectionHistoryRow, DailyCollectionSheet } from "@/lib/daily-collection";
+import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
 import {
   CashDenominationSection,
   cashStateFromReconciliation,
@@ -100,6 +101,48 @@ function BreakdownToggle({
       </button>
       {open ? <div className="border-t border-border/60">{children}</div> : null}
     </div>
+  );
+}
+
+function RevenueSourceBreakdownCard({
+  sheet,
+  casualSwim,
+  totalRevenue,
+}: {
+  sheet: DailyCollectionSheet;
+  casualSwim: DailyCollectionSheet["casualSwim"];
+  totalRevenue: number;
+}) {
+  return (
+    <Card className={sectionCard}>
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="text-base">Revenue Source Breakdown</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">Invoices &amp; Subscriptions</p>
+            <p className="text-xs text-muted-foreground">Coaching packages and product sales</p>
+          </div>
+          <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
+        </div>
+        <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">Casual Swimming</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Coupons Used: {casualSwim.couponsUsed} · Rate: {formatCurrency(casualSwim.couponRate)}
+              </p>
+            </div>
+            <p className="text-lg font-bold tabular-nums">{formatCurrency(casualSwim.revenue)}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
+          <span>Total Revenue</span>
+          <span className="text-lg tabular-nums text-primary">{formatCurrency(totalRevenue)}</span>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -300,6 +343,7 @@ export function DailyCollectionPanel() {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [lastCouponInput, setLastCouponInput] = useState("");
 
   const loadSheet = useCallback(async (date: string, preferLive = false) => {
     setLoading(true);
@@ -314,6 +358,11 @@ export function DailyCollectionPanel() {
       }
       setSheet(result.data);
       setNotes(result.data.collection?.notes ?? "");
+      setLastCouponInput(
+        result.data.casualSwim.lastCouponNumber != null
+          ? String(result.data.casualSwim.lastCouponNumber)
+          : ""
+      );
       setDenominations(
         cashStateFromReconciliation(result.data.collection?.cashReconciliation)
       );
@@ -355,6 +404,12 @@ export function DailyCollectionPanel() {
   }, []);
 
   const submitCollection = async (method: "POST" | "PUT") => {
+    const parsedCoupon = parseInt(lastCouponInput, 10);
+    if (Number.isNaN(parsedCoupon)) {
+      toast.error("Enter today's last coupon number");
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/admin/daily-collection", {
@@ -364,6 +419,7 @@ export function DailyCollectionPanel() {
           date: selectedDate,
           notes,
           collectedByName: collectorName.trim(),
+          lastCouponNumber: parsedCoupon,
           cashDenominations: denominations,
         }),
       });
@@ -390,19 +446,73 @@ export function DailyCollectionPanel() {
 
   const collected = !!sheet?.collection;
   const formLocked = collected && !editMode;
-  const { paymentBreakdown } = sheet ?? {
-    paymentBreakdown: {
-      cash: 0,
-      upi: 0,
-      card: 0,
-      other: 0,
-      grossCollected: 0,
-      cashExpenses: 0,
-      upiExpenses: 0,
-      netCash: 0,
-      netUpi: 0,
-    },
-  };
+  const couponEditable = !formLocked;
+
+  const couponPreview = useMemo(() => {
+    if (!sheet || !couponEditable) return null;
+    const parsed = parseInt(lastCouponInput, 10);
+    if (Number.isNaN(parsed)) return null;
+    return calculateCasualSwimCouponRevenue(
+      sheet.casualSwim.previousClosingCoupon,
+      parsed,
+      sheet.casualSwim.couponRate
+    );
+  }, [sheet, lastCouponInput, couponEditable]);
+
+  const displayCasualSwim = useMemo(() => {
+    if (!sheet) return null;
+    if (couponPreview?.ok) {
+      return {
+        previousClosingCoupon: couponPreview.result.previousClosingCoupon,
+        lastCouponNumber: couponPreview.result.lastCouponNumber,
+        couponRate: couponPreview.result.couponRate,
+        couponsUsed: couponPreview.result.couponsUsed,
+        revenue: couponPreview.result.revenue,
+      };
+    }
+    return sheet.casualSwim;
+  }, [sheet, couponPreview]);
+
+  const displayTotals = useMemo(() => {
+    if (!sheet || !displayCasualSwim) return null;
+    const invoiceCash = sheet.paymentBreakdown.cash - sheet.casualSwim.revenue;
+    const casualRevenue = displayCasualSwim.revenue;
+    const totalRevenue = sheet.invoiceRevenue + casualRevenue;
+    const grossCash = invoiceCash + casualRevenue;
+    const netCash = grossCash - sheet.cashExpenses;
+    const netCollection = totalRevenue - sheet.totalExpenses;
+    return { totalRevenue, netCollection, grossCash, netCash };
+  }, [sheet, displayCasualSwim]);
+
+  const paymentBreakdown = useMemo(() => {
+    if (!sheet) {
+      return {
+        cash: 0,
+        upi: 0,
+        card: 0,
+        other: 0,
+        grossCollected: 0,
+        cashExpenses: 0,
+        upiExpenses: 0,
+        netCash: 0,
+        netUpi: 0,
+      };
+    }
+    if (!displayTotals || !couponEditable) return sheet.paymentBreakdown;
+    return {
+      ...sheet.paymentBreakdown,
+      cash: displayTotals.grossCash,
+      grossCollected:
+        displayTotals.grossCash +
+        sheet.paymentBreakdown.upi +
+        sheet.paymentBreakdown.card +
+        sheet.paymentBreakdown.other,
+      netCash: displayTotals.netCash,
+    };
+  }, [sheet, displayTotals, couponEditable]);
+
+  const totalRevenue = displayTotals?.totalRevenue ?? sheet?.totalRevenue ?? 0;
+  const netCollection = displayTotals?.netCollection ?? sheet?.netCollection ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -466,7 +576,7 @@ export function DailyCollectionPanel() {
                 <div>
                   <CardTitle className="text-base text-primary">Daily Collection</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Net Collection: {formatCurrency(sheet.netCollection)}
+                    Net Collection: {formatCurrency(netCollection)}
                   </p>
                 </div>
                 <div className="flex flex-col items-start gap-2 sm:items-end">
@@ -488,11 +598,11 @@ export function DailyCollectionPanel() {
             </CardHeader>
             <CardContent className="space-y-5 p-5">
               <p className="text-4xl font-bold tabular-nums text-primary sm:text-5xl">
-                {formatCurrency(sheet.netCollection)}
+                {formatCurrency(netCollection)}
               </p>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <SummaryStat label="Revenue Earned" value={formatCurrency(sheet.totalRevenue)} />
+                <SummaryStat label="Revenue Earned" value={formatCurrency(totalRevenue)} />
                 <SummaryStat
                   label="Expense · Cash"
                   value={formatCurrency(sheet.cashExpenses)}
@@ -527,6 +637,68 @@ export function DailyCollectionPanel() {
               )}
             </CardContent>
           </Card>
+
+          <Card className={sectionCard}>
+            <CardHeader className="border-b border-border px-5 py-4">
+              <CardTitle className="text-base">Casual Swimming Coupon Tracking</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="previous-closing-coupon">Previous Closing Coupon</Label>
+                  <Input
+                    id="previous-closing-coupon"
+                    value={sheet.casualSwim.previousClosingCoupon}
+                    readOnly
+                    disabled
+                    className="cursor-not-allowed opacity-80"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Carried forward from the most recent saved closing coupon.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="last-coupon-number">Today&apos;s Last Coupon</Label>
+                  <Input
+                    id="last-coupon-number"
+                    type="number"
+                    min={sheet.casualSwim.previousClosingCoupon}
+                    step={1}
+                    value={lastCouponInput}
+                    onChange={(e) => setLastCouponInput(e.target.value)}
+                    readOnly={!couponEditable}
+                    disabled={!couponEditable}
+                    placeholder="e.g. 120"
+                    className={cn(!couponEditable && "cursor-not-allowed opacity-80")}
+                  />
+                  {couponPreview && !couponPreview.ok && (
+                    <p className="text-sm text-destructive">{couponPreview.message}</p>
+                  )}
+                </div>
+              </div>
+              {displayCasualSwim && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+                  <p>
+                    Coupons Used: <span className="font-semibold">{displayCasualSwim.couponsUsed}</span>
+                  </p>
+                  <p>
+                    Rate: <span className="font-semibold">{formatCurrency(displayCasualSwim.couponRate)}</span>
+                  </p>
+                  <p>
+                    Revenue: <span className="font-semibold">{formatCurrency(displayCasualSwim.revenue)}</span>
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {displayCasualSwim && (
+            <RevenueSourceBreakdownCard
+              sheet={sheet}
+              casualSwim={displayCasualSwim}
+              totalRevenue={totalRevenue}
+            />
+          )}
 
           {(sheet.revenueBreakdown.length > 0 || sheet.expenses.length > 0) && (
             <Card className={sectionCard}>
@@ -606,14 +778,30 @@ export function DailyCollectionPanel() {
               </div>
 
               {!collected && (
-                <Button onClick={handleMarkCollected} disabled={saving || !collectorName.trim()}>
+                <Button
+                  onClick={handleMarkCollected}
+                  disabled={
+                    saving ||
+                    !collectorName.trim() ||
+                    !lastCouponInput.trim() ||
+                    (couponPreview != null && !couponPreview.ok)
+                  }
+                >
                   {saving ? "Saving…" : "Mark Collection As Collected"}
                 </Button>
               )}
 
               {editMode && (
                 <div className="flex flex-wrap gap-2">
-                  <Button onClick={handleSaveChanges} disabled={saving || !collectorName.trim()}>
+                  <Button
+                    onClick={handleSaveChanges}
+                    disabled={
+                      saving ||
+                      !collectorName.trim() ||
+                      !lastCouponInput.trim() ||
+                      (couponPreview != null && !couponPreview.ok)
+                    }
+                  >
                     {saving ? "Saving…" : "Save Changes"}
                   </Button>
                   <Button

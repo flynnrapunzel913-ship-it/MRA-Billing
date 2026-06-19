@@ -5,6 +5,7 @@ import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 import { normalizeDenominations, type CashDenominations } from "@/lib/cash-denominations";
+import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
 
 export type RevenueSourceRow = {
   name: string;
@@ -50,14 +51,33 @@ export type CashReconciliation = {
 
 export type CollectionSnapshot = {
   totalRevenue: number;
+  invoiceRevenue: number;
   subscriptionRevenue: number;
   productRevenue: number;
+  casualSwimRevenue: number;
+  casualSwimCouponsUsed: number;
+  casualSwimCouponRate: number;
+  lastCouponNumber: number | null;
+  previousClosingCoupon: number;
   totalExpenses: number;
   cashCollected: number;
   upiCollected: number;
   cardCollected?: number;
   otherCollected?: number;
   netCollection: number;
+};
+
+export type CasualSwimCouponTracking = {
+  previousClosingCoupon: number;
+  lastCouponNumber: number | null;
+  couponRate: number;
+  couponsUsed: number;
+  revenue: number;
+};
+
+export type RevenueSourceBreakdown = {
+  invoices: number;
+  casualSwimming: CasualSwimCouponTracking;
 };
 
 export type CollectionRecord = {
@@ -86,8 +106,11 @@ export type DailyCollectionSheet = {
   date: string;
   isSnapshot: boolean;
   totalRevenue: number;
+  invoiceRevenue: number;
   subscriptionRevenue: number;
   productRevenue: number;
+  casualSwim: CasualSwimCouponTracking;
+  revenueSourceBreakdown: RevenueSourceBreakdown;
   revenueBreakdown: RevenueSourceRow[];
   totalExpenses: number;
   cashExpenses: number;
@@ -144,19 +167,30 @@ function enrichSnapshotFromOriginal(
 
 function serializeSnapshot(row: {
   totalRevenue: unknown;
+  invoiceRevenue?: unknown;
   subscriptionRevenue: unknown;
   productRevenue: unknown;
+  casualSwimRevenue?: unknown;
+  casualSwimCouponsUsed?: unknown;
+  casualSwimCouponRate?: unknown;
+  lastCouponNumber?: number | null;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
   netCollection: unknown;
   originalSnapshotJson?: unknown;
-}): CollectionSnapshot | null {
+}, previousClosingCoupon = 0): CollectionSnapshot | null {
   if (row.totalRevenue == null) return null;
   const snapshot: CollectionSnapshot = {
     totalRevenue: toJsonNumber(row.totalRevenue),
+    invoiceRevenue: toJsonNumber(row.invoiceRevenue ?? row.totalRevenue),
     subscriptionRevenue: toJsonNumber(row.subscriptionRevenue),
     productRevenue: toJsonNumber(row.productRevenue),
+    casualSwimRevenue: toJsonNumber(row.casualSwimRevenue ?? 0),
+    casualSwimCouponsUsed: row.casualSwimCouponsUsed ?? 0,
+    casualSwimCouponRate: toJsonNumber(row.casualSwimCouponRate ?? 0),
+    lastCouponNumber: row.lastCouponNumber ?? null,
+    previousClosingCoupon,
     totalExpenses: toJsonNumber(row.totalExpenses),
     cashCollected: toJsonNumber(row.cashCollectedSystem),
     upiCollected: toJsonNumber(row.upiCollected),
@@ -191,7 +225,9 @@ export function computeCollectionTotals(input: {
   grossOther: number;
   cashExpenses: number;
   upiExpenses: number;
+  casualSwimRevenue?: number;
 }): {
+  invoiceRevenue: number;
   totalRevenue: number;
   totalExpenses: number;
   cashExpenses: number;
@@ -199,23 +235,29 @@ export function computeCollectionTotals(input: {
   netCollection: number;
   paymentBreakdown: PaymentBreakdown;
 } {
+  const casualSwimRevenue = input.casualSwimRevenue ?? 0;
+  const grossCashWithCasual = input.grossCash + casualSwimRevenue;
   const grossCollected =
-    input.grossCash + input.grossUpi + input.grossCard + input.grossOther;
+    grossCashWithCasual + input.grossUpi + input.grossCard + input.grossOther;
   const itemRevenue = input.subscriptionRevenue + input.productRevenue;
-  const totalRevenue = grossCollected > 0 ? grossCollected : itemRevenue;
+  const invoiceRevenue = input.grossCash + input.grossUpi + input.grossCard + input.grossOther > 0
+    ? input.grossCash + input.grossUpi + input.grossCard + input.grossOther
+    : itemRevenue;
+  const totalRevenue = invoiceRevenue + casualSwimRevenue;
   const totalExpenses = input.cashExpenses + input.upiExpenses;
-  const netCash = input.grossCash - input.cashExpenses;
+  const netCash = grossCashWithCasual - input.cashExpenses;
   const netUpi = input.grossUpi - input.upiExpenses;
   const netCollection = totalRevenue - totalExpenses;
 
   return {
+    invoiceRevenue,
     totalRevenue,
     totalExpenses,
     cashExpenses: input.cashExpenses,
     upiExpenses: input.upiExpenses,
     netCollection,
     paymentBreakdown: {
-      cash: input.grossCash,
+      cash: grossCashWithCasual,
       upi: input.grossUpi,
       card: input.grossCard,
       other: input.grossOther,
@@ -301,7 +343,68 @@ function buildPaymentBreakdown(
 export type DailyCollectionSheetOptions = {
   /** When true, always use live invoice/expense totals (mark-collected / edit save). */
   preferLiveTotals?: boolean;
+  /** Today's last coupon for live recalculation when saving. */
+  lastCouponNumber?: number;
 };
+
+export async function getCasualSwimCouponRate(): Promise<number> {
+  const settings = await prisma.settings.findUnique({
+    where: { id: "default" },
+    select: { casualSwimCouponRate: true },
+  });
+  return toJsonNumber(settings?.casualSwimCouponRate ?? 150);
+}
+
+export async function getPreviousClosingCoupon(beforeDate: Date): Promise<number> {
+  const row = await prisma.dailyCollection.findFirst({
+    where: {
+      collectionDate: { lt: beforeDate },
+      lastCouponNumber: { not: null },
+    },
+    orderBy: { collectionDate: "desc" },
+    select: { lastCouponNumber: true },
+  });
+  return row?.lastCouponNumber ?? 0;
+}
+
+export function resolveCasualSwimCouponTracking(
+  previousClosingCoupon: number,
+  couponRate: number,
+  lastCouponNumber: number | null
+): CasualSwimCouponTracking {
+  if (lastCouponNumber == null) {
+    return {
+      previousClosingCoupon,
+      lastCouponNumber: null,
+      couponRate,
+      couponsUsed: 0,
+      revenue: 0,
+    };
+  }
+
+  const calc = calculateCasualSwimCouponRevenue(
+    previousClosingCoupon,
+    lastCouponNumber,
+    couponRate
+  );
+  if (!calc.ok) {
+    return {
+      previousClosingCoupon,
+      lastCouponNumber,
+      couponRate,
+      couponsUsed: 0,
+      revenue: 0,
+    };
+  }
+
+  return {
+    previousClosingCoupon,
+    lastCouponNumber: calc.result.lastCouponNumber,
+    couponRate: calc.result.couponRate,
+    couponsUsed: calc.result.couponsUsed,
+    revenue: calc.result.revenue,
+  };
+}
 
 export async function getDailyCollectionSheet(
   dateStr: string,
@@ -326,7 +429,7 @@ export async function getDailyCollectionSheet(
 
   const historyStart = startOfDay(subDays(dayStart, 13));
 
-  const [paymentGroups, coachingGroups, productGroups, expenseRows, collection, historyCollections] =
+  const [paymentGroups, coachingGroups, productGroups, expenseRows, collection, historyCollections, couponRate, previousClosingCoupon] =
     await Promise.all([
       prisma.invoice.groupBy({
         by: ["paymentMethod"],
@@ -387,6 +490,8 @@ export async function getDailyCollectionSheet(
         },
         orderBy: { collectionDate: "desc" },
       }),
+      getCasualSwimCouponRate(),
+      getPreviousClosingCoupon(dayStart),
     ]);
 
   const subscriptionBreakdown: RevenueSourceRow[] = coachingGroups
@@ -431,6 +536,16 @@ export async function getDailyCollectionSheet(
     liveSubscriptionRevenue,
     liveProductRevenue
   );
+
+  const resolvedLastCoupon =
+    options?.lastCouponNumber ??
+    (collection?.lastCouponNumber != null ? collection.lastCouponNumber : null);
+  const casualSwim = resolveCasualSwimCouponTracking(
+    previousClosingCoupon,
+    couponRate,
+    resolvedLastCoupon
+  );
+
   const liveTotals = computeCollectionTotals({
     subscriptionRevenue: liveSubscriptionRevenue,
     productRevenue: liveProductRevenue,
@@ -440,14 +555,19 @@ export async function getDailyCollectionSheet(
     grossOther: livePaymentBreakdown.other,
     cashExpenses: liveCashExpenses,
     upiExpenses: liveUpiExpenses,
+    casualSwimRevenue: casualSwim.revenue,
   });
   const liveTotalRevenue = liveTotals.totalRevenue;
+  const liveInvoiceRevenue = liveTotals.invoiceRevenue;
   const liveNetCollection = liveTotals.netCollection;
   const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
+  const livePaymentWithCasual = liveTotals.paymentBreakdown;
 
   const isSnapshot = collection != null;
   const persistedSnapshot =
-    collection && !options?.preferLiveTotals ? serializeSnapshot(collection) : null;
+    collection && !options?.preferLiveTotals
+      ? serializeSnapshot(collection, previousClosingCoupon)
+      : null;
   const usePersistedTotals = persistedSnapshot != null;
   const persistedPaymentBreakdown = persistedSnapshot
     ? buildPaymentBreakdownFromSnapshot(persistedSnapshot)
@@ -481,22 +601,39 @@ export async function getDailyCollectionSheet(
   }
 
   const displayTotalRevenue = persistedSnapshot?.totalRevenue ?? liveTotalRevenue;
+  const displayInvoiceRevenue = persistedSnapshot?.invoiceRevenue ?? liveInvoiceRevenue;
   const displaySubscriptionRevenue =
     persistedSnapshot?.subscriptionRevenue ?? liveSubscriptionRevenue;
   const displayProductRevenue = persistedSnapshot?.productRevenue ?? liveProductRevenue;
+  const displayCasualSwim =
+    persistedSnapshot != null
+      ? {
+          previousClosingCoupon: persistedSnapshot.previousClosingCoupon,
+          lastCouponNumber: persistedSnapshot.lastCouponNumber,
+          couponRate: persistedSnapshot.casualSwimCouponRate,
+          couponsUsed: persistedSnapshot.casualSwimCouponsUsed,
+          revenue: persistedSnapshot.casualSwimRevenue,
+        }
+      : casualSwim;
   const displayTotalExpenses = persistedSnapshot?.totalExpenses ?? liveTotalExpenses;
   const displayCashExpenses =
     persistedPaymentBreakdown?.cashExpenses ?? liveCashExpenses;
   const displayUpiExpenses = persistedPaymentBreakdown?.upiExpenses ?? liveUpiExpenses;
-  const displayPaymentBreakdown = persistedPaymentBreakdown ?? livePaymentBreakdown;
+  const displayPaymentBreakdown = persistedPaymentBreakdown ?? livePaymentWithCasual;
   const displayNetCollection = persistedSnapshot?.netCollection ?? liveNetCollection;
 
   return {
     date: dateStr,
     isSnapshot,
     totalRevenue: displayTotalRevenue,
+    invoiceRevenue: displayInvoiceRevenue,
     subscriptionRevenue: displaySubscriptionRevenue,
     productRevenue: displayProductRevenue,
+    casualSwim: displayCasualSwim,
+    revenueSourceBreakdown: {
+      invoices: displayInvoiceRevenue,
+      casualSwimming: displayCasualSwim,
+    },
     revenueBreakdown: usePersistedTotals ? [] : liveRevenueBreakdown,
     totalExpenses: displayTotalExpenses,
     cashExpenses: displayCashExpenses,
@@ -511,7 +648,7 @@ export async function getDailyCollectionSheet(
           collectedAt: collection.collectedAt.toISOString(),
           collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
-          snapshot: persistedSnapshot ?? serializeSnapshot(collection),
+          snapshot: persistedSnapshot ?? serializeSnapshot(collection, previousClosingCoupon),
           cashReconciliation: serializeCashReconciliation(collection),
         }
       : null,
@@ -529,10 +666,16 @@ export function buildCollectionSnapshotFromSheet(
 ): CollectionSnapshot {
   return {
     totalRevenue: sheet.totalRevenue,
+    invoiceRevenue: sheet.invoiceRevenue,
     subscriptionRevenue: sheet.subscriptionRevenue,
     productRevenue: sheet.productRevenue,
+    casualSwimRevenue: sheet.casualSwim.revenue,
+    casualSwimCouponsUsed: sheet.casualSwim.couponsUsed,
+    casualSwimCouponRate: sheet.casualSwim.couponRate,
+    lastCouponNumber: sheet.casualSwim.lastCouponNumber,
+    previousClosingCoupon: sheet.casualSwim.previousClosingCoupon,
     totalExpenses: sheet.totalExpenses,
-    cashCollected: sheet.paymentBreakdown.cash,
+    cashCollected: sheet.paymentBreakdown.netCash,
     upiCollected: sheet.paymentBreakdown.upi,
     cardCollected: sheet.paymentBreakdown.card,
     otherCollected: sheet.paymentBreakdown.other,

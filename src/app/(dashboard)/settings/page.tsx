@@ -363,6 +363,22 @@ export default function SettingsPage() {
 
         <Separator />
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Casual Swimming</CardTitle>
+            <CardDescription>
+              Manual coupon register — configure per-coupon rate for Daily Collection.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button type="button" variant="outline" asChild>
+              <PrefetchLink href="/settings/casual-swim">Manage Coupon Rate</PrefetchLink>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
         <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? "Saving..." : "Save Settings"}
         </Button>
