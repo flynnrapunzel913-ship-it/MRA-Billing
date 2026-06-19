@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 
 /** Bump when User model / UserActivity changes to bust dev global Prisma cache */
-export const PRISMA_CLIENT_MARKER = "casual-swim-cashier-v1";
+export const PRISMA_CLIENT_MARKER = "mra-billing-v2";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

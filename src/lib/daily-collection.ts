@@ -4,7 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { toJsonNumber } from "@/lib/serialize-prisma";
-import { sumCasualSwimRevenueByPaymentMode } from "@/lib/casual-swim-revenue";
 import { normalizeDenominations, type CashDenominations } from "@/lib/cash-denominations";
 
 export type RevenueSourceRow = {
@@ -12,41 +11,6 @@ export type RevenueSourceRow = {
   count: number;
   amount: number;
 };
-
-/** Cash / UPI split for one revenue channel (invoices or casual swimming). */
-export type RevenueChannelBreakdown = {
-  total: number;
-  cash: number;
-  upi: number;
-};
-
-export type RevenueSourceChannelBreakdown = {
-  invoices: RevenueChannelBreakdown;
-  casualSwimming: RevenueChannelBreakdown;
-};
-
-/**
- * Derives per-source cash/UPI splits from combined totals already on the sheet.
- * Ensures: invoices + casual = totalRevenue; per-mode sums match paymentBreakdown.
- */
-export function buildRevenueSourceChannelBreakdown(
-  totalRevenue: number,
-  paymentBreakdown: PaymentBreakdown,
-  casualSwim: { total: number; cash: number; upi: number }
-): RevenueSourceChannelBreakdown {
-  return {
-    invoices: {
-      total: totalRevenue - casualSwim.total,
-      cash: paymentBreakdown.cash - casualSwim.cash,
-      upi: paymentBreakdown.upi - casualSwim.upi,
-    },
-    casualSwimming: {
-      total: casualSwim.total,
-      cash: casualSwim.cash,
-      upi: casualSwim.upi,
-    },
-  };
-}
 
 export type ExpenseDetailRow = {
   id: string;
@@ -122,9 +86,6 @@ export type DailyCollectionSheet = {
   date: string;
   isSnapshot: boolean;
   totalRevenue: number;
-  invoiceRevenue: number;
-  casualSwimRevenue: number;
-  revenueSourceBreakdown: RevenueSourceChannelBreakdown;
   subscriptionRevenue: number;
   productRevenue: number;
   revenueBreakdown: RevenueSourceRow[];
@@ -224,7 +185,6 @@ export function sumExpensesByPaymentMode(
 export function computeCollectionTotals(input: {
   subscriptionRevenue: number;
   productRevenue: number;
-  casualSwimRevenue?: number;
   grossCash: number;
   grossUpi: number;
   grossCard: number;
@@ -241,8 +201,7 @@ export function computeCollectionTotals(input: {
 } {
   const grossCollected =
     input.grossCash + input.grossUpi + input.grossCard + input.grossOther;
-  const itemRevenue =
-    input.subscriptionRevenue + input.productRevenue + (input.casualSwimRevenue ?? 0);
+  const itemRevenue = input.subscriptionRevenue + input.productRevenue;
   const totalRevenue = grossCollected > 0 ? grossCollected : itemRevenue;
   const totalExpenses = input.cashExpenses + input.upiExpenses;
   const netCash = input.grossCash - input.cashExpenses;
@@ -300,13 +259,10 @@ export function buildPaymentBreakdownFromSnapshot(
 
 function buildPaymentBreakdown(
   paymentGroups: Array<{ paymentMethod: string; _sum: { amountPaid: unknown } }>,
-  casualSwimCash: number,
-  casualSwimUpi: number,
   cashExpenses: number,
   upiExpenses: number,
   subscriptionRevenue: number,
-  productRevenue: number,
-  casualSwimRevenue: number
+  productRevenue: number
 ): PaymentBreakdown {
   let grossCash = 0;
   let grossUpi = 0;
@@ -330,13 +286,9 @@ function buildPaymentBreakdown(
     }
   }
 
-  grossCash += casualSwimCash;
-  grossUpi += casualSwimUpi;
-
   return computeCollectionTotals({
     subscriptionRevenue,
     productRevenue,
-    casualSwimRevenue,
     grossCash,
     grossUpi,
     grossCard,
@@ -374,79 +326,68 @@ export async function getDailyCollectionSheet(
 
   const historyStart = startOfDay(subDays(dayStart, 13));
 
-  const [
-    paymentGroups,
-    coachingGroups,
-    productGroups,
-    expenseRows,
-    casualSwimBills,
-    collection,
-    historyCollections,
-  ] = await Promise.all([
-    prisma.invoice.groupBy({
-      by: ["paymentMethod"],
-      where: paidInvoiceWhere,
-      _sum: { amountPaid: true },
-    }),
-    prisma.invoiceItem.groupBy({
-      by: ["description"],
-      where: {
-        itemType: COACHING_PACKAGE_TYPE,
-        invoice: paidInvoiceWhere,
-      },
-      _sum: { amount: true, quantity: true },
-    }),
-    prisma.invoiceItem.groupBy({
-      by: ["description"],
-      where: {
-        itemType: "Accessories / Products",
-        invoice: paidInvoiceWhere,
-      },
-      _sum: { amount: true, quantity: true },
-    }),
-    prisma.expense.findMany({
-      where: expenseWhere,
-      orderBy: { createdAt: "asc" },
-      include: {
-        createdBy: { select: { name: true, username: true } },
-      },
-    }),
-    prisma.casualSwimBill.findMany({
-      where: { createdAt: { gte: dayStart, lte: dayEnd } },
-      select: { totalAmount: true, paymentMode: true, cashAmount: true, upiAmount: true },
-    }),
-    prisma.dailyCollection.findUnique({
-      where: { collectionDate: dayStart },
-      include: {
-        collectedBy: { select: { id: true, name: true, username: true } },
-        editHistory: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-          select: { createdAt: true },
+  const [paymentGroups, coachingGroups, productGroups, expenseRows, collection, historyCollections] =
+    await Promise.all([
+      prisma.invoice.groupBy({
+        by: ["paymentMethod"],
+        where: paidInvoiceWhere,
+        _sum: { amountPaid: true },
+      }),
+      prisma.invoiceItem.groupBy({
+        by: ["description"],
+        where: {
+          itemType: COACHING_PACKAGE_TYPE,
+          invoice: paidInvoiceWhere,
         },
-        _count: { select: { editHistory: true } },
-      },
-    }),
-    prisma.dailyCollection.findMany({
-      where: { collectionDate: { gte: historyStart, lte: dayEnd } },
-      select: {
-        collectionDate: true,
-        totalRevenue: true,
-        subscriptionRevenue: true,
-        productRevenue: true,
-        totalExpenses: true,
-        cashCollectedSystem: true,
-        upiCollected: true,
-        netCollection: true,
-        originalSnapshotJson: true,
-        cashCountedPhysical: true,
-        cashDifference: true,
-        cashDifferenceNotes: true,
-        cashDenominations: true,
-      },
-      orderBy: { collectionDate: "desc" },
-    }),
-  ]);
+        _sum: { amount: true, quantity: true },
+      }),
+      prisma.invoiceItem.groupBy({
+        by: ["description"],
+        where: {
+          itemType: "Accessories / Products",
+          invoice: paidInvoiceWhere,
+        },
+        _sum: { amount: true, quantity: true },
+      }),
+      prisma.expense.findMany({
+        where: expenseWhere,
+        orderBy: { createdAt: "asc" },
+        include: {
+          createdBy: { select: { name: true, username: true } },
+        },
+      }),
+      prisma.dailyCollection.findUnique({
+        where: { collectionDate: dayStart },
+        include: {
+          collectedBy: { select: { id: true, name: true, username: true } },
+          editHistory: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { createdAt: true },
+          },
+          _count: { select: { editHistory: true } },
+        },
+      }),
+      prisma.dailyCollection.findMany({
+        where: { collectionDate: { gte: historyStart, lte: dayEnd } },
+        select: {
+          collectionDate: true,
+          totalRevenue: true,
+          subscriptionRevenue: true,
+          productRevenue: true,
+          totalExpenses: true,
+          cashCollectedSystem: true,
+          upiCollected: true,
+          netCollection: true,
+          originalSnapshotJson: true,
+          cashCountedPhysical: true,
+          cashDifference: true,
+          cashDifferenceNotes: true,
+          cashDenominations: true,
+        },
+        orderBy: { collectionDate: "desc" },
+      }),
+    ]);
 
   const subscriptionBreakdown: RevenueSourceRow[] = coachingGroups
     .map((row) => ({
@@ -483,45 +424,16 @@ export async function getDailyCollectionSheet(
   const { cashExpenses: liveCashExpenses, upiExpenses: liveUpiExpenses, totalExpenses: liveTotalExpenses } =
     sumExpensesByPaymentMode(expenses);
 
-  const casualSwimTotals = sumCasualSwimRevenueByPaymentMode(casualSwimBills);
-
-  let invoiceGrossCash = 0;
-  let invoiceGrossUpi = 0;
-  let invoiceGrossCard = 0;
-  let invoiceGrossOther = 0;
-  for (const row of paymentGroups) {
-    const amount = toJsonNumber(row._sum.amountPaid);
-    switch (row.paymentMethod) {
-      case "CASH":
-        invoiceGrossCash = amount;
-        break;
-      case "UPI":
-        invoiceGrossUpi = amount;
-        break;
-      case "CARD":
-        invoiceGrossCard = amount;
-        break;
-      default:
-        invoiceGrossOther += amount;
-    }
-  }
-  const liveInvoiceRevenue =
-    invoiceGrossCash + invoiceGrossUpi + invoiceGrossCard + invoiceGrossOther;
-
   const livePaymentBreakdown = buildPaymentBreakdown(
     paymentGroups,
-    casualSwimTotals.cash,
-    casualSwimTotals.upi,
     liveCashExpenses,
     liveUpiExpenses,
     liveSubscriptionRevenue,
-    liveProductRevenue,
-    casualSwimTotals.total
+    liveProductRevenue
   );
   const liveTotals = computeCollectionTotals({
     subscriptionRevenue: liveSubscriptionRevenue,
     productRevenue: liveProductRevenue,
-    casualSwimRevenue: casualSwimTotals.total,
     grossCash: livePaymentBreakdown.cash,
     grossUpi: livePaymentBreakdown.upi,
     grossCard: livePaymentBreakdown.card,
@@ -579,19 +491,10 @@ export async function getDailyCollectionSheet(
   const displayPaymentBreakdown = persistedPaymentBreakdown ?? livePaymentBreakdown;
   const displayNetCollection = persistedSnapshot?.netCollection ?? liveNetCollection;
 
-  const revenueSourceBreakdown = buildRevenueSourceChannelBreakdown(
-    displayTotalRevenue,
-    displayPaymentBreakdown,
-    casualSwimTotals
-  );
-
   return {
     date: dateStr,
     isSnapshot,
     totalRevenue: displayTotalRevenue,
-    invoiceRevenue: revenueSourceBreakdown.invoices.total,
-    casualSwimRevenue: revenueSourceBreakdown.casualSwimming.total,
-    revenueSourceBreakdown,
     subscriptionRevenue: displaySubscriptionRevenue,
     productRevenue: displayProductRevenue,
     revenueBreakdown: usePersistedTotals ? [] : liveRevenueBreakdown,

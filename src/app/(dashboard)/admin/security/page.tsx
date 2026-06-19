@@ -42,11 +42,6 @@ const ACTION_FILTER_OPTIONS = [
   { value: "RATE_LIMIT_EXCEEDED", label: "Rate limit exceeded" },
   { value: "DAILY_COLLECTION_MARKED", label: "Daily collection marked" },
   { value: "DAILY_COLLECTION_UPDATED", label: "Daily collection updated" },
-  { value: "CASUAL_SWIM_TICKET_CREATED", label: "Casual swim ticket created" },
-  { value: "CASUAL_SWIM_BILL_CREATED", label: "Casual swim bill created" },
-  { value: "CASUAL_SWIM_BILL_DELETED", label: "Casual swim bill deleted" },
-  { value: "CASUAL_SWIM_TICKET_COUNTER_RESET", label: "Casual swim counter reset" },
-  { value: "CASUAL_SWIM_SETTINGS_UPDATED", label: "Casual swim settings updated" },
 ] as const;
 
 type AuditEventRow = {

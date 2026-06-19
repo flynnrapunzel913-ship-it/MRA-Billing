@@ -103,68 +103,6 @@ function BreakdownToggle({
   );
 }
 
-function RevenueSourceBreakdownCard({ sheet }: { sheet: DailyCollectionSheet }) {
-  const { invoices, casualSwimming } = sheet.revenueSourceBreakdown;
-
-  return (
-    <Card className={cn(sectionCard, "border-primary/30 bg-primary/5")}>
-      <CardHeader className="border-b border-primary/15 px-5 py-4">
-        <CardTitle className="text-base text-primary">Revenue Source Breakdown</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5 p-5">
-        <div className="grid gap-5 lg:grid-cols-2">
-          <RevenueChannelPanel
-            title="Invoices & Subscriptions"
-            channel={invoices}
-            cashClassName="border-emerald-500/30 bg-emerald-500/5 [&_p:first-child]:text-emerald-700 dark:[&_p:first-child]:text-emerald-400"
-            upiClassName="border-sky-500/30 bg-sky-500/5 [&_p:first-child]:text-sky-700 dark:[&_p:first-child]:text-sky-400"
-          />
-          <RevenueChannelPanel
-            title="Casual Swimming"
-            channel={casualSwimming}
-            cashClassName="border-emerald-500/30 bg-emerald-500/5 [&_p:first-child]:text-emerald-700 dark:[&_p:first-child]:text-emerald-400"
-            upiClassName="border-sky-500/30 bg-sky-500/5 [&_p:first-child]:text-sky-700 dark:[&_p:first-child]:text-sky-400"
-          />
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function RevenueChannelPanel({
-  title,
-  channel,
-  cashClassName,
-  upiClassName,
-}: {
-  title: string;
-  channel: DailyCollectionSheet["revenueSourceBreakdown"]["invoices"];
-  cashClassName?: string;
-  upiClassName?: string;
-}) {
-  return (
-    <div className="space-y-3 rounded-lg border border-border/60 bg-card/50 p-4">
-      <div>
-        <p className="text-sm font-semibold text-foreground">{title}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Total Revenue:{" "}
-          <span className="font-semibold tabular-nums text-foreground">
-            {formatCurrency(channel.total)}
-          </span>
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SummaryStat label="Cash" value={formatCurrency(channel.cash)} className={cashClassName} />
-        <SummaryStat
-          label="UPI / PhonePe"
-          value={formatCurrency(channel.upi)}
-          className={upiClassName}
-        />
-      </div>
-    </div>
-  );
-}
-
 function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
   const [open, setOpen] = useState(false);
 
@@ -182,7 +120,7 @@ function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
             {formatCurrency(sheet.productRevenue)}
           </p>
         </div>
-        <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
+        <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.totalRevenue)}</p>
       </div>
       <BreakdownToggle
         label={`View ${sheet.revenueBreakdown.length} revenue record${sheet.revenueBreakdown.length === 1 ? "" : "s"}`}
@@ -589,8 +527,6 @@ export function DailyCollectionPanel() {
               )}
             </CardContent>
           </Card>
-
-          <RevenueSourceBreakdownCard sheet={sheet} />
 
           {(sheet.revenueBreakdown.length > 0 || sheet.expenses.length > 0) && (
             <Card className={sectionCard}>

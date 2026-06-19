@@ -19,8 +19,6 @@ const PLANS_TO_KEEP: Record<string, string> = {
   "6 Months Swimming": "sp_month_6",
   "1 Year Swimming": "sp_month_12",
   "21 Classes Coaching": "sp_coach_21",
-  "Casual Swim Adult": "sp_casual_adult",
-  "Casual Swim Below 5 Years": "spl_casual_child",
 };
 
 const EXPECTED_FEES: Record<string, number> = {
@@ -30,8 +28,6 @@ const EXPECTED_FEES: Record<string, number> = {
   "6 Months Swimming": 14160,
   "1 Year Swimming": 21240,
   "21 Classes Coaching": 5000,
-  "Casual Swim Adult": 150,
-  "Casual Swim Below 5 Years": 100,
 };
 
 async function main() {

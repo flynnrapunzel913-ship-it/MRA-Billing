@@ -2,7 +2,7 @@ import { edgeAuth } from "@/lib/auth/edge";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { applyApiRateLimitsEdge } from "@/lib/security/request-rate-limit-edge";
-import { canAccessApi, canAccessRoute, getHomeRoute } from "@/lib/permissions";
+import { canAccessRoute, getHomeRoute } from "@/lib/permissions";
 import type { Role } from "@prisma/client";
 
 const protectedPrefixes = [
@@ -15,7 +15,6 @@ const protectedPrefixes = [
   "/admin",
   "/settings",
   "/profile",
-  "/casual-swim",
 ];
 
 function isApiPath(pathname: string) {
@@ -64,10 +63,6 @@ export default edgeAuth(async (req) => {
     }
   }
 
-  if (isApiPath(pathname) && isLoggedIn && role === "CASHIER" && !canAccessApi(role, pathname)) {
-    return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
-  }
-
   const requestHeaders = new Headers(req.headers);
   requestHeaders.set("x-mra-pathname", pathname);
   return NextResponse.next({ request: { headers: requestHeaders } });
@@ -80,7 +75,6 @@ export const config = {
     "/api/customers",
     "/api/invoices",
     "/api/invoices/:path*",
-    "/api/casual-swim/:path*",
     "/((?!_next/static|_next/image|favicon.ico|backgrounds|.*\\..*).*)",
   ],
 };

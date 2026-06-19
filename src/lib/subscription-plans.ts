@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/prisma";
 import { toJsonNumber } from "@/lib/serialize-prisma";
-import { casualSubscriptionExclusionFilter } from "@/lib/casual-subscription-exclusions";
 import {
   formatDurationLabel,
   formatPlanCoverageSummary,
@@ -67,7 +66,6 @@ export async function listSubscriptionPlans(options?: { q?: string; activeOnly?:
 
   const rows = await prisma.subscriptionPlan.findMany({
     where: {
-      ...casualSubscriptionExclusionFilter(),
       ...(options?.activeOnly ? { isActive: true } : {}),
       ...(q
         ? {

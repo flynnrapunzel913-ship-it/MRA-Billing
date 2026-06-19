@@ -5,7 +5,8 @@ export type SecurityEvent =
   | "rate_limit_exceeded"
   | "session_revoked_disabled"
   | "session_revoked_missing_user"
-  | "admin_forbidden";
+  | "admin_forbidden"
+  | "operational_forbidden";
 
 export function logSecurityEvent(
   event: SecurityEvent,
