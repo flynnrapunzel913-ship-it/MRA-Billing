@@ -105,15 +105,7 @@ function BreakdownToggle({
   );
 }
 
-function RevenueSourceBreakdownCard({
-  sheet,
-  casualSwim,
-  totalRevenue,
-}: {
-  sheet: DailyCollectionSheet;
-  casualSwim: DailyCollectionSheet["casualSwim"];
-  totalRevenue: number;
-}) {
+function RevenueSourceBreakdownCard({ sheet }: { sheet: DailyCollectionSheet }) {
   return (
     <Card className={sectionCard}>
       <CardHeader className="border-b border-border px-5 py-4">
@@ -127,36 +119,56 @@ function RevenueSourceBreakdownCard({
           </div>
           <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
         </div>
-        <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 space-y-3">
-          <p className="text-sm font-semibold">Casual Swimming</p>
-          <div className="flex items-start justify-between gap-3 text-sm">
-            <div>
-              <p className="font-medium">Above 5 Years</p>
-              <p className="text-xs text-muted-foreground">
-                {casualSwim.above5.couponsUsed} Coupons · Rate{" "}
-                {formatCurrency(casualSwim.above5.couponRate)}
-              </p>
-            </div>
-            <p className="font-bold tabular-nums">{formatCurrency(casualSwim.above5.revenue)}</p>
-          </div>
-          <div className="flex items-start justify-between gap-3 text-sm">
-            <div>
-              <p className="font-medium">Below 5 Years</p>
-              <p className="text-xs text-muted-foreground">
-                {casualSwim.below5.couponsUsed} Coupons · Rate{" "}
-                {formatCurrency(casualSwim.below5.couponRate)}
-              </p>
-            </div>
-            <p className="font-bold tabular-nums">{formatCurrency(casualSwim.below5.revenue)}</p>
-          </div>
-          <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
-            <span>Total Casual Swimming</span>
-            <span className="tabular-nums">{formatCurrency(casualSwim.revenue)}</span>
-          </div>
-        </div>
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
           <span>Revenue Earned</span>
-          <span className="text-lg tabular-nums text-primary">{formatCurrency(totalRevenue)}</span>
+          <span className="text-lg tabular-nums text-primary">
+            {formatCurrency(sheet.invoiceRevenue)}
+          </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CasualSwimmingSummaryCard({
+  casualSwim,
+}: {
+  casualSwim: DailyCollectionSheet["casualSwim"];
+}) {
+  return (
+    <Card className={sectionCard}>
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="text-base">Casual Swimming Summary</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Tracked separately from Daily Collection revenue — informational only.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4 p-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-sm font-semibold">Above 5 Years</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">
+              {casualSwim.above5.couponsUsed} Coupons
+            </p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-primary">
+              {formatCurrency(casualSwim.above5.revenue)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+            <p className="text-sm font-semibold">Below 5 Years</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">
+              {casualSwim.below5.couponsUsed} Coupons
+            </p>
+            <p className="mt-1 text-lg font-bold tabular-nums text-primary">
+              {formatCurrency(casualSwim.below5.revenue)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 font-semibold">
+          <span>Total Casual Swimming Revenue</span>
+          <span className="text-lg tabular-nums text-primary">
+            {formatCurrency(casualSwim.revenue)}
+          </span>
         </div>
       </CardContent>
     </Card>
@@ -245,7 +257,7 @@ function RevenueBreakdownTable({ sheet }: { sheet: DailyCollectionSheet }) {
             {formatCurrency(sheet.productRevenue)}
           </p>
         </div>
-        <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.totalRevenue)}</p>
+        <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
       </div>
       <BreakdownToggle
         label={`View ${sheet.revenueBreakdown.length} revenue record${sheet.revenueBreakdown.length === 1 ? "" : "s"}`}
@@ -582,46 +594,20 @@ export function DailyCollectionPanel() {
   const couponsFilled =
     lastCouponAbove5Input.trim().length > 0 && lastCouponBelow5Input.trim().length > 0;
 
-  const displayTotals = useMemo(() => {
-    if (!sheet || !displayCasualSwim) return null;
-    const invoiceCash = sheet.paymentBreakdown.cash - sheet.casualSwim.revenue;
-    const casualRevenue = displayCasualSwim.revenue;
-    const totalRevenue = sheet.invoiceRevenue + casualRevenue;
-    const grossCash = invoiceCash + casualRevenue;
-    const netCash = grossCash - sheet.cashExpenses;
-    const netCollection = totalRevenue - sheet.totalExpenses;
-    return { totalRevenue, netCollection, grossCash, netCash };
-  }, [sheet, displayCasualSwim]);
+  const paymentBreakdown = sheet?.paymentBreakdown ?? {
+    cash: 0,
+    upi: 0,
+    card: 0,
+    other: 0,
+    grossCollected: 0,
+    cashExpenses: 0,
+    upiExpenses: 0,
+    netCash: 0,
+    netUpi: 0,
+  };
 
-  const paymentBreakdown = useMemo(() => {
-    if (!sheet) {
-      return {
-        cash: 0,
-        upi: 0,
-        card: 0,
-        other: 0,
-        grossCollected: 0,
-        cashExpenses: 0,
-        upiExpenses: 0,
-        netCash: 0,
-        netUpi: 0,
-      };
-    }
-    if (!displayTotals || !couponEditable) return sheet.paymentBreakdown;
-    return {
-      ...sheet.paymentBreakdown,
-      cash: displayTotals.grossCash,
-      grossCollected:
-        displayTotals.grossCash +
-        sheet.paymentBreakdown.upi +
-        sheet.paymentBreakdown.card +
-        sheet.paymentBreakdown.other,
-      netCash: displayTotals.netCash,
-    };
-  }, [sheet, displayTotals, couponEditable]);
-
-  const totalRevenue = displayTotals?.totalRevenue ?? sheet?.totalRevenue ?? 0;
-  const netCollection = displayTotals?.netCollection ?? sheet?.netCollection ?? 0;
+  const totalRevenue = sheet?.invoiceRevenue ?? 0;
+  const netCollection = sheet?.netCollection ?? 0;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -778,28 +764,12 @@ export function DailyCollectionPanel() {
                   />
                 </div>
               )}
-              {displayCasualSwim && (
-                <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
-                  <p className="font-semibold text-primary">
-                    Total Casual Swimming Revenue: {formatCurrency(displayCasualSwim.revenue)}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {displayCasualSwim.couponsUsed} coupons total (
-                    {displayCasualSwim.above5.couponsUsed} above 5 +{" "}
-                    {displayCasualSwim.below5.couponsUsed} below 5)
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 
-          {displayCasualSwim && (
-            <RevenueSourceBreakdownCard
-              sheet={sheet}
-              casualSwim={displayCasualSwim}
-              totalRevenue={totalRevenue}
-            />
-          )}
+          {displayCasualSwim && <CasualSwimmingSummaryCard casualSwim={displayCasualSwim} />}
+
+          <RevenueSourceBreakdownCard sheet={sheet} />
 
           {(sheet.revenueBreakdown.length > 0 || sheet.expenses.length > 0) && (
             <Card className={sectionCard}>

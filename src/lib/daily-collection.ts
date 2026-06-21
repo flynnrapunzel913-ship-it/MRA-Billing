@@ -225,17 +225,23 @@ function serializeSnapshot(
 ): CollectionSnapshot | null {
   if (row.totalRevenue == null) return null;
   const casualSwim = buildCasualSwimFromPersistedRow(row, previousClosing, rates);
+  const invoiceRevenue = resolvePersistedInvoiceRevenue(row, casualSwim.revenue);
+  const totalExpenses = toJsonNumber(row.totalExpenses);
+  const cashCollected =
+    row.invoiceRevenue != null
+      ? toJsonNumber(row.cashCollectedSystem)
+      : Math.max(0, toJsonNumber(row.cashCollectedSystem) - casualSwim.revenue);
   const snapshot: CollectionSnapshot = {
-    totalRevenue: toJsonNumber(row.totalRevenue),
-    invoiceRevenue: toJsonNumber(row.invoiceRevenue ?? row.totalRevenue),
+    totalRevenue: invoiceRevenue,
+    invoiceRevenue,
     subscriptionRevenue: toJsonNumber(row.subscriptionRevenue),
     productRevenue: toJsonNumber(row.productRevenue),
     casualSwimRevenue: toJsonNumber(row.casualSwimRevenue ?? casualSwim.revenue),
     casualSwim,
-    totalExpenses: toJsonNumber(row.totalExpenses),
-    cashCollected: toJsonNumber(row.cashCollectedSystem),
+    totalExpenses,
+    cashCollected,
     upiCollected: toJsonNumber(row.upiCollected),
-    netCollection: toJsonNumber(row.netCollection),
+    netCollection: resolvePersistedNetCollection(invoiceRevenue, totalExpenses),
   };
   return enrichSnapshotFromOriginal(snapshot, row.originalSnapshotJson);
 }
@@ -264,7 +270,6 @@ export function computeCollectionTotals(input: {
   grossOther: number;
   cashExpenses: number;
   upiExpenses: number;
-  casualSwimRevenue?: number;
 }): {
   invoiceRevenue: number;
   totalRevenue: number;
@@ -274,18 +279,13 @@ export function computeCollectionTotals(input: {
   netCollection: number;
   paymentBreakdown: PaymentBreakdown;
 } {
-  const casualSwimRevenue = input.casualSwimRevenue ?? 0;
-  const grossCashWithCasual = input.grossCash + casualSwimRevenue;
   const grossCollected =
-    grossCashWithCasual + input.grossUpi + input.grossCard + input.grossOther;
+    input.grossCash + input.grossUpi + input.grossCard + input.grossOther;
   const itemRevenue = input.subscriptionRevenue + input.productRevenue;
-  const invoiceRevenue =
-    input.grossCash + input.grossUpi + input.grossCard + input.grossOther > 0
-      ? input.grossCash + input.grossUpi + input.grossCard + input.grossOther
-      : itemRevenue;
-  const totalRevenue = invoiceRevenue + casualSwimRevenue;
+  const invoiceRevenue = grossCollected > 0 ? grossCollected : itemRevenue;
+  const totalRevenue = invoiceRevenue;
   const totalExpenses = input.cashExpenses + input.upiExpenses;
-  const netCash = grossCashWithCasual - input.cashExpenses;
+  const netCash = input.grossCash - input.cashExpenses;
   const netUpi = input.grossUpi - input.upiExpenses;
   const netCollection = totalRevenue - totalExpenses;
 
@@ -297,7 +297,7 @@ export function computeCollectionTotals(input: {
     upiExpenses: input.upiExpenses,
     netCollection,
     paymentBreakdown: {
-      cash: grossCashWithCasual,
+      cash: input.grossCash,
       upi: input.grossUpi,
       card: input.grossCard,
       other: input.grossOther,
@@ -319,9 +319,10 @@ export function buildPaymentBreakdownFromSnapshot(
   const upiExpenses = Math.max(0, grossUpi - netUpi);
   const cashExpenses = Math.max(0, snapshot.totalExpenses - upiExpenses);
   const grossCash = netCash + cashExpenses;
+  const revenueBase = snapshot.invoiceRevenue;
   const card =
     snapshot.cardCollected ??
-    Math.max(0, snapshot.totalRevenue - grossCash - grossUpi - (snapshot.otherCollected ?? 0));
+    Math.max(0, revenueBase - grossCash - grossUpi - (snapshot.otherCollected ?? 0));
   const other = snapshot.otherCollected ?? 0;
   const grossCollected = grossCash + grossUpi + card + other;
 
@@ -336,6 +337,27 @@ export function buildPaymentBreakdownFromSnapshot(
     netCash,
     netUpi,
   };
+}
+
+function resolvePersistedInvoiceRevenue(
+  row: {
+    totalRevenue: unknown;
+    invoiceRevenue?: unknown;
+    casualSwimRevenue?: unknown;
+  },
+  casualSwimRevenue: number
+): number {
+  if (row.invoiceRevenue != null) {
+    return toJsonNumber(row.invoiceRevenue);
+  }
+  const total = toJsonNumber(row.totalRevenue);
+  const casual =
+    row.casualSwimRevenue != null ? toJsonNumber(row.casualSwimRevenue) : casualSwimRevenue;
+  return Math.max(0, total - casual);
+}
+
+function resolvePersistedNetCollection(invoiceRevenue: number, totalExpenses: number): number {
+  return invoiceRevenue - totalExpenses;
 }
 
 function buildPaymentBreakdown(
@@ -614,7 +636,6 @@ export async function getDailyCollectionSheet(
     grossOther: livePaymentBreakdown.other,
     cashExpenses: liveCashExpenses,
     upiExpenses: liveUpiExpenses,
-    casualSwimRevenue: casualSwim.revenue,
   });
 
   const isSnapshot = collection != null;
@@ -655,8 +676,8 @@ export async function getDailyCollectionSheet(
   }
 
   const displayCasualSwim = persistedSnapshot?.casualSwim ?? casualSwim;
-  const displayTotalRevenue = persistedSnapshot?.totalRevenue ?? liveTotals.totalRevenue;
-  const displayInvoiceRevenue = persistedSnapshot?.invoiceRevenue ?? liveTotals.invoiceRevenue;
+  const displayTotalRevenue = persistedSnapshot?.invoiceRevenue ?? liveTotals.invoiceRevenue;
+  const displayInvoiceRevenue = displayTotalRevenue;
   const displaySubscriptionRevenue =
     persistedSnapshot?.subscriptionRevenue ?? liveSubscriptionRevenue;
   const displayProductRevenue = persistedSnapshot?.productRevenue ?? liveProductRevenue;
@@ -710,7 +731,7 @@ export function buildCollectionSnapshotFromSheet(
   sheet: DailyCollectionSheet
 ): CollectionSnapshot {
   return {
-    totalRevenue: sheet.totalRevenue,
+    totalRevenue: sheet.invoiceRevenue,
     invoiceRevenue: sheet.invoiceRevenue,
     subscriptionRevenue: sheet.subscriptionRevenue,
     productRevenue: sheet.productRevenue,

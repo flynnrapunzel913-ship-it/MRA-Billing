@@ -140,7 +140,7 @@ describe("computeCollectionTotals", () => {
     expect(result.paymentBreakdown.grossCollected).toBe(3000);
   });
 
-  it("includes casual swim revenue in totals and cash collected", () => {
+  it("does not include casual swim revenue in daily collection totals", () => {
     const result = computeCollectionTotals({
       subscriptionRevenue: 2500,
       productRevenue: 500,
@@ -150,12 +150,11 @@ describe("computeCollectionTotals", () => {
       grossOther: 0,
       cashExpenses: 200,
       upiExpenses: 0,
-      casualSwimRevenue: 3000,
     });
 
     expect(result.invoiceRevenue).toBe(3000);
-    expect(result.totalRevenue).toBe(6000);
-    expect(result.paymentBreakdown.cash).toBe(5000);
-    expect(result.netCollection).toBe(5800);
+    expect(result.totalRevenue).toBe(3000);
+    expect(result.paymentBreakdown.cash).toBe(2000);
+    expect(result.netCollection).toBe(2800);
   });
 });
