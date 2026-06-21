@@ -30,6 +30,10 @@ import type { CollectionHistoryRow, DailyCollectionSheet } from "@/lib/daily-col
 import { calculateCasualSwimDualCouponRevenue } from "@/lib/casual-swim-coupon";
 import type { CasualSwimCouponBook } from "@/lib/casual-swim-coupon";
 import {
+  computeComplementAmount,
+  validateCasualSwimReconciliation,
+} from "@/lib/casual-swim-reconciliation";
+import {
   CashDenominationSection,
   cashStateFromReconciliation,
   emptyCashState,
@@ -105,7 +109,17 @@ function BreakdownToggle({
   );
 }
 
-function RevenueSourceBreakdownCard({ sheet }: { sheet: DailyCollectionSheet }) {
+function RevenueSourceBreakdownCard({
+  sheet,
+  reconciliation,
+}: {
+  sheet: DailyCollectionSheet;
+  reconciliation: DailyCollectionSheet["casualSwimReconciliation"];
+}) {
+  const revenueEarned = reconciliation.reconciled
+    ? sheet.totalRevenue
+    : sheet.invoiceRevenue;
+
   return (
     <Card className={sectionCard}>
       <CardHeader className="border-b border-border px-5 py-4">
@@ -119,12 +133,27 @@ function RevenueSourceBreakdownCard({ sheet }: { sheet: DailyCollectionSheet }) 
           </div>
           <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
         </div>
+        {reconciliation.reconciled && (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+            <div>
+              <p className="font-semibold">Casual Swimming (Reconciled)</p>
+              <p className="text-xs text-muted-foreground">
+                Cash {formatCurrency(reconciliation.cashAmount)} · UPI{" "}
+                {formatCurrency(reconciliation.upiAmount)}
+              </p>
+            </div>
+            <p className="font-bold tabular-nums">{formatCurrency(sheet.casualSwim.revenue)}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
           <span>Revenue Earned</span>
-          <span className="text-lg tabular-nums text-primary">
-            {formatCurrency(sheet.invoiceRevenue)}
-          </span>
+          <span className="text-lg tabular-nums text-primary">{formatCurrency(revenueEarned)}</span>
         </div>
+        {!reconciliation.reconciled && sheet.casualSwim.revenue > 0 && (
+          <p className="text-xs text-muted-foreground">
+            Casual swimming revenue is excluded until collection reconciliation is saved.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -132,16 +161,31 @@ function RevenueSourceBreakdownCard({ sheet }: { sheet: DailyCollectionSheet }) 
 
 function CasualSwimmingSummaryCard({
   casualSwim,
+  reconciliation,
 }: {
   casualSwim: DailyCollectionSheet["casualSwim"];
+  reconciliation: DailyCollectionSheet["casualSwimReconciliation"];
 }) {
+  const statusLabel = reconciliation.stale
+    ? "Stale — Reconcile Again"
+    : reconciliation.reconciled
+      ? "Reconciled"
+      : "Not Reconciled";
+
+  const statusVariant = reconciliation.reconciled && !reconciliation.stale ? "success" : "secondary";
+
   return (
     <Card className={sectionCard}>
       <CardHeader className="border-b border-border px-5 py-4">
-        <CardTitle className="text-base">Casual Swimming Summary</CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Tracked separately from Daily Collection revenue — informational only.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Casual Swimming Summary</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Saved reconciliation summary — excluded from Daily Collection until reconciled.
+            </p>
+          </div>
+          <Badge variant={statusVariant}>{statusLabel}</Badge>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4 p-5">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -170,6 +214,235 @@ function CasualSwimmingSummaryCard({
             {formatCurrency(casualSwim.revenue)}
           </span>
         </div>
+        {reconciliation.reconciled && reconciliation.reconciledAt && (
+          <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-sm">
+            <p className="font-medium text-emerald-700 dark:text-emerald-400">
+              Payment split: Cash {formatCurrency(reconciliation.cashAmount)} · UPI{" "}
+              {formatCurrency(reconciliation.upiAmount)}
+            </p>
+            <p className="text-muted-foreground">
+              Saved by{" "}
+              {reconciliation.reconciledByName ??
+                reconciliation.reconciledBy?.name ??
+                reconciliation.reconciledBy?.username ??
+                "Admin"}{" "}
+              · {formatDateTime(reconciliation.reconciledAt)}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CasualSwimmingEntryCard({
+  casualSwim,
+  reconciliation,
+  lastCouponAbove5Input,
+  lastCouponBelow5Input,
+  onLastCouponAbove5Change,
+  onLastCouponBelow5Change,
+  above5Validation,
+  below5Validation,
+  couponEditable,
+  reconciliationEditable,
+  upiInput,
+  cashInput,
+  onUpiChange,
+  onCashChange,
+  validationError,
+  saving,
+  onSave,
+  canSave,
+}: {
+  casualSwim: DailyCollectionSheet["casualSwim"];
+  reconciliation: DailyCollectionSheet["casualSwimReconciliation"];
+  lastCouponAbove5Input: string;
+  lastCouponBelow5Input: string;
+  onLastCouponAbove5Change: (value: string) => void;
+  onLastCouponBelow5Change: (value: string) => void;
+  above5Validation: string | null;
+  below5Validation: string | null;
+  couponEditable: boolean;
+  reconciliationEditable: boolean;
+  upiInput: string;
+  cashInput: string;
+  onUpiChange: (value: string) => void;
+  onCashChange: (value: string) => void;
+  validationError: string | null;
+  saving: boolean;
+  onSave: () => void;
+  canSave: boolean;
+}) {
+  const statusLabel = reconciliation.stale
+    ? "Stale — Reconcile Again"
+    : reconciliation.reconciled
+      ? "Reconciled"
+      : "Not Reconciled";
+
+  const statusVariant = reconciliation.reconciled && !reconciliation.stale ? "success" : "secondary";
+  const showRevenue = casualSwim.revenue > 0 || (lastCouponAbove5Input.trim() && lastCouponBelow5Input.trim());
+
+  return (
+    <Card className={sectionCard}>
+      <CardHeader className="border-b border-border px-5 py-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">Casual Swimming Entry</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Enter today&apos;s closing coupon numbers, review revenue, then reconcile cash and UPI.
+            </p>
+          </div>
+          <Badge variant={statusVariant}>{statusLabel}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-6 p-5">
+        {/* Section 1: Coupon Entry */}
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Coupon Entry
+          </h3>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <CouponBookSection
+              title="Above 5 Years Coupons"
+              rateLabel={formatCurrency(casualSwim.above5.couponRate)}
+              book={casualSwim.above5}
+              lastCouponInput={lastCouponAbove5Input}
+              onLastCouponChange={onLastCouponAbove5Change}
+              couponEditable={couponEditable}
+              validationMessage={above5Validation}
+            />
+            <CouponBookSection
+              title="Below 5 Years Coupons"
+              rateLabel={formatCurrency(casualSwim.below5.couponRate)}
+              book={casualSwim.below5}
+              lastCouponInput={lastCouponBelow5Input}
+              onLastCouponChange={onLastCouponBelow5Change}
+              couponEditable={couponEditable}
+              validationMessage={below5Validation}
+            />
+          </div>
+        </div>
+
+        {/* Section 2: Revenue Calculation */}
+        {showRevenue && (
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Revenue Calculation
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                <p className="text-sm font-medium">Adult Revenue (Above 5 Years)</p>
+                <p className="text-xs text-muted-foreground">
+                  {casualSwim.above5.couponsUsed} coupons × {formatCurrency(casualSwim.above5.couponRate)}
+                </p>
+                <p className="mt-1 text-xl font-bold tabular-nums text-primary">
+                  {formatCurrency(casualSwim.above5.revenue)}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
+                <p className="text-sm font-medium">Child Revenue (Below 5 Years)</p>
+                <p className="text-xs text-muted-foreground">
+                  {casualSwim.below5.couponsUsed} coupons × {formatCurrency(casualSwim.below5.couponRate)}
+                </p>
+                <p className="mt-1 text-xl font-bold tabular-nums text-primary">
+                  {formatCurrency(casualSwim.below5.revenue)}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 font-semibold">
+              <span>Total Casual Swimming Revenue</span>
+              <span className="text-lg tabular-nums text-primary">
+                {formatCurrency(casualSwim.revenue)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Section 3: Payment Reconciliation */}
+        {casualSwim.revenue > 0 && (
+          <div className="space-y-4 rounded-lg border border-border/60 bg-card/50 p-4">
+            <div>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Payment Reconciliation
+              </h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Enter UPI collected — cash is calculated automatically. Cash + UPI must equal total
+                revenue. Daily Collection updates only after you save.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="casual-swim-upi">UPI Amount</Label>
+                <Input
+                  id="casual-swim-upi"
+                  type="number"
+                  min={0}
+                  max={casualSwim.revenue}
+                  step="0.01"
+                  value={upiInput}
+                  onChange={(e) => onUpiChange(e.target.value)}
+                  placeholder="0"
+                  disabled={!reconciliationEditable}
+                  readOnly={!reconciliationEditable}
+                  className={cn(!reconciliationEditable && "cursor-not-allowed opacity-80")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="casual-swim-cash">Cash Amount</Label>
+                <Input
+                  id="casual-swim-cash"
+                  type="number"
+                  min={0}
+                  max={casualSwim.revenue}
+                  step="0.01"
+                  value={cashInput}
+                  onChange={(e) => onCashChange(e.target.value)}
+                  placeholder="0"
+                  disabled={!reconciliationEditable}
+                  readOnly={!reconciliationEditable}
+                  className={cn(!reconciliationEditable && "cursor-not-allowed opacity-80")}
+                />
+                <p className="text-xs text-muted-foreground">Auto-calculated from UPI, or edit to update UPI.</p>
+              </div>
+            </div>
+            {upiInput.trim() && cashInput.trim() && (
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                <p>
+                  UPI: <span className="font-semibold tabular-nums">{formatCurrency(parseFloat(upiInput) || 0)}</span>
+                </p>
+                <p>
+                  Cash: <span className="font-semibold tabular-nums">{formatCurrency(parseFloat(cashInput) || 0)}</span>
+                </p>
+                <p>
+                  Total:{" "}
+                  <span className="font-semibold tabular-nums">
+                    {formatCurrency((parseFloat(upiInput) || 0) + (parseFloat(cashInput) || 0))}
+                  </span>
+                </p>
+              </div>
+            )}
+            {validationError && <p className="text-sm text-destructive">{validationError}</p>}
+            {!couponEditable && !reconciliationEditable && (
+              <p className="text-sm text-muted-foreground">
+                Click &quot;Edit Collection&quot; above to change coupon numbers or reconciliation for this date.
+              </p>
+            )}
+            <Button
+              onClick={onSave}
+              disabled={saving || !canSave || !reconciliationEditable}
+              className="w-full sm:w-auto"
+            >
+              {saving ? "Saving…" : "Save Casual Swimming Reconciliation"}
+            </Button>
+          </div>
+        )}
+
+        {casualSwim.revenue <= 0 && lastCouponAbove5Input.trim() && lastCouponBelow5Input.trim() && (
+          <p className="text-sm text-muted-foreground">
+            Enter valid today&apos;s last coupon numbers above to calculate revenue and reconcile payment.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
@@ -439,6 +712,9 @@ export function DailyCollectionPanel() {
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [lastCouponAbove5Input, setLastCouponAbove5Input] = useState("");
   const [lastCouponBelow5Input, setLastCouponBelow5Input] = useState("");
+  const [reconciliationUpiInput, setReconciliationUpiInput] = useState("");
+  const [reconciliationCashInput, setReconciliationCashInput] = useState("");
+  const [savingReconciliation, setSavingReconciliation] = useState(false);
 
   const loadSheet = useCallback(async (date: string, preferLive = false) => {
     setLoading(true);
@@ -463,6 +739,14 @@ export function DailyCollectionPanel() {
           ? String(result.data.casualSwim.below5.lastCouponNumber)
           : ""
       );
+      const recon = result.data.casualSwimReconciliation;
+      if (recon.reconciled || recon.stale) {
+        setReconciliationUpiInput(String(recon.upiAmount));
+        setReconciliationCashInput(String(recon.cashAmount));
+      } else {
+        setReconciliationUpiInput("");
+        setReconciliationCashInput("");
+      }
       setDenominations(
         cashStateFromReconciliation(result.data.collection?.cashReconciliation)
       );
@@ -553,9 +837,21 @@ export function DailyCollectionPanel() {
   const collected = !!sheet?.collection;
   const formLocked = collected && !editMode;
   const couponEditable = !formLocked;
+  const casualSwimReconciliation = sheet?.casualSwimReconciliation ?? {
+    reconciled: false,
+    stale: false,
+    cashAmount: 0,
+    upiAmount: 0,
+    casualSwimTotal: 0,
+    reconciledAt: null,
+    reconciledByName: null,
+    reconciledBy: null,
+  };
+  const reconciliationEditable =
+    !formLocked || !casualSwimReconciliation.reconciled || casualSwimReconciliation.stale;
 
   const couponPreview = useMemo(() => {
-    if (!sheet || !couponEditable) return null;
+    if (!sheet) return null;
     const parsedAbove5 = parseInt(lastCouponAbove5Input, 10);
     const parsedBelow5 = parseInt(lastCouponBelow5Input, 10);
     if (Number.isNaN(parsedAbove5) || Number.isNaN(parsedBelow5)) return null;
@@ -567,7 +863,7 @@ export function DailyCollectionPanel() {
       adultCouponRate: sheet.casualSwim.above5.couponRate,
       childCouponRate: sheet.casualSwim.below5.couponRate,
     });
-  }, [sheet, lastCouponAbove5Input, lastCouponBelow5Input, couponEditable]);
+  }, [sheet, lastCouponAbove5Input, lastCouponBelow5Input]);
 
   const displayCasualSwim = useMemo(() => {
     if (!sheet) return null;
@@ -594,6 +890,84 @@ export function DailyCollectionPanel() {
   const couponsFilled =
     lastCouponAbove5Input.trim().length > 0 && lastCouponBelow5Input.trim().length > 0;
 
+  const handleReconciliationUpiChange = (value: string) => {
+    setReconciliationUpiInput(value);
+    const parsed = parseFloat(value);
+    if (!displayCasualSwim || Number.isNaN(parsed)) {
+      setReconciliationCashInput("");
+      return;
+    }
+    setReconciliationCashInput(String(computeComplementAmount(displayCasualSwim.revenue, parsed)));
+  };
+
+  const handleReconciliationCashChange = (value: string) => {
+    setReconciliationCashInput(value);
+    const parsed = parseFloat(value);
+    if (!displayCasualSwim || Number.isNaN(parsed)) {
+      setReconciliationUpiInput("");
+      return;
+    }
+    setReconciliationUpiInput(String(computeComplementAmount(displayCasualSwim.revenue, parsed)));
+  };
+
+  const reconciliationValidation = useMemo(() => {
+    if (!displayCasualSwim || displayCasualSwim.revenue <= 0) return null;
+    if (!reconciliationUpiInput.trim() && !reconciliationCashInput.trim()) return null;
+    const upi = parseFloat(reconciliationUpiInput);
+    const cash = parseFloat(reconciliationCashInput);
+    if (Number.isNaN(upi) || Number.isNaN(cash)) {
+      return "Enter valid UPI and cash amounts.";
+    }
+    const result = validateCasualSwimReconciliation({
+      totalRevenue: displayCasualSwim.revenue,
+      cashAmount: cash,
+      upiAmount: upi,
+    });
+    return result.ok ? null : result.message;
+  }, [displayCasualSwim, reconciliationUpiInput, reconciliationCashInput]);
+
+  const canSaveReconciliation =
+    couponsFilled &&
+    couponsValid &&
+    displayCasualSwim != null &&
+    displayCasualSwim.revenue > 0 &&
+    reconciliationUpiInput.trim().length > 0 &&
+    reconciliationCashInput.trim().length > 0 &&
+    reconciliationValidation == null;
+
+  const saveReconciliation = async () => {
+    if (!displayCasualSwim || !canSaveReconciliation) return;
+    const parsedAbove5 = parseInt(lastCouponAbove5Input, 10);
+    const parsedBelow5 = parseInt(lastCouponBelow5Input, 10);
+    const upi = parseFloat(reconciliationUpiInput);
+    const cash = parseFloat(reconciliationCashInput);
+
+    setSavingReconciliation(true);
+    try {
+      const res = await fetch("/api/admin/daily-collection/casual-swim-reconciliation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: selectedDate,
+          upiAmount: upi,
+          cashAmount: cash,
+          lastCouponAbove5: parsedAbove5,
+          lastCouponBelow5: parsedBelow5,
+        }),
+      });
+      const result = await readApiResponse(res, "Failed to save casual swimming reconciliation");
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success("Casual swimming collection reconciled");
+      setHistoryRefreshKey((k) => k + 1);
+      await loadSheet(selectedDate, editMode);
+    } finally {
+      setSavingReconciliation(false);
+    }
+  };
+
   const paymentBreakdown = sheet?.paymentBreakdown ?? {
     cash: 0,
     upi: 0,
@@ -606,7 +980,7 @@ export function DailyCollectionPanel() {
     netUpi: 0,
   };
 
-  const totalRevenue = sheet?.invoiceRevenue ?? 0;
+  const totalRevenue = sheet?.totalRevenue ?? 0;
   const netCollection = sheet?.netCollection ?? 0;
 
   return (
@@ -665,6 +1039,36 @@ export function DailyCollectionPanel() {
         </div>
       ) : (
         <>
+          {displayCasualSwim && (
+            <CasualSwimmingEntryCard
+              casualSwim={displayCasualSwim}
+              reconciliation={casualSwimReconciliation}
+              lastCouponAbove5Input={lastCouponAbove5Input}
+              lastCouponBelow5Input={lastCouponBelow5Input}
+              onLastCouponAbove5Change={setLastCouponAbove5Input}
+              onLastCouponBelow5Change={setLastCouponBelow5Input}
+              above5Validation={above5Validation}
+              below5Validation={below5Validation}
+              couponEditable={couponEditable}
+              reconciliationEditable={reconciliationEditable}
+              upiInput={reconciliationUpiInput}
+              cashInput={reconciliationCashInput}
+              onUpiChange={handleReconciliationUpiChange}
+              onCashChange={handleReconciliationCashChange}
+              validationError={reconciliationValidation}
+              saving={savingReconciliation}
+              onSave={() => void saveReconciliation()}
+              canSave={canSaveReconciliation}
+            />
+          )}
+
+          {displayCasualSwim && (
+            <CasualSwimmingSummaryCard
+              casualSwim={displayCasualSwim}
+              reconciliation={casualSwimReconciliation}
+            />
+          )}
+
           <Card className={cn(sectionCard, "border-primary/30 bg-primary/5")}>
             <CardHeader className="border-b border-primary/15 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -733,43 +1137,7 @@ export function DailyCollectionPanel() {
             </CardContent>
           </Card>
 
-          <Card className={sectionCard}>
-            <CardHeader className="border-b border-border px-5 py-4">
-              <CardTitle className="text-base">Casual Swimming Coupon Tracking</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Separate coupon books for Above 5 Years and Below 5 Years. Closing numbers carry
-                forward automatically.
-              </p>
-            </CardHeader>
-            <CardContent className="p-5">
-              {displayCasualSwim && (
-                <div className="grid gap-5 lg:grid-cols-2">
-                  <CouponBookSection
-                    title="Above 5 Years Coupons"
-                    rateLabel={formatCurrency(displayCasualSwim.above5.couponRate)}
-                    book={displayCasualSwim.above5}
-                    lastCouponInput={lastCouponAbove5Input}
-                    onLastCouponChange={setLastCouponAbove5Input}
-                    couponEditable={couponEditable}
-                    validationMessage={above5Validation}
-                  />
-                  <CouponBookSection
-                    title="Below 5 Years Coupons"
-                    rateLabel={formatCurrency(displayCasualSwim.below5.couponRate)}
-                    book={displayCasualSwim.below5}
-                    lastCouponInput={lastCouponBelow5Input}
-                    onLastCouponChange={setLastCouponBelow5Input}
-                    couponEditable={couponEditable}
-                    validationMessage={below5Validation}
-                  />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {displayCasualSwim && <CasualSwimmingSummaryCard casualSwim={displayCasualSwim} />}
-
-          <RevenueSourceBreakdownCard sheet={sheet} />
+          <RevenueSourceBreakdownCard sheet={sheet} reconciliation={casualSwimReconciliation} />
 
           {(sheet.revenueBreakdown.length > 0 || sheet.expenses.length > 0) && (
             <Card className={sectionCard}>

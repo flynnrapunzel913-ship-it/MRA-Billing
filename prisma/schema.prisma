@@ -94,6 +94,7 @@ model User {
   expenses         Expense[]
   dailyCollections       DailyCollection[]
   dailyCollectionEdits   DailyCollectionHistory[]
+  casualSwimReconciliations CasualSwimReconciliation[]
   auditLogs        AuditLog[]
 }
 
@@ -367,6 +368,8 @@ model DailyCollection {
   casualSwimCouponsBelow5 Int?
   casualSwimRevenueAbove5 Decimal? @db.Decimal(12, 2)
   casualSwimRevenueBelow5 Decimal? @db.Decimal(12, 2)
+  casualSwimCashCollected Decimal? @db.Decimal(12, 2)
+  casualSwimUpiCollected  Decimal? @db.Decimal(12, 2)
   totalExpenses       Decimal? @db.Decimal(12, 2)
   cashCollectedSystem Decimal? @db.Decimal(12, 2)
   upiCollected        Decimal? @db.Decimal(12, 2)
@@ -380,6 +383,24 @@ model DailyCollection {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
   editHistory         DailyCollectionHistory[]
+
+  @@index([collectionDate])
+}
+
+/// Cash/UPI split for casual swimming revenue — applied to Daily Collection after admin confirms.
+model CasualSwimReconciliation {
+  id                 String   @id @default(cuid())
+  collectionDate     DateTime @unique
+  cashAmount         Decimal  @db.Decimal(12, 2)
+  upiAmount          Decimal  @db.Decimal(12, 2)
+  casualSwimTotal    Decimal  @db.Decimal(12, 2)
+  lastCouponAbove5   Int?
+  lastCouponBelow5   Int?
+  reconciledAt       DateTime
+  reconciledByUserId String
+  reconciledByName   String?
+  reconciledBy       User     @relation(fields: [reconciledByUserId], references: [id])
+  updatedAt          DateTime @updatedAt
 
   @@index([collectionDate])
 }

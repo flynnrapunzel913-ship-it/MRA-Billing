@@ -14,6 +14,8 @@ export type CollectionDiffValues = {
   casualSwimCouponsBelow5: number | null;
   casualSwimRevenueAbove5: number | null;
   casualSwimRevenueBelow5: number | null;
+  casualSwimCashCollected: number | null;
+  casualSwimUpiCollected: number | null;
   totalExpenses: number | null;
   cashCollected: number | null;
   upiCollected: number | null;
@@ -48,6 +50,8 @@ export const COLLECTION_FIELD_LABELS: Record<keyof CollectionDiffValues, string>
   casualSwimCouponsBelow5: "Coupons Used (Below 5 Years)",
   casualSwimRevenueAbove5: "Revenue (Above 5 Years)",
   casualSwimRevenueBelow5: "Revenue (Below 5 Years)",
+  casualSwimCashCollected: "Casual Swimming Cash Collected",
+  casualSwimUpiCollected: "Casual Swimming UPI Collected",
   totalExpenses: "Expenses",
   cashCollected: "Cash Collected",
   upiCollected: "UPI Collected",
@@ -73,6 +77,8 @@ type CollectionRecordLike = {
   casualSwimCouponsBelow5?: number | null;
   casualSwimRevenueAbove5?: unknown;
   casualSwimRevenueBelow5?: unknown;
+  casualSwimCashCollected?: unknown;
+  casualSwimUpiCollected?: unknown;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
@@ -106,6 +112,8 @@ export function extractCollectionDiffValues(
       record.casualSwimCouponsBelow5 == null ? null : Number(record.casualSwimCouponsBelow5),
     casualSwimRevenueAbove5: toNullableNumber(record.casualSwimRevenueAbove5),
     casualSwimRevenueBelow5: toNullableNumber(record.casualSwimRevenueBelow5),
+    casualSwimCashCollected: toNullableNumber(record.casualSwimCashCollected),
+    casualSwimUpiCollected: toNullableNumber(record.casualSwimUpiCollected),
     totalExpenses: toNullableNumber(record.totalExpenses),
     cashCollected: toNullableNumber(record.cashCollectedSystem),
     upiCollected: toNullableNumber(record.upiCollected),
@@ -170,6 +178,8 @@ export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
     casualSwimCouponsBelow5: values.casualSwimCouponsBelow5,
     casualSwimRevenueAbove5: values.casualSwimRevenueAbove5,
     casualSwimRevenueBelow5: values.casualSwimRevenueBelow5,
+    casualSwimCashCollected: values.casualSwimCashCollected,
+    casualSwimUpiCollected: values.casualSwimUpiCollected,
     notes: values.notes,
     collectedByName: values.collectedByName,
   };

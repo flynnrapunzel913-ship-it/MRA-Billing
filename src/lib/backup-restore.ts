@@ -648,6 +648,8 @@ function mapDailyCollection(row: Record<string, unknown>): Prisma.DailyCollectio
         : requireInt(row, "casualSwimCouponsBelow5"),
     casualSwimRevenueAbove5: optionalNumber(row.casualSwimRevenueAbove5),
     casualSwimRevenueBelow5: optionalNumber(row.casualSwimRevenueBelow5),
+    casualSwimCashCollected: optionalNumber(row.casualSwimCashCollected),
+    casualSwimUpiCollected: optionalNumber(row.casualSwimUpiCollected),
     totalExpenses: optionalNumber(row.totalExpenses),
     cashCollectedSystem: optionalNumber(row.cashCollectedSystem),
     upiCollected: optionalNumber(row.upiCollected),

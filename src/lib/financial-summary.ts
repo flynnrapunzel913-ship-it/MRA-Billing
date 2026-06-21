@@ -78,7 +78,8 @@ export async function getFinancialSummary(
     expenseDate: { gte: start, lte: end },
   };
 
-  const [collectionAgg, expenseAgg, expenseGroups, itemGroups] = await Promise.all([
+  const [collectionAgg, expenseAgg, expenseGroups, itemGroups, reconciledCasualSwimAgg] =
+    await Promise.all([
     prisma.invoice.aggregate({
       where: paidInvoiceWhere,
       _sum: { amountPaid: true },
@@ -97,9 +98,17 @@ export async function getFinancialSummary(
       where: { invoice: paidInvoiceWhere },
       _sum: { amount: true },
     }),
+    prisma.casualSwimReconciliation.aggregate({
+      where: { collectionDate: { gte: start, lte: end } },
+      _sum: { cashAmount: true, upiAmount: true },
+    }),
   ]);
 
-  const totalCollections = toJsonNumber(collectionAgg._sum.amountPaid);
+  const invoiceCollections = toJsonNumber(collectionAgg._sum.amountPaid);
+  const reconciledCasualSwim =
+    toJsonNumber(reconciledCasualSwimAgg._sum.cashAmount) +
+    toJsonNumber(reconciledCasualSwimAgg._sum.upiAmount);
+  const totalCollections = invoiceCollections + reconciledCasualSwim;
   const totalExpenses = toJsonNumber(expenseAgg._sum.amount);
   const netAmount = totalCollections - totalExpenses;
 
@@ -131,6 +140,9 @@ export async function getFinancialSummary(
   }
   if (otherServicesTotal > 0) {
     revenueBreakdown.push({ name: "Other Services", amount: otherServicesTotal });
+  }
+  if (reconciledCasualSwim > 0) {
+    revenueBreakdown.push({ name: "Casual Swimming (Reconciled)", amount: reconciledCasualSwim });
   }
   revenueBreakdown.sort((a, b) => b.amount - a.amount);
 

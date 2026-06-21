@@ -72,6 +72,8 @@ export function buildVersionHistoryResponse(input: {
     casualSwimCouponsBelow5: input.fallbackSnapshot.casualSwimCouponsBelow5,
     casualSwimRevenueAbove5: input.fallbackSnapshot.casualSwimRevenueAbove5,
     casualSwimRevenueBelow5: input.fallbackSnapshot.casualSwimRevenueBelow5,
+    casualSwimCashCollected: input.fallbackSnapshot.casualSwimCashCollected,
+    casualSwimUpiCollected: input.fallbackSnapshot.casualSwimUpiCollected,
     notes: input.fallbackSnapshot.notes,
     collectedByName: input.fallbackSnapshot.collectedByName,
   };

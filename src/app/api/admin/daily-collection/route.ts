@@ -18,6 +18,7 @@ import {
   getCasualSwimCouponRates,
   getDailyCollectionSheet,
   getPreviousClosingCoupons,
+  invalidateCasualSwimReconciliationIfStale,
   parseCollectionDateInput,
 } from "@/lib/daily-collection";
 import { calculateCasualSwimDualCouponRevenue } from "@/lib/casual-swim-coupon";
@@ -184,6 +185,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: couponCalc.message }, { status: 400 });
     }
 
+    await invalidateCasualSwimReconciliationIfStale(collectionDate, couponCalc.result.revenue);
+
     const existing = await prisma.dailyCollection.findUnique({
       where: { collectionDate },
     });
@@ -329,6 +332,8 @@ export async function PUT(request: NextRequest) {
     if (!couponCalc.ok) {
       return NextResponse.json({ error: couponCalc.message }, { status: 400 });
     }
+
+    await invalidateCasualSwimReconciliationIfStale(collectionDate, couponCalc.result.revenue);
 
     const existing = await prisma.dailyCollection.findUnique({
       where: { collectionDate },

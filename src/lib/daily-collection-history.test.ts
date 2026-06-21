@@ -32,6 +32,8 @@ describe("buildVersionHistoryResponse", () => {
         casualSwimCouponsBelow5: null,
         casualSwimRevenueAbove5: null,
         casualSwimRevenueBelow5: null,
+        casualSwimCashCollected: null,
+        casualSwimUpiCollected: null,
         totalExpenses: 350,
         cashCollected: 1800,
         upiCollected: 1200,

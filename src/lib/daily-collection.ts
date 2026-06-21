@@ -6,6 +6,12 @@ import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 import { normalizeDenominations, type CashDenominations } from "@/lib/cash-denominations";
 import {
+  applyCasualSwimReconciliationToTotals,
+  serializeReconciliationRecord,
+  type CasualSwimReconciliationRecord,
+  type ReconciliationRow,
+} from "@/lib/casual-swim-reconciliation";
+import {
   calculateCasualSwimDualCouponRevenue,
   DEFAULT_ADULT_COUPON_RATE,
   DEFAULT_CHILD_COUPON_RATE,
@@ -100,6 +106,7 @@ export type DailyCollectionSheet = {
   subscriptionRevenue: number;
   productRevenue: number;
   casualSwim: CasualSwimDualCouponTracking;
+  casualSwimReconciliation: CasualSwimReconciliationRecord;
   revenueSourceBreakdown: RevenueSourceBreakdown;
   revenueBreakdown: RevenueSourceRow[];
   totalExpenses: number;
@@ -506,6 +513,7 @@ export async function getDailyCollectionSheet(
     historyCollections,
     couponRates,
     previousClosing,
+    reconciliationRows,
   ] = await Promise.all([
     prisma.invoice.groupBy({
       by: ["paymentMethod"],
@@ -568,7 +576,20 @@ export async function getDailyCollectionSheet(
     }),
     getCasualSwimCouponRates(),
     getPreviousClosingCoupons(dayStart),
+    prisma.casualSwimReconciliation.findMany({
+      where: { collectionDate: { gte: historyStart, lte: dayEnd } },
+      include: {
+        reconciledBy: { select: { id: true, name: true, username: true } },
+      },
+    }),
   ]);
+
+  const reconciliationByDate = new Map(
+    reconciliationRows.map((row) => [
+      format(startOfDay(row.collectionDate), "yyyy-MM-dd"),
+      row as ReconciliationRow,
+    ])
+  );
 
   const subscriptionBreakdown: RevenueSourceRow[] = coachingGroups
     .map((row) => ({
@@ -615,10 +636,14 @@ export async function getDailyCollectionSheet(
 
   const resolvedLastAbove5 =
     options?.lastCouponAbove5 ??
-    (collection?.lastCouponAbove5 != null ? collection.lastCouponAbove5 : null);
+    collection?.lastCouponAbove5 ??
+    reconciliationByDate.get(dateStr)?.lastCouponAbove5 ??
+    null;
   const resolvedLastBelow5 =
     options?.lastCouponBelow5 ??
-    (collection?.lastCouponBelow5 != null ? collection.lastCouponBelow5 : null);
+    collection?.lastCouponBelow5 ??
+    reconciliationByDate.get(dateStr)?.lastCouponBelow5 ??
+    null;
 
   const casualSwim = resolveCasualSwimDualCouponTracking(
     previousClosing,
@@ -676,8 +701,25 @@ export async function getDailyCollectionSheet(
   }
 
   const displayCasualSwim = persistedSnapshot?.casualSwim ?? casualSwim;
-  const displayTotalRevenue = persistedSnapshot?.invoiceRevenue ?? liveTotals.invoiceRevenue;
-  const displayInvoiceRevenue = displayTotalRevenue;
+  const reconciliationRow = reconciliationByDate.get(dateStr);
+  const casualSwimReconciliation = serializeReconciliationRecord(
+    reconciliationRow,
+    displayCasualSwim.revenue
+  );
+
+  const invoiceOnlyBreakdown = persistedPaymentBreakdown ?? liveTotals.paymentBreakdown;
+  const invoiceRevenueBase = persistedSnapshot?.invoiceRevenue ?? liveTotals.invoiceRevenue;
+
+  const appliedTotals = applyCasualSwimReconciliationToTotals({
+    invoiceRevenue: invoiceRevenueBase,
+    totalExpenses: persistedSnapshot?.totalExpenses ?? liveTotalExpenses,
+    paymentBreakdown: invoiceOnlyBreakdown,
+    casualSwimRevenue: displayCasualSwim.revenue,
+    reconciliation: casualSwimReconciliation,
+  });
+
+  const displayTotalRevenue = appliedTotals.totalRevenue;
+  const displayInvoiceRevenue = invoiceRevenueBase;
   const displaySubscriptionRevenue =
     persistedSnapshot?.subscriptionRevenue ?? liveSubscriptionRevenue;
   const displayProductRevenue = persistedSnapshot?.productRevenue ?? liveProductRevenue;
@@ -685,8 +727,8 @@ export async function getDailyCollectionSheet(
   const displayCashExpenses =
     persistedPaymentBreakdown?.cashExpenses ?? liveCashExpenses;
   const displayUpiExpenses = persistedPaymentBreakdown?.upiExpenses ?? liveUpiExpenses;
-  const displayPaymentBreakdown = persistedPaymentBreakdown ?? liveTotals.paymentBreakdown;
-  const displayNetCollection = persistedSnapshot?.netCollection ?? liveTotals.netCollection;
+  const displayPaymentBreakdown = appliedTotals.paymentBreakdown;
+  const displayNetCollection = appliedTotals.netCollection;
 
   return {
     date: dateStr,
@@ -696,6 +738,7 @@ export async function getDailyCollectionSheet(
     subscriptionRevenue: displaySubscriptionRevenue,
     productRevenue: displayProductRevenue,
     casualSwim: displayCasualSwim,
+    casualSwimReconciliation,
     revenueSourceBreakdown: {
       invoices: displayInvoiceRevenue,
       casualSwimming: displayCasualSwim,
@@ -731,7 +774,7 @@ export function buildCollectionSnapshotFromSheet(
   sheet: DailyCollectionSheet
 ): CollectionSnapshot {
   return {
-    totalRevenue: sheet.invoiceRevenue,
+    totalRevenue: sheet.totalRevenue,
     invoiceRevenue: sheet.invoiceRevenue,
     subscriptionRevenue: sheet.subscriptionRevenue,
     productRevenue: sheet.productRevenue,
@@ -744,6 +787,25 @@ export function buildCollectionSnapshotFromSheet(
     otherCollected: sheet.paymentBreakdown.other,
     netCollection: sheet.netCollection,
   };
+}
+
+export async function invalidateCasualSwimReconciliationIfStale(
+  collectionDate: Date,
+  casualSwimRevenue: number
+): Promise<void> {
+  const existing = await prisma.casualSwimReconciliation.findUnique({
+    where: { collectionDate },
+  });
+  if (!existing) return;
+
+  const storedTotal = toJsonNumber(existing.casualSwimTotal);
+  if (Math.abs(storedTotal - casualSwimRevenue) >= 0.005) {
+    await prisma.casualSwimReconciliation.delete({ where: { collectionDate } });
+    await prisma.dailyCollection.updateMany({
+      where: { collectionDate },
+      data: { casualSwimCashCollected: null, casualSwimUpiCollected: null },
+    });
+  }
 }
 
 export type CasualSwimCouponPersistFields = {
