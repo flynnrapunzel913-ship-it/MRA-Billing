@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
+import { prisma } from "@/lib/prisma";
 import { casualSwimSettingsSchema } from "@/lib/validations";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 
@@ -12,18 +12,19 @@ export async function GET() {
 
     const settings = await prisma.settings.findUnique({
       where: { id: "default" },
-      select: { casualSwimCouponRate: true },
+      select: { casualSwimAdultCouponRate: true, casualSwimChildCouponRate: true },
     });
 
     return NextResponse.json({
-      casualSwimCouponRate: toJsonNumber(settings?.casualSwimCouponRate ?? 150),
+      casualSwimAdultCouponRate: toJsonNumber(settings?.casualSwimAdultCouponRate ?? 150),
+      casualSwimChildCouponRate: toJsonNumber(settings?.casualSwimChildCouponRate ?? 100),
     });
   } catch (error) {
     return apiErrorResponse(error, "Failed to load casual swim settings");
   }
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
   try {
     const { error } = await requireAdmin();
     if (error) return error;
@@ -42,16 +43,21 @@ export async function PUT(request: Request) {
 
     const settings = await prisma.settings.upsert({
       where: { id: "default" },
-      update: { casualSwimCouponRate: parsed.data.casualSwimCouponRate },
+      update: {
+        casualSwimAdultCouponRate: parsed.data.casualSwimAdultCouponRate,
+        casualSwimChildCouponRate: parsed.data.casualSwimChildCouponRate,
+      },
       create: {
         id: "default",
-        casualSwimCouponRate: parsed.data.casualSwimCouponRate,
+        casualSwimAdultCouponRate: parsed.data.casualSwimAdultCouponRate,
+        casualSwimChildCouponRate: parsed.data.casualSwimChildCouponRate,
       },
-      select: { casualSwimCouponRate: true },
+      select: { casualSwimAdultCouponRate: true, casualSwimChildCouponRate: true },
     });
 
     return NextResponse.json({
-      casualSwimCouponRate: toJsonNumber(settings.casualSwimCouponRate),
+      casualSwimAdultCouponRate: toJsonNumber(settings.casualSwimAdultCouponRate),
+      casualSwimChildCouponRate: toJsonNumber(settings.casualSwimChildCouponRate),
     });
   } catch (error) {
     return apiErrorResponse(error, "Failed to update casual swim settings");

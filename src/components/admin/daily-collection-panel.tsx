@@ -27,7 +27,8 @@ import {
 import { formatCurrency, formatDateInput, cn } from "@/lib/utils";
 import { readApiResponse } from "@/lib/api-error";
 import type { CollectionHistoryRow, DailyCollectionSheet } from "@/lib/daily-collection";
-import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
+import { calculateCasualSwimDualCouponRevenue } from "@/lib/casual-swim-coupon";
+import type { CasualSwimCouponBook } from "@/lib/casual-swim-coupon";
 import {
   CashDenominationSection,
   cashStateFromReconciliation,
@@ -126,23 +127,104 @@ function RevenueSourceBreakdownCard({
           </div>
           <p className="text-lg font-bold tabular-nums">{formatCurrency(sheet.invoiceRevenue)}</p>
         </div>
-        <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
+        <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 space-y-3">
+          <p className="text-sm font-semibold">Casual Swimming</p>
+          <div className="flex items-start justify-between gap-3 text-sm">
             <div>
-              <p className="text-sm font-semibold">Casual Swimming</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Coupons Used: {casualSwim.couponsUsed} · Rate: {formatCurrency(casualSwim.couponRate)}
+              <p className="font-medium">Above 5 Years</p>
+              <p className="text-xs text-muted-foreground">
+                {casualSwim.above5.couponsUsed} Coupons · Rate{" "}
+                {formatCurrency(casualSwim.above5.couponRate)}
               </p>
             </div>
-            <p className="text-lg font-bold tabular-nums">{formatCurrency(casualSwim.revenue)}</p>
+            <p className="font-bold tabular-nums">{formatCurrency(casualSwim.above5.revenue)}</p>
+          </div>
+          <div className="flex items-start justify-between gap-3 text-sm">
+            <div>
+              <p className="font-medium">Below 5 Years</p>
+              <p className="text-xs text-muted-foreground">
+                {casualSwim.below5.couponsUsed} Coupons · Rate{" "}
+                {formatCurrency(casualSwim.below5.couponRate)}
+              </p>
+            </div>
+            <p className="font-bold tabular-nums">{formatCurrency(casualSwim.below5.revenue)}</p>
+          </div>
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
+            <span>Total Casual Swimming</span>
+            <span className="tabular-nums">{formatCurrency(casualSwim.revenue)}</span>
           </div>
         </div>
         <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3 font-semibold">
-          <span>Total Revenue</span>
+          <span>Revenue Earned</span>
           <span className="text-lg tabular-nums text-primary">{formatCurrency(totalRevenue)}</span>
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function CouponBookSection({
+  title,
+  rateLabel,
+  book,
+  lastCouponInput,
+  onLastCouponChange,
+  couponEditable,
+  validationMessage,
+}: {
+  title: string;
+  rateLabel: string;
+  book: CasualSwimCouponBook;
+  lastCouponInput: string;
+  onLastCouponChange: (value: string) => void;
+  couponEditable: boolean;
+  validationMessage?: string | null;
+}) {
+  const idPrefix = title.replace(/\s+/g, "-").toLowerCase();
+
+  return (
+    <div className="space-y-4 rounded-lg border border-border/60 bg-card/50 p-4">
+      <div>
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-xs text-muted-foreground">Rate: {rateLabel}</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-previous`}>Previous Closing Coupon</Label>
+        <Input
+          id={`${idPrefix}-previous`}
+          value={book.previousClosingCoupon}
+          readOnly
+          disabled
+          className="cursor-not-allowed opacity-80"
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor={`${idPrefix}-last`}>Today&apos;s Last Coupon</Label>
+        <Input
+          id={`${idPrefix}-last`}
+          type="number"
+          min={book.previousClosingCoupon}
+          step={1}
+          value={lastCouponInput}
+          onChange={(e) => onLastCouponChange(e.target.value)}
+          readOnly={!couponEditable}
+          disabled={!couponEditable}
+          placeholder="0"
+          className={cn(!couponEditable && "cursor-not-allowed opacity-80")}
+        />
+        {validationMessage && (
+          <p className="text-sm text-destructive">{validationMessage}</p>
+        )}
+      </div>
+      <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm space-y-1">
+        <p>
+          Coupons Used: <span className="font-semibold">{book.couponsUsed}</span>
+        </p>
+        <p>
+          Revenue: <span className="font-semibold">{formatCurrency(book.revenue)}</span>
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -343,7 +425,8 @@ export function DailyCollectionPanel() {
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
-  const [lastCouponInput, setLastCouponInput] = useState("");
+  const [lastCouponAbove5Input, setLastCouponAbove5Input] = useState("");
+  const [lastCouponBelow5Input, setLastCouponBelow5Input] = useState("");
 
   const loadSheet = useCallback(async (date: string, preferLive = false) => {
     setLoading(true);
@@ -358,9 +441,14 @@ export function DailyCollectionPanel() {
       }
       setSheet(result.data);
       setNotes(result.data.collection?.notes ?? "");
-      setLastCouponInput(
-        result.data.casualSwim.lastCouponNumber != null
-          ? String(result.data.casualSwim.lastCouponNumber)
+      setLastCouponAbove5Input(
+        result.data.casualSwim.above5.lastCouponNumber != null
+          ? String(result.data.casualSwim.above5.lastCouponNumber)
+          : ""
+      );
+      setLastCouponBelow5Input(
+        result.data.casualSwim.below5.lastCouponNumber != null
+          ? String(result.data.casualSwim.below5.lastCouponNumber)
           : ""
       );
       setDenominations(
@@ -404,9 +492,14 @@ export function DailyCollectionPanel() {
   }, []);
 
   const submitCollection = async (method: "POST" | "PUT") => {
-    const parsedCoupon = parseInt(lastCouponInput, 10);
-    if (Number.isNaN(parsedCoupon)) {
-      toast.error("Enter today's last coupon number");
+    const parsedAbove5 = parseInt(lastCouponAbove5Input, 10);
+    const parsedBelow5 = parseInt(lastCouponBelow5Input, 10);
+    if (Number.isNaN(parsedAbove5)) {
+      toast.error("Enter today's last coupon number (Above 5 Years)");
+      return;
+    }
+    if (Number.isNaN(parsedBelow5)) {
+      toast.error("Enter today's last coupon number (Below 5 Years)");
       return;
     }
 
@@ -419,7 +512,8 @@ export function DailyCollectionPanel() {
           date: selectedDate,
           notes,
           collectedByName: collectorName.trim(),
-          lastCouponNumber: parsedCoupon,
+          lastCouponAbove5: parsedAbove5,
+          lastCouponBelow5: parsedBelow5,
           cashDenominations: denominations,
         }),
       });
@@ -450,28 +544,43 @@ export function DailyCollectionPanel() {
 
   const couponPreview = useMemo(() => {
     if (!sheet || !couponEditable) return null;
-    const parsed = parseInt(lastCouponInput, 10);
-    if (Number.isNaN(parsed)) return null;
-    return calculateCasualSwimCouponRevenue(
-      sheet.casualSwim.previousClosingCoupon,
-      parsed,
-      sheet.casualSwim.couponRate
-    );
-  }, [sheet, lastCouponInput, couponEditable]);
+    const parsedAbove5 = parseInt(lastCouponAbove5Input, 10);
+    const parsedBelow5 = parseInt(lastCouponBelow5Input, 10);
+    if (Number.isNaN(parsedAbove5) || Number.isNaN(parsedBelow5)) return null;
+    return calculateCasualSwimDualCouponRevenue({
+      previousAbove5: sheet.casualSwim.above5.previousClosingCoupon,
+      previousBelow5: sheet.casualSwim.below5.previousClosingCoupon,
+      lastCouponAbove5: parsedAbove5,
+      lastCouponBelow5: parsedBelow5,
+      adultCouponRate: sheet.casualSwim.above5.couponRate,
+      childCouponRate: sheet.casualSwim.below5.couponRate,
+    });
+  }, [sheet, lastCouponAbove5Input, lastCouponBelow5Input, couponEditable]);
 
   const displayCasualSwim = useMemo(() => {
     if (!sheet) return null;
-    if (couponPreview?.ok) {
-      return {
-        previousClosingCoupon: couponPreview.result.previousClosingCoupon,
-        lastCouponNumber: couponPreview.result.lastCouponNumber,
-        couponRate: couponPreview.result.couponRate,
-        couponsUsed: couponPreview.result.couponsUsed,
-        revenue: couponPreview.result.revenue,
-      };
-    }
+    if (couponPreview?.ok) return couponPreview.result;
     return sheet.casualSwim;
   }, [sheet, couponPreview]);
+
+  const above5Validation =
+    couponPreview && !couponPreview.ok && lastCouponAbove5Input.trim()
+      ? couponPreview.message.includes("Above 5")
+        ? couponPreview.message
+        : null
+      : null;
+  const below5Validation =
+    couponPreview && !couponPreview.ok && lastCouponBelow5Input.trim()
+      ? couponPreview.message.includes("Below 5")
+        ? couponPreview.message
+        : couponPreview.message.includes("Above 5")
+          ? null
+          : couponPreview.message
+      : null;
+
+  const couponsValid = couponPreview == null || couponPreview.ok;
+  const couponsFilled =
+    lastCouponAbove5Input.trim().length > 0 && lastCouponBelow5Input.trim().length > 0;
 
   const displayTotals = useMemo(() => {
     if (!sheet || !displayCasualSwim) return null;
@@ -641,51 +750,43 @@ export function DailyCollectionPanel() {
           <Card className={sectionCard}>
             <CardHeader className="border-b border-border px-5 py-4">
               <CardTitle className="text-base">Casual Swimming Coupon Tracking</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Separate coupon books for Above 5 Years and Below 5 Years. Closing numbers carry
+                forward automatically.
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4 p-5">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="previous-closing-coupon">Previous Closing Coupon</Label>
-                  <Input
-                    id="previous-closing-coupon"
-                    value={sheet.casualSwim.previousClosingCoupon}
-                    readOnly
-                    disabled
-                    className="cursor-not-allowed opacity-80"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Carried forward from the most recent saved closing coupon.
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="last-coupon-number">Today&apos;s Last Coupon</Label>
-                  <Input
-                    id="last-coupon-number"
-                    type="number"
-                    min={sheet.casualSwim.previousClosingCoupon}
-                    step={1}
-                    value={lastCouponInput}
-                    onChange={(e) => setLastCouponInput(e.target.value)}
-                    readOnly={!couponEditable}
-                    disabled={!couponEditable}
-                    placeholder="e.g. 120"
-                    className={cn(!couponEditable && "cursor-not-allowed opacity-80")}
-                  />
-                  {couponPreview && !couponPreview.ok && (
-                    <p className="text-sm text-destructive">{couponPreview.message}</p>
-                  )}
-                </div>
-              </div>
+            <CardContent className="p-5">
               {displayCasualSwim && (
-                <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
-                  <p>
-                    Coupons Used: <span className="font-semibold">{displayCasualSwim.couponsUsed}</span>
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <CouponBookSection
+                    title="Above 5 Years Coupons"
+                    rateLabel={formatCurrency(displayCasualSwim.above5.couponRate)}
+                    book={displayCasualSwim.above5}
+                    lastCouponInput={lastCouponAbove5Input}
+                    onLastCouponChange={setLastCouponAbove5Input}
+                    couponEditable={couponEditable}
+                    validationMessage={above5Validation}
+                  />
+                  <CouponBookSection
+                    title="Below 5 Years Coupons"
+                    rateLabel={formatCurrency(displayCasualSwim.below5.couponRate)}
+                    book={displayCasualSwim.below5}
+                    lastCouponInput={lastCouponBelow5Input}
+                    onLastCouponChange={setLastCouponBelow5Input}
+                    couponEditable={couponEditable}
+                    validationMessage={below5Validation}
+                  />
+                </div>
+              )}
+              {displayCasualSwim && (
+                <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm">
+                  <p className="font-semibold text-primary">
+                    Total Casual Swimming Revenue: {formatCurrency(displayCasualSwim.revenue)}
                   </p>
-                  <p>
-                    Rate: <span className="font-semibold">{formatCurrency(displayCasualSwim.couponRate)}</span>
-                  </p>
-                  <p>
-                    Revenue: <span className="font-semibold">{formatCurrency(displayCasualSwim.revenue)}</span>
+                  <p className="text-muted-foreground">
+                    {displayCasualSwim.couponsUsed} coupons total (
+                    {displayCasualSwim.above5.couponsUsed} above 5 +{" "}
+                    {displayCasualSwim.below5.couponsUsed} below 5)
                   </p>
                 </div>
               )}
@@ -783,8 +884,8 @@ export function DailyCollectionPanel() {
                   disabled={
                     saving ||
                     !collectorName.trim() ||
-                    !lastCouponInput.trim() ||
-                    (couponPreview != null && !couponPreview.ok)
+                    !couponsFilled ||
+                    !couponsValid
                   }
                 >
                   {saving ? "Saving…" : "Mark Collection As Collected"}
@@ -798,8 +899,8 @@ export function DailyCollectionPanel() {
                     disabled={
                       saving ||
                       !collectorName.trim() ||
-                      !lastCouponInput.trim() ||
-                      (couponPreview != null && !couponPreview.ok)
+                      !couponsFilled ||
+                      !couponsValid
                     }
                   >
                     {saving ? "Saving…" : "Save Changes"}

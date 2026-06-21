@@ -1,6 +1,5 @@
 import { toJsonNumber } from "@/lib/serialize-prisma";
 
-/** Keys stored in changesJson / originalSnapshotJson */
 export type CollectionDiffValues = {
   notes: string | null;
   collectedByName: string | null;
@@ -9,8 +8,12 @@ export type CollectionDiffValues = {
   subscriptionRevenue: number | null;
   productRevenue: number | null;
   casualSwimRevenue: number | null;
-  casualSwimCouponsUsed: number | null;
-  lastCouponNumber: number | null;
+  lastCouponAbove5: number | null;
+  lastCouponBelow5: number | null;
+  casualSwimCouponsAbove5: number | null;
+  casualSwimCouponsBelow5: number | null;
+  casualSwimRevenueAbove5: number | null;
+  casualSwimRevenueBelow5: number | null;
   totalExpenses: number | null;
   cashCollected: number | null;
   upiCollected: number | null;
@@ -38,9 +41,13 @@ export const COLLECTION_FIELD_LABELS: Record<keyof CollectionDiffValues, string>
   invoiceRevenue: "Invoice Revenue",
   subscriptionRevenue: "Subscription Revenue",
   productRevenue: "Product Revenue",
-  casualSwimRevenue: "Casual Swim Revenue",
-  casualSwimCouponsUsed: "Coupons Used",
-  lastCouponNumber: "Today's Last Coupon",
+  casualSwimRevenue: "Casual Swimming Revenue",
+  lastCouponAbove5: "Today's Last Coupon (Above 5 Years)",
+  lastCouponBelow5: "Today's Last Coupon (Below 5 Years)",
+  casualSwimCouponsAbove5: "Coupons Used (Above 5 Years)",
+  casualSwimCouponsBelow5: "Coupons Used (Below 5 Years)",
+  casualSwimRevenueAbove5: "Revenue (Above 5 Years)",
+  casualSwimRevenueBelow5: "Revenue (Below 5 Years)",
   totalExpenses: "Expenses",
   cashCollected: "Cash Collected",
   upiCollected: "UPI Collected",
@@ -60,8 +67,12 @@ type CollectionRecordLike = {
   subscriptionRevenue: unknown;
   productRevenue: unknown;
   casualSwimRevenue?: unknown;
-  casualSwimCouponsUsed?: unknown;
-  lastCouponNumber?: number | null;
+  lastCouponAbove5?: number | null;
+  lastCouponBelow5?: number | null;
+  casualSwimCouponsAbove5?: number | null;
+  casualSwimCouponsBelow5?: number | null;
+  casualSwimRevenueAbove5?: unknown;
+  casualSwimRevenueBelow5?: unknown;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
@@ -87,9 +98,14 @@ export function extractCollectionDiffValues(
     subscriptionRevenue: toNullableNumber(record.subscriptionRevenue),
     productRevenue: toNullableNumber(record.productRevenue),
     casualSwimRevenue: toNullableNumber(record.casualSwimRevenue),
-    casualSwimCouponsUsed:
-      record.casualSwimCouponsUsed == null ? null : Number(record.casualSwimCouponsUsed),
-    lastCouponNumber: record.lastCouponNumber ?? null,
+    lastCouponAbove5: record.lastCouponAbove5 ?? null,
+    lastCouponBelow5: record.lastCouponBelow5 ?? null,
+    casualSwimCouponsAbove5:
+      record.casualSwimCouponsAbove5 == null ? null : Number(record.casualSwimCouponsAbove5),
+    casualSwimCouponsBelow5:
+      record.casualSwimCouponsBelow5 == null ? null : Number(record.casualSwimCouponsBelow5),
+    casualSwimRevenueAbove5: toNullableNumber(record.casualSwimRevenueAbove5),
+    casualSwimRevenueBelow5: toNullableNumber(record.casualSwimRevenueBelow5),
     totalExpenses: toNullableNumber(record.totalExpenses),
     cashCollected: toNullableNumber(record.cashCollectedSystem),
     upiCollected: toNullableNumber(record.upiCollected),
@@ -135,7 +151,6 @@ export function hasCollectionChanges(changes: CollectionChangesJson): boolean {
   return Object.keys(changes).length > 0;
 }
 
-/** Compact snapshot persisted on first mark-collected for Version 0. */
 export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
   return {
     totalRevenue: values.totalRevenue,
@@ -149,8 +164,12 @@ export function buildOriginalSnapshotJson(values: CollectionDiffValues) {
     subscriptionRevenue: values.subscriptionRevenue,
     productRevenue: values.productRevenue,
     casualSwimRevenue: values.casualSwimRevenue,
-    casualSwimCouponsUsed: values.casualSwimCouponsUsed,
-    lastCouponNumber: values.lastCouponNumber,
+    lastCouponAbove5: values.lastCouponAbove5,
+    lastCouponBelow5: values.lastCouponBelow5,
+    casualSwimCouponsAbove5: values.casualSwimCouponsAbove5,
+    casualSwimCouponsBelow5: values.casualSwimCouponsBelow5,
+    casualSwimRevenueAbove5: values.casualSwimRevenueAbove5,
+    casualSwimRevenueBelow5: values.casualSwimRevenueBelow5,
     notes: values.notes,
     collectedByName: values.collectedByName,
   };

@@ -133,7 +133,8 @@ export const settingsSchema = z.object({
 });
 
 export const casualSwimSettingsSchema = z.object({
-  casualSwimCouponRate: z.coerce.number().positive("Coupon rate must be greater than zero"),
+  casualSwimAdultCouponRate: z.coerce.number().positive("Adult coupon rate must be greater than zero"),
+  casualSwimChildCouponRate: z.coerce.number().positive("Child coupon rate must be greater than zero"),
 });
 
 export type CasualSwimSettingsInput = z.infer<typeof casualSwimSettingsSchema>;

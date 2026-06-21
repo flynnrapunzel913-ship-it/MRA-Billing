@@ -5,7 +5,13 @@ import { getActiveInvoiceWhere } from "@/lib/invoice-filters";
 import { COACHING_PACKAGE_TYPE } from "@/lib/constants";
 import { toJsonNumber } from "@/lib/serialize-prisma";
 import { normalizeDenominations, type CashDenominations } from "@/lib/cash-denominations";
-import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
+import {
+  calculateCasualSwimDualCouponRevenue,
+  DEFAULT_ADULT_COUPON_RATE,
+  DEFAULT_CHILD_COUPON_RATE,
+  resolveCasualSwimCouponBook,
+  type CasualSwimDualCouponTracking,
+} from "@/lib/casual-swim-coupon";
 
 export type RevenueSourceRow = {
   name: string;
@@ -29,15 +35,10 @@ export type PaymentBreakdown = {
   upi: number;
   card: number;
   other: number;
-  /** Gross payments received (all methods, before expenses). */
   grossCollected: number;
-  /** Expenses paid from cash. */
   cashExpenses: number;
-  /** Expenses paid via UPI. */
   upiExpenses: number;
-  /** Cash remaining after same-day cash expenses. */
   netCash: number;
-  /** UPI remaining after same-day UPI expenses. */
   netUpi: number;
 };
 
@@ -55,10 +56,7 @@ export type CollectionSnapshot = {
   subscriptionRevenue: number;
   productRevenue: number;
   casualSwimRevenue: number;
-  casualSwimCouponsUsed: number;
-  casualSwimCouponRate: number;
-  lastCouponNumber: number | null;
-  previousClosingCoupon: number;
+  casualSwim: CasualSwimDualCouponTracking;
   totalExpenses: number;
   cashCollected: number;
   upiCollected: number;
@@ -67,17 +65,9 @@ export type CollectionSnapshot = {
   netCollection: number;
 };
 
-export type CasualSwimCouponTracking = {
-  previousClosingCoupon: number;
-  lastCouponNumber: number | null;
-  couponRate: number;
-  couponsUsed: number;
-  revenue: number;
-};
-
 export type RevenueSourceBreakdown = {
   invoices: number;
-  casualSwimming: CasualSwimCouponTracking;
+  casualSwimming: CasualSwimDualCouponTracking;
 };
 
 export type CollectionRecord = {
@@ -109,7 +99,7 @@ export type DailyCollectionSheet = {
   invoiceRevenue: number;
   subscriptionRevenue: number;
   productRevenue: number;
-  casualSwim: CasualSwimCouponTracking;
+  casualSwim: CasualSwimDualCouponTracking;
   revenueSourceBreakdown: RevenueSourceBreakdown;
   revenueBreakdown: RevenueSourceRow[];
   totalExpenses: number;
@@ -165,32 +155,83 @@ function enrichSnapshotFromOriginal(
   };
 }
 
-function serializeSnapshot(row: {
-  totalRevenue: unknown;
-  invoiceRevenue?: unknown;
-  subscriptionRevenue: unknown;
-  productRevenue: unknown;
-  casualSwimRevenue?: unknown;
-  casualSwimCouponsUsed?: unknown;
-  casualSwimCouponRate?: unknown;
-  lastCouponNumber?: number | null;
-  totalExpenses: unknown;
-  cashCollectedSystem: unknown;
-  upiCollected: unknown;
-  netCollection: unknown;
-  originalSnapshotJson?: unknown;
-}, previousClosingCoupon = 0): CollectionSnapshot | null {
+function buildCasualSwimFromPersistedRow(
+  row: {
+    lastCouponAbove5?: number | null;
+    lastCouponBelow5?: number | null;
+    casualSwimCouponsAbove5?: number | null;
+    casualSwimCouponsBelow5?: number | null;
+    casualSwimRevenueAbove5?: unknown;
+    casualSwimRevenueBelow5?: unknown;
+    casualSwimRevenue?: unknown;
+  },
+  previous: { above5: number; below5: number },
+  rates: { adultRate: number; childRate: number }
+): CasualSwimDualCouponTracking {
+  const above5 = resolveCasualSwimCouponBook(
+    previous.above5,
+    rates.adultRate,
+    row.lastCouponAbove5 ?? null
+  );
+  const below5 = resolveCasualSwimCouponBook(
+    previous.below5,
+    rates.childRate,
+    row.lastCouponBelow5 ?? null
+  );
+
+  if (row.casualSwimCouponsAbove5 != null || row.casualSwimRevenueAbove5 != null) {
+    above5.couponsUsed = row.casualSwimCouponsAbove5 ?? above5.couponsUsed;
+    above5.revenue = toJsonNumber(row.casualSwimRevenueAbove5 ?? above5.revenue);
+  }
+  if (row.casualSwimCouponsBelow5 != null || row.casualSwimRevenueBelow5 != null) {
+    below5.couponsUsed = row.casualSwimCouponsBelow5 ?? below5.couponsUsed;
+    below5.revenue = toJsonNumber(row.casualSwimRevenueBelow5 ?? below5.revenue);
+  }
+
+  const revenue =
+    row.casualSwimRevenue != null
+      ? toJsonNumber(row.casualSwimRevenue)
+      : above5.revenue + below5.revenue;
+
+  return {
+    above5,
+    below5,
+    couponsUsed: above5.couponsUsed + below5.couponsUsed,
+    revenue,
+  };
+}
+
+function serializeSnapshot(
+  row: {
+    totalRevenue: unknown;
+    invoiceRevenue?: unknown;
+    subscriptionRevenue: unknown;
+    productRevenue: unknown;
+    casualSwimRevenue?: unknown;
+    lastCouponAbove5?: number | null;
+    lastCouponBelow5?: number | null;
+    casualSwimCouponsAbove5?: number | null;
+    casualSwimCouponsBelow5?: number | null;
+    casualSwimRevenueAbove5?: unknown;
+    casualSwimRevenueBelow5?: unknown;
+    totalExpenses: unknown;
+    cashCollectedSystem: unknown;
+    upiCollected: unknown;
+    netCollection: unknown;
+    originalSnapshotJson?: unknown;
+  },
+  previousClosing: { above5: number; below5: number },
+  rates: { adultRate: number; childRate: number }
+): CollectionSnapshot | null {
   if (row.totalRevenue == null) return null;
+  const casualSwim = buildCasualSwimFromPersistedRow(row, previousClosing, rates);
   const snapshot: CollectionSnapshot = {
     totalRevenue: toJsonNumber(row.totalRevenue),
     invoiceRevenue: toJsonNumber(row.invoiceRevenue ?? row.totalRevenue),
     subscriptionRevenue: toJsonNumber(row.subscriptionRevenue),
     productRevenue: toJsonNumber(row.productRevenue),
-    casualSwimRevenue: toJsonNumber(row.casualSwimRevenue ?? 0),
-    casualSwimCouponsUsed: row.casualSwimCouponsUsed ?? 0,
-    casualSwimCouponRate: toJsonNumber(row.casualSwimCouponRate ?? 0),
-    lastCouponNumber: row.lastCouponNumber ?? null,
-    previousClosingCoupon,
+    casualSwimRevenue: toJsonNumber(row.casualSwimRevenue ?? casualSwim.revenue),
+    casualSwim,
     totalExpenses: toJsonNumber(row.totalExpenses),
     cashCollected: toJsonNumber(row.cashCollectedSystem),
     upiCollected: toJsonNumber(row.upiCollected),
@@ -199,7 +240,6 @@ function serializeSnapshot(row: {
   return enrichSnapshotFromOriginal(snapshot, row.originalSnapshotJson);
 }
 
-/** Sum expenses by payment mode for daily collection math. */
 export function sumExpensesByPaymentMode(
   expenses: Array<{ amount: number; paymentMode: "CASH" | "UPI" }>
 ): { cashExpenses: number; upiExpenses: number; totalExpenses: number } {
@@ -215,7 +255,6 @@ export function sumExpensesByPaymentMode(
   return { cashExpenses, upiExpenses, totalExpenses: cashExpenses + upiExpenses };
 }
 
-/** Pure collection math — used by the daily sheet and unit tests. */
 export function computeCollectionTotals(input: {
   subscriptionRevenue: number;
   productRevenue: number;
@@ -240,9 +279,10 @@ export function computeCollectionTotals(input: {
   const grossCollected =
     grossCashWithCasual + input.grossUpi + input.grossCard + input.grossOther;
   const itemRevenue = input.subscriptionRevenue + input.productRevenue;
-  const invoiceRevenue = input.grossCash + input.grossUpi + input.grossCard + input.grossOther > 0
-    ? input.grossCash + input.grossUpi + input.grossCard + input.grossOther
-    : itemRevenue;
+  const invoiceRevenue =
+    input.grossCash + input.grossUpi + input.grossCard + input.grossOther > 0
+      ? input.grossCash + input.grossUpi + input.grossCard + input.grossOther
+      : itemRevenue;
   const totalRevenue = invoiceRevenue + casualSwimRevenue;
   const totalExpenses = input.cashExpenses + input.upiExpenses;
   const netCash = grossCashWithCasual - input.cashExpenses;
@@ -270,7 +310,6 @@ export function computeCollectionTotals(input: {
   };
 }
 
-/** Reconstruct payment breakdown from persisted collection snapshot fields. */
 export function buildPaymentBreakdownFromSnapshot(
   snapshot: CollectionSnapshot
 ): PaymentBreakdown {
@@ -341,69 +380,76 @@ function buildPaymentBreakdown(
 }
 
 export type DailyCollectionSheetOptions = {
-  /** When true, always use live invoice/expense totals (mark-collected / edit save). */
   preferLiveTotals?: boolean;
-  /** Today's last coupon for live recalculation when saving. */
-  lastCouponNumber?: number;
+  lastCouponAbove5?: number;
+  lastCouponBelow5?: number;
 };
 
-export async function getCasualSwimCouponRate(): Promise<number> {
+export async function getCasualSwimCouponRates(): Promise<{
+  adultRate: number;
+  childRate: number;
+}> {
   const settings = await prisma.settings.findUnique({
     where: { id: "default" },
-    select: { casualSwimCouponRate: true },
+    select: { casualSwimAdultCouponRate: true, casualSwimChildCouponRate: true },
   });
-  return toJsonNumber(settings?.casualSwimCouponRate ?? 150);
+  return {
+    adultRate: toJsonNumber(settings?.casualSwimAdultCouponRate ?? DEFAULT_ADULT_COUPON_RATE),
+    childRate: toJsonNumber(settings?.casualSwimChildCouponRate ?? DEFAULT_CHILD_COUPON_RATE),
+  };
 }
 
-export async function getPreviousClosingCoupon(beforeDate: Date): Promise<number> {
+export async function getPreviousClosingCoupons(
+  beforeDate: Date
+): Promise<{ above5: number; below5: number }> {
   const row = await prisma.dailyCollection.findFirst({
     where: {
       collectionDate: { lt: beforeDate },
-      lastCouponNumber: { not: null },
+      OR: [{ lastCouponAbove5: { not: null } }, { lastCouponBelow5: { not: null } }],
     },
     orderBy: { collectionDate: "desc" },
-    select: { lastCouponNumber: true },
+    select: { lastCouponAbove5: true, lastCouponBelow5: true },
   });
-  return row?.lastCouponNumber ?? 0;
+  return {
+    above5: row?.lastCouponAbove5 ?? 0,
+    below5: row?.lastCouponBelow5 ?? 0,
+  };
 }
 
-export function resolveCasualSwimCouponTracking(
-  previousClosingCoupon: number,
-  couponRate: number,
-  lastCouponNumber: number | null
-): CasualSwimCouponTracking {
-  if (lastCouponNumber == null) {
+export function resolveCasualSwimDualCouponTracking(
+  previous: { above5: number; below5: number },
+  rates: { adultRate: number; childRate: number },
+  lastCouponAbove5: number | null,
+  lastCouponBelow5: number | null
+): CasualSwimDualCouponTracking {
+  if (lastCouponAbove5 == null && lastCouponBelow5 == null) {
     return {
-      previousClosingCoupon,
-      lastCouponNumber: null,
-      couponRate,
+      above5: resolveCasualSwimCouponBook(previous.above5, rates.adultRate, null),
+      below5: resolveCasualSwimCouponBook(previous.below5, rates.childRate, null),
       couponsUsed: 0,
       revenue: 0,
     };
   }
 
-  const calc = calculateCasualSwimCouponRevenue(
-    previousClosingCoupon,
-    lastCouponNumber,
-    couponRate
-  );
+  const calc = calculateCasualSwimDualCouponRevenue({
+    previousAbove5: previous.above5,
+    previousBelow5: previous.below5,
+    lastCouponAbove5: lastCouponAbove5 ?? previous.above5,
+    lastCouponBelow5: lastCouponBelow5 ?? previous.below5,
+    adultCouponRate: rates.adultRate,
+    childCouponRate: rates.childRate,
+  });
+
   if (!calc.ok) {
     return {
-      previousClosingCoupon,
-      lastCouponNumber,
-      couponRate,
+      above5: resolveCasualSwimCouponBook(previous.above5, rates.adultRate, lastCouponAbove5),
+      below5: resolveCasualSwimCouponBook(previous.below5, rates.childRate, lastCouponBelow5),
       couponsUsed: 0,
       revenue: 0,
     };
   }
 
-  return {
-    previousClosingCoupon,
-    lastCouponNumber: calc.result.lastCouponNumber,
-    couponRate: calc.result.couponRate,
-    couponsUsed: calc.result.couponsUsed,
-    revenue: calc.result.revenue,
-  };
+  return calc.result;
 }
 
 export async function getDailyCollectionSheet(
@@ -429,70 +475,78 @@ export async function getDailyCollectionSheet(
 
   const historyStart = startOfDay(subDays(dayStart, 13));
 
-  const [paymentGroups, coachingGroups, productGroups, expenseRows, collection, historyCollections, couponRate, previousClosingCoupon] =
-    await Promise.all([
-      prisma.invoice.groupBy({
-        by: ["paymentMethod"],
-        where: paidInvoiceWhere,
-        _sum: { amountPaid: true },
-      }),
-      prisma.invoiceItem.groupBy({
-        by: ["description"],
-        where: {
-          itemType: COACHING_PACKAGE_TYPE,
-          invoice: paidInvoiceWhere,
+  const [
+    paymentGroups,
+    coachingGroups,
+    productGroups,
+    expenseRows,
+    collection,
+    historyCollections,
+    couponRates,
+    previousClosing,
+  ] = await Promise.all([
+    prisma.invoice.groupBy({
+      by: ["paymentMethod"],
+      where: paidInvoiceWhere,
+      _sum: { amountPaid: true },
+    }),
+    prisma.invoiceItem.groupBy({
+      by: ["description"],
+      where: { itemType: COACHING_PACKAGE_TYPE, invoice: paidInvoiceWhere },
+      _sum: { amount: true, quantity: true },
+    }),
+    prisma.invoiceItem.groupBy({
+      by: ["description"],
+      where: { itemType: "Accessories / Products", invoice: paidInvoiceWhere },
+      _sum: { amount: true, quantity: true },
+    }),
+    prisma.expense.findMany({
+      where: expenseWhere,
+      orderBy: { createdAt: "asc" },
+      include: { createdBy: { select: { name: true, username: true } } },
+    }),
+    prisma.dailyCollection.findUnique({
+      where: { collectionDate: dayStart },
+      include: {
+        collectedBy: { select: { id: true, name: true, username: true } },
+        editHistory: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { createdAt: true },
         },
-        _sum: { amount: true, quantity: true },
-      }),
-      prisma.invoiceItem.groupBy({
-        by: ["description"],
-        where: {
-          itemType: "Accessories / Products",
-          invoice: paidInvoiceWhere,
-        },
-        _sum: { amount: true, quantity: true },
-      }),
-      prisma.expense.findMany({
-        where: expenseWhere,
-        orderBy: { createdAt: "asc" },
-        include: {
-          createdBy: { select: { name: true, username: true } },
-        },
-      }),
-      prisma.dailyCollection.findUnique({
-        where: { collectionDate: dayStart },
-        include: {
-          collectedBy: { select: { id: true, name: true, username: true } },
-          editHistory: {
-            orderBy: { createdAt: "desc" },
-            take: 1,
-            select: { createdAt: true },
-          },
-          _count: { select: { editHistory: true } },
-        },
-      }),
-      prisma.dailyCollection.findMany({
-        where: { collectionDate: { gte: historyStart, lte: dayEnd } },
-        select: {
-          collectionDate: true,
-          totalRevenue: true,
-          subscriptionRevenue: true,
-          productRevenue: true,
-          totalExpenses: true,
-          cashCollectedSystem: true,
-          upiCollected: true,
-          netCollection: true,
-          originalSnapshotJson: true,
-          cashCountedPhysical: true,
-          cashDifference: true,
-          cashDifferenceNotes: true,
-          cashDenominations: true,
-        },
-        orderBy: { collectionDate: "desc" },
-      }),
-      getCasualSwimCouponRate(),
-      getPreviousClosingCoupon(dayStart),
-    ]);
+        _count: { select: { editHistory: true } },
+      },
+    }),
+    prisma.dailyCollection.findMany({
+      where: { collectionDate: { gte: historyStart, lte: dayEnd } },
+      select: {
+        collectionDate: true,
+        totalRevenue: true,
+        invoiceRevenue: true,
+        subscriptionRevenue: true,
+        productRevenue: true,
+        casualSwimRevenue: true,
+        lastCouponAbove5: true,
+        lastCouponBelow5: true,
+        casualSwimCouponsAbove5: true,
+        casualSwimCouponsBelow5: true,
+        casualSwimRevenueAbove5: true,
+        casualSwimRevenueBelow5: true,
+        totalExpenses: true,
+        cashCollectedSystem: true,
+        upiCollected: true,
+        netCollection: true,
+        originalSnapshotJson: true,
+        cashCountedPhysical: true,
+        cashDifference: true,
+        cashDifferenceNotes: true,
+        cashDenominations: true,
+      },
+      orderBy: { collectionDate: "desc" },
+    }),
+    getCasualSwimCouponRates(),
+    getPreviousClosingCoupons(dayStart),
+  ]);
 
   const subscriptionBreakdown: RevenueSourceRow[] = coachingGroups
     .map((row) => ({
@@ -537,13 +591,18 @@ export async function getDailyCollectionSheet(
     liveProductRevenue
   );
 
-  const resolvedLastCoupon =
-    options?.lastCouponNumber ??
-    (collection?.lastCouponNumber != null ? collection.lastCouponNumber : null);
-  const casualSwim = resolveCasualSwimCouponTracking(
-    previousClosingCoupon,
-    couponRate,
-    resolvedLastCoupon
+  const resolvedLastAbove5 =
+    options?.lastCouponAbove5 ??
+    (collection?.lastCouponAbove5 != null ? collection.lastCouponAbove5 : null);
+  const resolvedLastBelow5 =
+    options?.lastCouponBelow5 ??
+    (collection?.lastCouponBelow5 != null ? collection.lastCouponBelow5 : null);
+
+  const casualSwim = resolveCasualSwimDualCouponTracking(
+    previousClosing,
+    couponRates,
+    resolvedLastAbove5,
+    resolvedLastBelow5
   );
 
   const liveTotals = computeCollectionTotals({
@@ -557,16 +616,11 @@ export async function getDailyCollectionSheet(
     upiExpenses: liveUpiExpenses,
     casualSwimRevenue: casualSwim.revenue,
   });
-  const liveTotalRevenue = liveTotals.totalRevenue;
-  const liveInvoiceRevenue = liveTotals.invoiceRevenue;
-  const liveNetCollection = liveTotals.netCollection;
-  const liveRevenueBreakdown = [...subscriptionBreakdown, ...productBreakdown];
-  const livePaymentWithCasual = liveTotals.paymentBreakdown;
 
   const isSnapshot = collection != null;
   const persistedSnapshot =
     collection && !options?.preferLiveTotals
-      ? serializeSnapshot(collection, previousClosingCoupon)
+      ? serializeSnapshot(collection, previousClosing, couponRates)
       : null;
   const usePersistedTotals = persistedSnapshot != null;
   const persistedPaymentBreakdown = persistedSnapshot
@@ -579,7 +633,7 @@ export async function getDailyCollectionSheet(
       return [
         key,
         {
-          snapshot: serializeSnapshot(row),
+          snapshot: serializeSnapshot(row, { above5: 0, below5: 0 }, couponRates),
           cash: serializeCashReconciliation(row),
         },
       ] as const;
@@ -600,27 +654,18 @@ export async function getDailyCollectionSheet(
     });
   }
 
-  const displayTotalRevenue = persistedSnapshot?.totalRevenue ?? liveTotalRevenue;
-  const displayInvoiceRevenue = persistedSnapshot?.invoiceRevenue ?? liveInvoiceRevenue;
+  const displayCasualSwim = persistedSnapshot?.casualSwim ?? casualSwim;
+  const displayTotalRevenue = persistedSnapshot?.totalRevenue ?? liveTotals.totalRevenue;
+  const displayInvoiceRevenue = persistedSnapshot?.invoiceRevenue ?? liveTotals.invoiceRevenue;
   const displaySubscriptionRevenue =
     persistedSnapshot?.subscriptionRevenue ?? liveSubscriptionRevenue;
   const displayProductRevenue = persistedSnapshot?.productRevenue ?? liveProductRevenue;
-  const displayCasualSwim =
-    persistedSnapshot != null
-      ? {
-          previousClosingCoupon: persistedSnapshot.previousClosingCoupon,
-          lastCouponNumber: persistedSnapshot.lastCouponNumber,
-          couponRate: persistedSnapshot.casualSwimCouponRate,
-          couponsUsed: persistedSnapshot.casualSwimCouponsUsed,
-          revenue: persistedSnapshot.casualSwimRevenue,
-        }
-      : casualSwim;
   const displayTotalExpenses = persistedSnapshot?.totalExpenses ?? liveTotalExpenses;
   const displayCashExpenses =
     persistedPaymentBreakdown?.cashExpenses ?? liveCashExpenses;
   const displayUpiExpenses = persistedPaymentBreakdown?.upiExpenses ?? liveUpiExpenses;
-  const displayPaymentBreakdown = persistedPaymentBreakdown ?? livePaymentWithCasual;
-  const displayNetCollection = persistedSnapshot?.netCollection ?? liveNetCollection;
+  const displayPaymentBreakdown = persistedPaymentBreakdown ?? liveTotals.paymentBreakdown;
+  const displayNetCollection = persistedSnapshot?.netCollection ?? liveTotals.netCollection;
 
   return {
     date: dateStr,
@@ -634,7 +679,7 @@ export async function getDailyCollectionSheet(
       invoices: displayInvoiceRevenue,
       casualSwimming: displayCasualSwim,
     },
-    revenueBreakdown: usePersistedTotals ? [] : liveRevenueBreakdown,
+    revenueBreakdown: usePersistedTotals ? [] : [...subscriptionBreakdown, ...productBreakdown],
     totalExpenses: displayTotalExpenses,
     cashExpenses: displayCashExpenses,
     upiExpenses: displayUpiExpenses,
@@ -648,7 +693,8 @@ export async function getDailyCollectionSheet(
           collectedAt: collection.collectedAt.toISOString(),
           collectedByName: collection.collectedByName,
           collectedBy: collection.collectedBy,
-          snapshot: persistedSnapshot ?? serializeSnapshot(collection, previousClosingCoupon),
+          snapshot:
+            persistedSnapshot ?? serializeSnapshot(collection, previousClosing, couponRates),
           cashReconciliation: serializeCashReconciliation(collection),
         }
       : null,
@@ -660,7 +706,6 @@ export async function getDailyCollectionSheet(
   };
 }
 
-/** Build snapshot values from live sheet data for persisting on mark-collected. */
 export function buildCollectionSnapshotFromSheet(
   sheet: DailyCollectionSheet
 ): CollectionSnapshot {
@@ -670,15 +715,36 @@ export function buildCollectionSnapshotFromSheet(
     subscriptionRevenue: sheet.subscriptionRevenue,
     productRevenue: sheet.productRevenue,
     casualSwimRevenue: sheet.casualSwim.revenue,
-    casualSwimCouponsUsed: sheet.casualSwim.couponsUsed,
-    casualSwimCouponRate: sheet.casualSwim.couponRate,
-    lastCouponNumber: sheet.casualSwim.lastCouponNumber,
-    previousClosingCoupon: sheet.casualSwim.previousClosingCoupon,
+    casualSwim: sheet.casualSwim,
     totalExpenses: sheet.totalExpenses,
     cashCollected: sheet.paymentBreakdown.netCash,
     upiCollected: sheet.paymentBreakdown.upi,
     cardCollected: sheet.paymentBreakdown.card,
     otherCollected: sheet.paymentBreakdown.other,
     netCollection: sheet.netCollection,
+  };
+}
+
+export type CasualSwimCouponPersistFields = {
+  lastCouponAbove5: number;
+  lastCouponBelow5: number;
+  casualSwimCouponsAbove5: number;
+  casualSwimCouponsBelow5: number;
+  casualSwimRevenueAbove5: number;
+  casualSwimRevenueBelow5: number;
+  casualSwimRevenue: number;
+};
+
+export function extractCasualSwimCouponPersistFields(
+  casualSwim: CasualSwimDualCouponTracking
+): CasualSwimCouponPersistFields {
+  return {
+    lastCouponAbove5: casualSwim.above5.lastCouponNumber ?? casualSwim.above5.previousClosingCoupon,
+    lastCouponBelow5: casualSwim.below5.lastCouponNumber ?? casualSwim.below5.previousClosingCoupon,
+    casualSwimCouponsAbove5: casualSwim.above5.couponsUsed,
+    casualSwimCouponsBelow5: casualSwim.below5.couponsUsed,
+    casualSwimRevenueAbove5: casualSwim.above5.revenue,
+    casualSwimRevenueBelow5: casualSwim.below5.revenue,
+    casualSwimRevenue: casualSwim.revenue,
   };
 }

@@ -367,12 +367,12 @@ export default function SettingsPage() {
           <CardHeader>
             <CardTitle>Casual Swimming</CardTitle>
             <CardDescription>
-              Manual coupon register — configure per-coupon rate for Daily Collection.
+              Manual coupon register — configure Above 5 and Below 5 coupon rates for Daily Collection.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Button type="button" variant="outline" asChild>
-              <PrefetchLink href="/settings/casual-swim">Manage Coupon Rate</PrefetchLink>
+              <PrefetchLink href="/settings/casual-swim">Manage Coupon Rates</PrefetchLink>
             </Button>
           </CardContent>
         </Card>

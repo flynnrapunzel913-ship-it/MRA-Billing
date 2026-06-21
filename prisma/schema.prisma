@@ -236,8 +236,9 @@ model Settings {
   headerImageUrl     String   @default("/branding/address-panel.jpeg")
   brandColor         String   @default("#0070C0")
   termsAndConditions String   @default("1. Fees once paid are non-refundable.\n2. Subject to academy rules.\n3. This is a computer generated invoice.")
-  /// Per-coupon rate for manual casual swim coupon register (daily collection).
-  casualSwimCouponRate Decimal @default(150) @db.Decimal(10, 2)
+  /// Per-coupon rates for manual casual swim coupon register (daily collection).
+  casualSwimAdultCouponRate Decimal @default(150) @db.Decimal(10, 2)
+  casualSwimChildCouponRate Decimal @default(100) @db.Decimal(10, 2)
   updatedAt          DateTime @updatedAt
 }
 
@@ -360,9 +361,12 @@ model DailyCollection {
   productRevenue      Decimal? @db.Decimal(12, 2)
   invoiceRevenue      Decimal? @db.Decimal(12, 2)
   casualSwimRevenue   Decimal? @db.Decimal(12, 2)
-  casualSwimCouponsUsed Int?
-  casualSwimCouponRate Decimal? @db.Decimal(10, 2)
-  lastCouponNumber    Int?
+  lastCouponAbove5    Int?
+  lastCouponBelow5    Int?
+  casualSwimCouponsAbove5 Int?
+  casualSwimCouponsBelow5 Int?
+  casualSwimRevenueAbove5 Decimal? @db.Decimal(12, 2)
+  casualSwimRevenueBelow5 Decimal? @db.Decimal(12, 2)
   totalExpenses       Decimal? @db.Decimal(12, 2)
   cashCollectedSystem Decimal? @db.Decimal(12, 2)
   upiCollected        Decimal? @db.Decimal(12, 2)

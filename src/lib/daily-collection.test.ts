@@ -3,6 +3,26 @@ import {
   buildPaymentBreakdownFromSnapshot,
   computeCollectionTotals,
 } from "@/lib/daily-collection";
+import type { CasualSwimDualCouponTracking } from "@/lib/casual-swim-coupon";
+
+const emptyCasualSwim: CasualSwimDualCouponTracking = {
+  above5: {
+    previousClosingCoupon: 0,
+    lastCouponNumber: null,
+    couponRate: 150,
+    couponsUsed: 0,
+    revenue: 0,
+  },
+  below5: {
+    previousClosingCoupon: 0,
+    lastCouponNumber: null,
+    couponRate: 100,
+    couponsUsed: 0,
+    revenue: 0,
+  },
+  couponsUsed: 0,
+  revenue: 0,
+};
 
 describe("buildPaymentBreakdownFromSnapshot", () => {
   it("reconstructs gross cash and expense split from persisted net figures", () => {
@@ -11,11 +31,8 @@ describe("buildPaymentBreakdownFromSnapshot", () => {
       invoiceRevenue: 3000,
       subscriptionRevenue: 2500,
       productRevenue: 500,
+      casualSwim: emptyCasualSwim,
       casualSwimRevenue: 0,
-      casualSwimCouponsUsed: 0,
-      casualSwimCouponRate: 150,
-      lastCouponNumber: null,
-      previousClosingCoupon: 0,
       totalExpenses: 500,
       cashCollected: 1800,
       upiCollected: 1000,
@@ -37,11 +54,8 @@ describe("buildPaymentBreakdownFromSnapshot", () => {
       invoiceRevenue: 3000,
       subscriptionRevenue: 0,
       productRevenue: 0,
+      casualSwim: emptyCasualSwim,
       casualSwimRevenue: 0,
-      casualSwimCouponsUsed: 0,
-      casualSwimCouponRate: 150,
-      lastCouponNumber: null,
-      previousClosingCoupon: 0,
       totalExpenses: 200,
       cashCollected: 1800,
       upiCollected: 1000,

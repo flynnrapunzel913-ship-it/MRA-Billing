@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { readApiResponse } from "@/lib/api-error";
@@ -22,11 +22,12 @@ export default function CasualSwimSettingsPage() {
     watch,
     formState: { isSubmitting, errors },
   } = useForm<CasualSwimSettingsInput>({
-    resolver: zodResolver(casualSwimSettingsSchema),
-    defaultValues: { casualSwimCouponRate: 150 },
+    resolver: zodResolver(casualSwimSettingsSchema) as Resolver<CasualSwimSettingsInput>,
+    defaultValues: { casualSwimAdultCouponRate: 150, casualSwimChildCouponRate: 100 },
   });
 
-  const couponRate = watch("casualSwimCouponRate");
+  const adultRate = watch("casualSwimAdultCouponRate");
+  const childRate = watch("casualSwimChildCouponRate");
 
   useEffect(() => {
     void (async () => {
@@ -37,7 +38,8 @@ export default function CasualSwimSettingsPage() {
       );
       if (result.ok) {
         reset({
-          casualSwimCouponRate: Number(result.data.casualSwimCouponRate ?? 150),
+          casualSwimAdultCouponRate: Number(result.data.casualSwimAdultCouponRate ?? 150),
+          casualSwimChildCouponRate: Number(result.data.casualSwimChildCouponRate ?? 100),
         });
       }
       setLoading(false);
@@ -59,9 +61,10 @@ export default function CasualSwimSettingsPage() {
       return;
     }
     reset({
-      casualSwimCouponRate: Number(result.data.casualSwimCouponRate),
+      casualSwimAdultCouponRate: Number(result.data.casualSwimAdultCouponRate),
+      casualSwimChildCouponRate: Number(result.data.casualSwimChildCouponRate),
     });
-    toast.success("Casual swim coupon rate updated");
+    toast.success("Casual swim coupon rates updated");
   };
 
   if (loading) {
@@ -73,37 +76,59 @@ export default function CasualSwimSettingsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Casual Swimming Configuration</h1>
         <p className="text-sm text-muted-foreground">
-          Set the per-coupon rate used in Daily Collection coupon tracking.
+          Set per-coupon rates for Above 5 Years and Below 5 Years coupon books used in Daily
+          Collection.
         </p>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         <Card>
           <CardHeader>
-            <CardTitle>Coupon Rate</CardTitle>
+            <CardTitle>Coupon Rates</CardTitle>
             <CardDescription>
               Physical coupons are tracked manually in Daily Collection. Revenue is calculated as
-              coupons used × this rate.
+              coupons used × the rate for each book.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="casualSwimCouponRate">Casual Swim Coupon Rate (₹)</Label>
+              <Label htmlFor="casualSwimAdultCouponRate">Above 5 Years (₹)</Label>
               <Input
-                id="casualSwimCouponRate"
+                id="casualSwimAdultCouponRate"
                 type="number"
                 min={1}
                 step="1"
-                {...register("casualSwimCouponRate", { valueAsNumber: true })}
+                {...register("casualSwimAdultCouponRate", { valueAsNumber: true })}
               />
-              {errors.casualSwimCouponRate && (
-                <p className="text-sm text-destructive">{errors.casualSwimCouponRate.message}</p>
+              {errors.casualSwimAdultCouponRate && (
+                <p className="text-sm text-destructive">
+                  {errors.casualSwimAdultCouponRate.message}
+                </p>
               )}
+              <p className="text-xs text-muted-foreground">
+                Example: 20 × {formatCurrency(Number(adultRate) || 0)} ={" "}
+                {formatCurrency((Number(adultRate) || 0) * 20)}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Example: 20 coupons × {formatCurrency(Number(couponRate) || 0)} ={" "}
-              {formatCurrency((Number(couponRate) || 0) * 20)}
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="casualSwimChildCouponRate">Below 5 Years (₹)</Label>
+              <Input
+                id="casualSwimChildCouponRate"
+                type="number"
+                min={1}
+                step="1"
+                {...register("casualSwimChildCouponRate", { valueAsNumber: true })}
+              />
+              {errors.casualSwimChildCouponRate && (
+                <p className="text-sm text-destructive">
+                  {errors.casualSwimChildCouponRate.message}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Example: 15 × {formatCurrency(Number(childRate) || 0)} ={" "}
+                {formatCurrency((Number(childRate) || 0) * 15)}
+              </p>
+            </div>
           </CardContent>
         </Card>
 

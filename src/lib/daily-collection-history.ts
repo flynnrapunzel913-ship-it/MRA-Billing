@@ -56,6 +56,7 @@ export function buildVersionHistoryResponse(input: {
   const parsedOriginal = parseOriginalSnapshot(input.originalSnapshotJson);
   const version0Snapshot: OriginalSnapshotJson = parsedOriginal ?? {
     totalRevenue: input.fallbackSnapshot.totalRevenue,
+    invoiceRevenue: input.fallbackSnapshot.invoiceRevenue,
     totalExpenses: input.fallbackSnapshot.totalExpenses,
     cashCollected: input.fallbackSnapshot.cashCollected,
     upiCollected: input.fallbackSnapshot.upiCollected,
@@ -64,6 +65,13 @@ export function buildVersionHistoryResponse(input: {
     netCollection: input.fallbackSnapshot.netCollection,
     subscriptionRevenue: input.fallbackSnapshot.subscriptionRevenue,
     productRevenue: input.fallbackSnapshot.productRevenue,
+    casualSwimRevenue: input.fallbackSnapshot.casualSwimRevenue,
+    lastCouponAbove5: input.fallbackSnapshot.lastCouponAbove5,
+    lastCouponBelow5: input.fallbackSnapshot.lastCouponBelow5,
+    casualSwimCouponsAbove5: input.fallbackSnapshot.casualSwimCouponsAbove5,
+    casualSwimCouponsBelow5: input.fallbackSnapshot.casualSwimCouponsBelow5,
+    casualSwimRevenueAbove5: input.fallbackSnapshot.casualSwimRevenueAbove5,
+    casualSwimRevenueBelow5: input.fallbackSnapshot.casualSwimRevenueBelow5,
     notes: input.fallbackSnapshot.notes,
     collectedByName: input.fallbackSnapshot.collectedByName,
   };

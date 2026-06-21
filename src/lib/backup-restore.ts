@@ -421,8 +421,14 @@ function mapSettings(row: Record<string, unknown>): Prisma.SettingsCreateManyInp
     headerImageUrl: requireString(row, "headerImageUrl"),
     brandColor: requireString(row, "brandColor"),
     termsAndConditions: requireString(row, "termsAndConditions"),
-    casualSwimCouponRate:
-      row.casualSwimCouponRate == null ? 150 : requireNumber(row, "casualSwimCouponRate"),
+    casualSwimAdultCouponRate:
+      row.casualSwimAdultCouponRate == null
+        ? 150
+        : requireNumber(row, "casualSwimAdultCouponRate"),
+    casualSwimChildCouponRate:
+      row.casualSwimChildCouponRate == null
+        ? 100
+        : requireNumber(row, "casualSwimChildCouponRate"),
     updatedAt: parseDateValue(row.updatedAt, "updatedAt"),
   };
 }
@@ -628,11 +634,20 @@ function mapDailyCollection(row: Record<string, unknown>): Prisma.DailyCollectio
     productRevenue: optionalNumber(row.productRevenue),
     invoiceRevenue: optionalNumber(row.invoiceRevenue),
     casualSwimRevenue: optionalNumber(row.casualSwimRevenue),
-    casualSwimCouponsUsed:
-      row.casualSwimCouponsUsed == null ? undefined : requireInt(row, "casualSwimCouponsUsed"),
-    casualSwimCouponRate: optionalNumber(row.casualSwimCouponRate),
-    lastCouponNumber:
-      row.lastCouponNumber == null ? undefined : requireInt(row, "lastCouponNumber"),
+    lastCouponAbove5:
+      row.lastCouponAbove5 == null ? undefined : requireInt(row, "lastCouponAbove5"),
+    lastCouponBelow5:
+      row.lastCouponBelow5 == null ? undefined : requireInt(row, "lastCouponBelow5"),
+    casualSwimCouponsAbove5:
+      row.casualSwimCouponsAbove5 == null
+        ? undefined
+        : requireInt(row, "casualSwimCouponsAbove5"),
+    casualSwimCouponsBelow5:
+      row.casualSwimCouponsBelow5 == null
+        ? undefined
+        : requireInt(row, "casualSwimCouponsBelow5"),
+    casualSwimRevenueAbove5: optionalNumber(row.casualSwimRevenueAbove5),
+    casualSwimRevenueBelow5: optionalNumber(row.casualSwimRevenueBelow5),
     totalExpenses: optionalNumber(row.totalExpenses),
     cashCollectedSystem: optionalNumber(row.cashCollectedSystem),
     upiCollected: optionalNumber(row.upiCollected),

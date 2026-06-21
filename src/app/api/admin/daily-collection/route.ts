@@ -14,11 +14,13 @@ import {
 } from "@/lib/daily-collection-diff";
 import {
   buildCollectionSnapshotFromSheet,
+  extractCasualSwimCouponPersistFields,
+  getCasualSwimCouponRates,
   getDailyCollectionSheet,
-  getPreviousClosingCoupon,
+  getPreviousClosingCoupons,
   parseCollectionDateInput,
 } from "@/lib/daily-collection";
-import { calculateCasualSwimCouponRevenue } from "@/lib/casual-swim-coupon";
+import { calculateCasualSwimDualCouponRevenue } from "@/lib/casual-swim-coupon";
 import {
   calculateCashDifference,
   calculatePhysicalCash,
@@ -30,7 +32,8 @@ const bodySchema = z.object({
   date: z.string().min(1, "Date is required"),
   notes: z.string().optional(),
   collectedByName: z.string().trim().min(1, "Collected by name is required").optional(),
-  lastCouponNumber: z.number().int().nonnegative(),
+  lastCouponAbove5: z.number().int().nonnegative(),
+  lastCouponBelow5: z.number().int().nonnegative(),
   cashDenominations: z.record(z.string(), z.number().int().nonnegative()).optional(),
   cashDifferenceNotes: z.string().optional(),
 });
@@ -72,8 +75,12 @@ function serializeCollectionAuditValues(record: {
   subscriptionRevenue: unknown;
   productRevenue: unknown;
   casualSwimRevenue?: unknown;
-  casualSwimCouponsUsed?: unknown;
-  lastCouponNumber?: number | null;
+  lastCouponAbove5?: number | null;
+  lastCouponBelow5?: number | null;
+  casualSwimCouponsAbove5?: number | null;
+  casualSwimCouponsBelow5?: number | null;
+  casualSwimRevenueAbove5?: unknown;
+  casualSwimRevenueBelow5?: unknown;
   totalExpenses: unknown;
   cashCollectedSystem: unknown;
   upiCollected: unknown;
@@ -93,8 +100,14 @@ function serializeCollectionAuditValues(record: {
     productRevenue: record.productRevenue != null ? toJsonNumber(record.productRevenue) : null,
     casualSwimRevenue:
       record.casualSwimRevenue != null ? toJsonNumber(record.casualSwimRevenue) : null,
-    casualSwimCouponsUsed: record.casualSwimCouponsUsed ?? null,
-    lastCouponNumber: record.lastCouponNumber ?? null,
+    lastCouponAbove5: record.lastCouponAbove5 ?? null,
+    lastCouponBelow5: record.lastCouponBelow5 ?? null,
+    casualSwimCouponsAbove5: record.casualSwimCouponsAbove5 ?? null,
+    casualSwimCouponsBelow5: record.casualSwimCouponsBelow5 ?? null,
+    casualSwimRevenueAbove5:
+      record.casualSwimRevenueAbove5 != null ? toJsonNumber(record.casualSwimRevenueAbove5) : null,
+    casualSwimRevenueBelow5:
+      record.casualSwimRevenueBelow5 != null ? toJsonNumber(record.casualSwimRevenueBelow5) : null,
     totalExpenses: record.totalExpenses != null ? toJsonNumber(record.totalExpenses) : null,
     cashCollectedSystem:
       record.cashCollectedSystem != null ? toJsonNumber(record.cashCollectedSystem) : null,
@@ -106,6 +119,19 @@ function serializeCollectionAuditValues(record: {
     cashDifferenceNotes: record.cashDifferenceNotes,
     cashDenominations: (record.cashDenominations ?? null) as Prisma.InputJsonValue | null,
   };
+}
+
+async function validateCouponInput(date: Date, lastAbove5: number, lastBelow5: number) {
+  const previous = await getPreviousClosingCoupons(date);
+  const rates = await getCasualSwimCouponRates();
+  return calculateCasualSwimDualCouponRevenue({
+    previousAbove5: previous.above5,
+    previousBelow5: previous.below5,
+    lastCouponAbove5: lastAbove5,
+    lastCouponBelow5: lastBelow5,
+    adultCouponRate: rates.adultRate,
+    childCouponRate: rates.childRate,
+  });
 }
 
 export async function GET(request: NextRequest) {
@@ -149,13 +175,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
-    const previousClosingCoupon = await getPreviousClosingCoupon(collectionDate);
-    const couponRate = (await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true }))
-      ?.casualSwim.couponRate ?? 150;
-    const couponCalc = calculateCasualSwimCouponRevenue(
-      previousClosingCoupon,
-      parsed.data.lastCouponNumber,
-      couponRate
+    const couponCalc = await validateCouponInput(
+      collectionDate,
+      parsed.data.lastCouponAbove5,
+      parsed.data.lastCouponBelow5
     );
     if (!couponCalc.ok) {
       return NextResponse.json({ error: couponCalc.message }, { status: 400 });
@@ -174,13 +197,15 @@ export async function POST(request: NextRequest) {
 
     const sheet = await getDailyCollectionSheet(parsed.data.date, {
       preferLiveTotals: true,
-      lastCouponNumber: parsed.data.lastCouponNumber,
+      lastCouponAbove5: parsed.data.lastCouponAbove5,
+      lastCouponBelow5: parsed.data.lastCouponBelow5,
     });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
     const snapshot = buildCollectionSnapshotFromSheet(sheet);
+    const couponFields = extractCasualSwimCouponPersistFields(sheet.casualSwim);
     const cash = await resolveCashReconciliation(
       sheet,
       parsed.data.cashDenominations,
@@ -204,10 +229,7 @@ export async function POST(request: NextRequest) {
         invoiceRevenue: snapshot.invoiceRevenue,
         subscriptionRevenue: snapshot.subscriptionRevenue,
         productRevenue: snapshot.productRevenue,
-        casualSwimRevenue: snapshot.casualSwimRevenue,
-        casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
-        casualSwimCouponRate: snapshot.casualSwimCouponRate,
-        lastCouponNumber: snapshot.lastCouponNumber,
+        ...couponFields,
         totalExpenses: snapshot.totalExpenses,
         cashCollectedSystem: cash.cashCollectedSystem,
         upiCollected: snapshot.upiCollected,
@@ -224,9 +246,13 @@ export async function POST(request: NextRequest) {
             invoiceRevenue: snapshot.invoiceRevenue,
             subscriptionRevenue: snapshot.subscriptionRevenue,
             productRevenue: snapshot.productRevenue,
-            casualSwimRevenue: snapshot.casualSwimRevenue,
-            casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
-            lastCouponNumber: snapshot.lastCouponNumber,
+            casualSwimRevenue: couponFields.casualSwimRevenue,
+            lastCouponAbove5: couponFields.lastCouponAbove5,
+            lastCouponBelow5: couponFields.lastCouponBelow5,
+            casualSwimCouponsAbove5: couponFields.casualSwimCouponsAbove5,
+            casualSwimCouponsBelow5: couponFields.casualSwimCouponsBelow5,
+            casualSwimRevenueAbove5: couponFields.casualSwimRevenueAbove5,
+            casualSwimRevenueBelow5: couponFields.casualSwimRevenueBelow5,
             totalExpenses: snapshot.totalExpenses,
             cashCollectedSystem: cash.cashCollectedSystem,
             upiCollected: snapshot.upiCollected,
@@ -254,6 +280,7 @@ export async function POST(request: NextRequest) {
         date: parsed.data.date,
         notes: record.notes,
         ...snapshot,
+        ...couponFields,
         ...auditCashDetails(cash),
       },
     });
@@ -294,13 +321,10 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
-    const previousClosingCoupon = await getPreviousClosingCoupon(collectionDate);
-    const couponRate = (await getDailyCollectionSheet(parsed.data.date, { preferLiveTotals: true }))
-      ?.casualSwim.couponRate ?? 150;
-    const couponCalc = calculateCasualSwimCouponRevenue(
-      previousClosingCoupon,
-      parsed.data.lastCouponNumber,
-      couponRate
+    const couponCalc = await validateCouponInput(
+      collectionDate,
+      parsed.data.lastCouponAbove5,
+      parsed.data.lastCouponBelow5
     );
     if (!couponCalc.ok) {
       return NextResponse.json({ error: couponCalc.message }, { status: 400 });
@@ -321,13 +345,15 @@ export async function PUT(request: NextRequest) {
 
     const sheet = await getDailyCollectionSheet(parsed.data.date, {
       preferLiveTotals: true,
-      lastCouponNumber: parsed.data.lastCouponNumber,
+      lastCouponAbove5: parsed.data.lastCouponAbove5,
+      lastCouponBelow5: parsed.data.lastCouponBelow5,
     });
     if (!sheet) {
       return NextResponse.json({ error: "Invalid date" }, { status: 400 });
     }
 
     const snapshot = buildCollectionSnapshotFromSheet(sheet);
+    const couponFields = extractCasualSwimCouponPersistFields(sheet.casualSwim);
     const cash = await resolveCashReconciliation(
       sheet,
       parsed.data.cashDenominations,
@@ -348,9 +374,13 @@ export async function PUT(request: NextRequest) {
       invoiceRevenue: snapshot.invoiceRevenue,
       subscriptionRevenue: snapshot.subscriptionRevenue,
       productRevenue: snapshot.productRevenue,
-      casualSwimRevenue: snapshot.casualSwimRevenue,
-      casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
-      lastCouponNumber: snapshot.lastCouponNumber,
+      casualSwimRevenue: couponFields.casualSwimRevenue,
+      lastCouponAbove5: couponFields.lastCouponAbove5,
+      lastCouponBelow5: couponFields.lastCouponBelow5,
+      casualSwimCouponsAbove5: couponFields.casualSwimCouponsAbove5,
+      casualSwimCouponsBelow5: couponFields.casualSwimCouponsBelow5,
+      casualSwimRevenueAbove5: couponFields.casualSwimRevenueAbove5,
+      casualSwimRevenueBelow5: couponFields.casualSwimRevenueBelow5,
       totalExpenses: snapshot.totalExpenses,
       cashCollectedSystem: cash.cashCollectedSystem,
       upiCollected: snapshot.upiCollected,
@@ -372,10 +402,7 @@ export async function PUT(request: NextRequest) {
           invoiceRevenue: snapshot.invoiceRevenue,
           subscriptionRevenue: snapshot.subscriptionRevenue,
           productRevenue: snapshot.productRevenue,
-          casualSwimRevenue: snapshot.casualSwimRevenue,
-          casualSwimCouponsUsed: snapshot.casualSwimCouponsUsed,
-          casualSwimCouponRate: snapshot.casualSwimCouponRate,
-          lastCouponNumber: snapshot.lastCouponNumber,
+          ...couponFields,
           totalExpenses: snapshot.totalExpenses,
           cashCollectedSystem: cash.cashCollectedSystem,
           upiCollected: snapshot.upiCollected,
@@ -403,10 +430,6 @@ export async function PUT(request: NextRequest) {
       return updated;
     });
 
-    const previousValues = serializeCollectionAuditValues(existing);
-
-    const newValues = serializeCollectionAuditValues(record);
-
     void logAuditEvent({
       userId: user!.id,
       username: user!.username,
@@ -415,8 +438,8 @@ export async function PUT(request: NextRequest) {
       entityId: record.id,
       details: {
         date: parsed.data.date,
-        previousValues,
-        newValues,
+        previousValues: serializeCollectionAuditValues(existing),
+        newValues: serializeCollectionAuditValues(record),
         ...(hasCollectionChanges(changesJson) ? { changes: changesJson } : {}),
       },
     });
