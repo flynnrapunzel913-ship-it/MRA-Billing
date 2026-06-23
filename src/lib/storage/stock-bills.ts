@@ -32,6 +32,17 @@ export function assertPendingBillKey(relativeKey: string) {
   return normalized;
 }
 
+/** Pending bills are prefixed with the uploader's sanitized user id. */
+export function assertPendingBillOwnedBy(pendingRelative: string, userId: string) {
+  const pendingKey = assertPendingBillKey(pendingRelative);
+  const ownerPrefix = sanitizeStorageToken(userId, 24);
+  const fileName = path.basename(pendingKey);
+  if (!fileName.startsWith(`${ownerPrefix}-`)) {
+    throw new Error("Uploaded bill file does not belong to this user");
+  }
+  return pendingKey;
+}
+
 export async function savePendingStockBill(userId: string, file: File) {
   const buffer = Buffer.from(await file.arrayBuffer());
   validatePdfUpload(file, buffer);
@@ -59,7 +70,8 @@ export function resolveStockBillPath(relativeUrl: string) {
 export async function finalizeStockBill(
   pendingRelative: string | null | undefined,
   entryId: string,
-  originalFileName?: string | null
+  originalFileName?: string | null,
+  uploadedByUserId?: string | null
 ): Promise<{ billPdfUrl: string | null; billFileName: string | null }> {
   if (!pendingRelative?.trim()) {
     return { billPdfUrl: null, billFileName: null };
@@ -70,7 +82,9 @@ export async function finalizeStockBill(
     throw new Error("Invalid stock entry id");
   }
 
-  const pendingKey = assertPendingBillKey(pendingRelative);
+  const pendingKey = uploadedByUserId
+    ? assertPendingBillOwnedBy(pendingRelative, uploadedByUserId)
+    : assertPendingBillKey(pendingRelative);
   const pendingPath = resolveStockBillPath(pendingKey);
 
   try {

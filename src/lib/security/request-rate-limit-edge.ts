@@ -1,11 +1,6 @@
 import type { NextRequest } from "next/server";
+import { getClientIp } from "@/lib/security/client-ip";
 import { consumeRateLimit, rateLimitResponse, type RateLimitPolicy } from "@/lib/security/rate-limit";
-
-export function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
-  return request.headers.get("x-real-ip") || "unknown";
-}
 
 function applyPolicy(request: NextRequest, policy: RateLimitPolicy): Response | null {
   const result = consumeRateLimit(policy);
@@ -73,6 +68,23 @@ export function rateLimitInvoicePdf(
   });
 }
 
+/** Database backup restore (admin). */
+export function rateLimitBackupRestore(
+  request: NextRequest,
+  userId?: string | null
+): Response | null {
+  if (request.method !== "POST") return null;
+  if (request.nextUrl.pathname !== "/api/admin/backup/restore") return null;
+
+  const keyUser = userId || getClientIp(request);
+  return applyPolicy(request, {
+    key: `backup_restore:${keyUser}`,
+    limit: 5,
+    windowMs: 60 * 60 * 1000,
+    label: "backup_restore",
+  });
+}
+
 /** Revenue CSV export (admin). */
 export function rateLimitRevenueExport(
   request: NextRequest,
@@ -101,6 +113,7 @@ export function applyApiRateLimitsEdge(
     rateLimitSearch(request, uid) ||
     rateLimitInvoicePdf(request, uid) ||
     rateLimitRevenueExport(request, uid) ||
+    rateLimitBackupRestore(request, uid) ||
     null
   );
 }

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
+import { downloadCsv } from "@/lib/csv-export";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -51,15 +51,11 @@ export default function ReportsPage() {
     loadReport();
   }, [type, period]);
 
-  const exportExcel = () => {
+  const exportCsv = () => {
     if (!data?.rows) return;
-    const ws = XLSX.utils.json_to_sheet(
-      data.rows.map((row: any) => flattenRow(row))
-    );
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, type);
-    XLSX.writeFile(wb, `mra-${type}-report.xlsx`);
-    toast.success("Excel exported");
+    const rows = data.rows.map((row: Record<string, unknown>) => flattenRow(row));
+    downloadCsv(`mra-${type}-report`, rows);
+    toast.success("CSV exported");
   };
 
   const exportPdf = () => {
@@ -114,8 +110,8 @@ export default function ReportsPage() {
           )}
           <div className="flex items-end gap-2 md:col-span-4">
             <Button onClick={loadReport}>Apply Filters</Button>
-            <Button variant="outline" onClick={exportExcel}>
-              <FileSpreadsheet className="mr-2 h-4 w-4" />Export Excel
+            <Button variant="outline" onClick={exportCsv}>
+              <FileSpreadsheet className="mr-2 h-4 w-4" />Export CSV
             </Button>
             <Button variant="outline" onClick={exportPdf}>
               <Download className="mr-2 h-4 w-4" />Export PDF

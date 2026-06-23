@@ -70,6 +70,9 @@ export function prismaErrorMessage(error: unknown): string {
     if (msg.includes("unable to start a transaction")) {
       return "Database is busy. Please wait a moment and try again.";
     }
+    if (process.env.NODE_ENV === "production") {
+      return "Request failed";
+    }
     return error.message;
   }
   return "Request failed";

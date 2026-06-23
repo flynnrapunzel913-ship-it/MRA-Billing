@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Modal } from "@/components/ui/modal";
+import { BACKUP_RESTORE_CONFIRMATION } from "@/lib/security/password-policy";
 
 function parseTermsPreview(text?: string) {
   return (text || "")
@@ -41,6 +42,8 @@ export default function SettingsPage() {
   const [downloadingBackup, setDownloadingBackup] = useState(false);
   const [restoringBackup, setRestoringBackup] = useState(false);
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
+  const [restorePassword, setRestorePassword] = useState("");
+  const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [backupFile, setBackupFile] = useState<File | null>(null);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
   const { data: settings, isLoading: loading, refetch, setData } =
@@ -185,11 +188,21 @@ export default function SettingsPage() {
       toast.error("Select a backup JSON file first");
       return;
     }
+    if (restoreConfirmation.trim() !== BACKUP_RESTORE_CONFIRMATION) {
+      toast.error(`Type "${BACKUP_RESTORE_CONFIRMATION}" to confirm`);
+      return;
+    }
+    if (!restorePassword) {
+      toast.error("Enter your admin password to confirm");
+      return;
+    }
 
     setRestoringBackup(true);
     try {
       const form = new FormData();
       form.append("file", backupFile);
+      form.append("adminPassword", restorePassword);
+      form.append("confirmation", restoreConfirmation.trim());
       const res = await fetch("/api/admin/backup/restore", {
         method: "POST",
         body: form,
@@ -204,6 +217,8 @@ export default function SettingsPage() {
       }
 
       setRestoreModalOpen(false);
+      setRestorePassword("");
+      setRestoreConfirmation("");
       setBackupFile(null);
       if (backupFileInputRef.current) {
         backupFileInputRef.current.value = "";
@@ -458,7 +473,11 @@ export default function SettingsPage() {
       <Modal
         open={restoreModalOpen}
         onClose={() => {
-          if (!restoringBackup) setRestoreModalOpen(false);
+          if (!restoringBackup) {
+            setRestoreModalOpen(false);
+            setRestorePassword("");
+            setRestoreConfirmation("");
+          }
         }}
         title="Restore Database Backup?"
         maxWidth="md"
@@ -476,7 +495,12 @@ export default function SettingsPage() {
               type="button"
               variant="destructive"
               onClick={restoreDatabaseBackup}
-              disabled={restoringBackup || !backupFile}
+              disabled={
+                restoringBackup ||
+                !backupFile ||
+                restoreConfirmation.trim() !== BACKUP_RESTORE_CONFIRMATION ||
+                !restorePassword
+              }
             >
               {restoringBackup ? (
                 <>
@@ -497,6 +521,31 @@ export default function SettingsPage() {
         {backupFile ? (
           <p className="mt-3 text-sm font-medium">{backupFile.name}</p>
         ) : null}
+        <div className="mt-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="restore-confirmation">
+              Type <span className="font-mono">{BACKUP_RESTORE_CONFIRMATION}</span> to confirm
+            </Label>
+            <Input
+              id="restore-confirmation"
+              value={restoreConfirmation}
+              onChange={(event) => setRestoreConfirmation(event.target.value)}
+              autoComplete="off"
+              disabled={restoringBackup}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="restore-password">Your admin password</Label>
+            <Input
+              id="restore-password"
+              type="password"
+              value={restorePassword}
+              onChange={(event) => setRestorePassword(event.target.value)}
+              autoComplete="current-password"
+              disabled={restoringBackup}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

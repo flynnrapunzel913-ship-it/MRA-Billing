@@ -134,7 +134,9 @@ export async function generateDatabaseBackup(): Promise<DatabaseBackup> {
     schemaVersion: BACKUP_SCHEMA_VERSION,
     counts,
     data: {
-      users: serializeForBackup(users) as unknown[],
+      users: serializeForBackup(
+        users.map(({ password: _password, ...user }) => user)
+      ) as unknown[],
       userActivities: serializeForBackup(userActivities) as unknown[],
       customers: serializeForBackup(customers) as unknown[],
       customerActivities: serializeForBackup(customerActivities) as unknown[],

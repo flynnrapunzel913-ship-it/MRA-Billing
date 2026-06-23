@@ -5,6 +5,7 @@ import { apiErrorResponse } from "@/lib/api-error";
 import { readStockBill } from "@/lib/stock-storage";
 import { getRequestMeta, recordStockActivity } from "@/lib/stock-activity";
 import { getActiveStockWhere } from "@/lib/stock-filters";
+import { safeContentDispositionFilename } from "@/lib/storage/paths";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -42,7 +43,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       ...meta,
     });
 
-    const fileName = entry.billFileName || `${entry.stockNumber}-bill.pdf`;
+    const fileName = safeContentDispositionFilename(
+      entry.billFileName || `${entry.stockNumber}-bill.pdf`,
+      `${entry.stockNumber}-bill.pdf`
+    );
 
     return new NextResponse(buffer, {
       headers: {

@@ -1,11 +1,28 @@
 import { PrismaClient, Role } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import {
+  assertPasswordAllowedInProduction,
+  hashPassword,
+} from "../src/lib/security/password-policy";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminPassword = await bcrypt.hash("admin123", 10);
-  const receptionPassword = await bcrypt.hash("reception123", 10);
+  const isProd = process.env.NODE_ENV === "production";
+  const adminPlain = process.env.SEED_ADMIN_PASSWORD?.trim();
+  const receptionPlain = process.env.SEED_RECEPTION_PASSWORD?.trim();
+
+  if (isProd) {
+    if (!adminPlain || !receptionPlain) {
+      throw new Error(
+        "Set SEED_ADMIN_PASSWORD and SEED_RECEPTION_PASSWORD before seeding production"
+      );
+    }
+    assertPasswordAllowedInProduction(adminPlain);
+    assertPasswordAllowedInProduction(receptionPlain);
+  }
+
+  const adminPassword = await hashPassword(adminPlain ?? "admin123-dev-only");
+  const receptionPassword = await hashPassword(receptionPlain ?? "reception123-dev-only");
 
   await prisma.user.upsert({
     where: { username: "admin" },
@@ -92,8 +109,10 @@ async function main() {
   }
 
   console.log("Database seeded successfully");
-  console.log("Admin: admin / admin123");
-  console.log("Receptionist: receptionist1 / reception123");
+  if (!isProd) {
+    console.log("Dev users: admin / admin123-dev-only, receptionist1 / reception123-dev-only");
+    console.log("Override with SEED_ADMIN_PASSWORD and SEED_RECEPTION_PASSWORD.");
+  }
 }
 
 main()

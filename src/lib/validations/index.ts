@@ -7,6 +7,7 @@ import {
   COACHING_PACKAGE_TYPE,
 } from "@/lib/constants";
 import { SUBSCRIPTION_DURATION_UNITS } from "@/lib/subscription-duration";
+import { newPasswordSchema } from "@/lib/security/password-policy";
 
 export const loginSchema = z.object({
   username: z
@@ -107,6 +108,27 @@ const settingsOptionalString = z
 
 const settingsNumber = z.coerce.number().min(0).max(100);
 
+const brandingAssetUrl = z
+  .string()
+  .refine(
+    (val) => {
+      const trimmed = val.trim();
+      if (!trimmed) return false;
+      if (/^data:image\/(png|jpe?g|gif|webp);/i.test(trimmed)) return true;
+      const path = trimmed.startsWith("/")
+        ? trimmed
+        : (() => {
+            try {
+              return new URL(trimmed).pathname;
+            } catch {
+              return "";
+            }
+          })();
+      return path.startsWith("/branding/") && !path.includes("..");
+    },
+    { message: "Asset URL must be a /branding/ path or data:image URI" }
+  );
+
 export const settingsSchema = z.object({
   academyName: z.string().min(2, "Academy name must be at least 2 characters"),
   address: z.string(),
@@ -124,10 +146,13 @@ export const settingsSchema = z.object({
   bankBranch: settingsOptionalString,
   upiId: settingsOptionalString,
   upiQrCode: settingsOptionalString,
-  logoUrl: z.string(),
-  signatureUrl: settingsOptionalString,
-  footerImageUrl: z.string(),
-  headerImageUrl: z.string(),
+  logoUrl: brandingAssetUrl,
+  signatureUrl: settingsOptionalString.refine(
+    (val) => !val || brandingAssetUrl.safeParse(val).success,
+    { message: "Asset URL must be a /branding/ path or data:image URI" }
+  ),
+  footerImageUrl: brandingAssetUrl,
+  headerImageUrl: brandingAssetUrl,
   brandColor: z.string(),
   termsAndConditions: z.string(),
 });
@@ -149,7 +174,7 @@ export const createUserSchema = z.object({
     .string()
     .min(3, "Username must be at least 3 characters")
     .regex(/^\S+$/, "Username cannot contain spaces"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: newPasswordSchema,
   role: userRoleSchema,
 });
 
@@ -160,15 +185,11 @@ export const updateUserSchema = z.object({
     .regex(/^\S+$/, "Username cannot contain spaces"),
   role: userRoleSchema,
   status: z.enum(["ACTIVE", "DISABLED"]),
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .optional()
-    .or(z.literal("")),
+  password: newPasswordSchema.optional().or(z.literal("")),
 });
 
 export const resetPasswordSchema = z.object({
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: newPasswordSchema,
 });
 
 export const catalogItemStatusSchema = z.enum(["ACTIVE", "INACTIVE"]);

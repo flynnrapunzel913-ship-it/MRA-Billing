@@ -6,10 +6,9 @@
  *
  * Usage:
  *   npx tsx scripts/production-data-cleanup.ts           # dry-run (default)
- *   npx tsx scripts/production-data-cleanup.ts --execute # perform cleanup
+ *   CLEANUP_ADMIN_PASSWORD='...' npx tsx scripts/production-data-cleanup.ts --execute
  */
 import "dotenv/config";
-import bcrypt from "bcryptjs";
 import { rm, mkdir, readdir } from "fs/promises";
 import path from "path";
 import {
@@ -18,12 +17,29 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { PrismaClient, Role, UserStatus } from "@prisma/client";
+import {
+  assertPasswordAllowedInProduction,
+  hashPassword,
+} from "../src/lib/security/password-policy";
 
 const prisma = new PrismaClient();
 
 const KEEP_USERNAME = "rajesh.shetti";
 const KEEP_NAME = "Rajesh Shetti";
-const KEEP_PASSWORD = "admin@123";
+
+function resolveKeepPassword(execute: boolean): string {
+  const password = process.env.CLEANUP_ADMIN_PASSWORD?.trim();
+  if (execute) {
+    if (!password) {
+      throw new Error(
+        "Set CLEANUP_ADMIN_PASSWORD (min 12 characters) before running with --execute"
+      );
+    }
+    assertPasswordAllowedInProduction(password);
+    return password;
+  }
+  return password ?? "dry-run-placeholder-not-used";
+}
 
 const TABLES_TO_CLEAR = [
   "DailyCollectionHistory",
@@ -272,7 +288,7 @@ async function runCleanup(execute: boolean) {
     .filter((u): u is string => Boolean(u?.trim()));
 
   const deleted: DeleteCounts = {};
-  const passwordHash = await bcrypt.hash(KEEP_PASSWORD, 10);
+  const passwordHash = await hashPassword(resolveKeepPassword(execute));
 
   await prisma.$transaction(
     async (tx) => {

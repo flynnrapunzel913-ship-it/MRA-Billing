@@ -4,6 +4,12 @@ import {
   ACADEMY_FOOTER_PATH,
   ACADEMY_LOGO_FALLBACKS,
 } from "@/lib/branding-assets";
+import {
+  assertPublicBrandingFileWithinRoot,
+  isAllowedBrandingAssetPath,
+  isBlockedFetchHostname,
+  resolveSafeBrandingRelativePath,
+} from "@/lib/pdf-image-security";
 
 const MIME: Record<string, string> = {
   png: "image/png",
@@ -31,8 +37,9 @@ function findPublicRoots(): string[] {
 }
 
 function publicFileCandidates(relativePath: string): string[] {
-  const normalized = relativePath.replace(/^\/+/, "");
-  return findPublicRoots().map((root) => path.join(root, normalized));
+  const safeRelative = resolveSafeBrandingRelativePath(`/${relativePath.replace(/^\/+/, "")}`);
+  if (!safeRelative) return [];
+  return findPublicRoots().map((root) => path.join(root, safeRelative));
 }
 
 function findExistingFile(relativePaths: readonly string[]): string | null {
@@ -45,8 +52,14 @@ function findExistingFile(relativePaths: readonly string[]): string | null {
 }
 
 function readPublicAsset(relativePath: string): string | null {
-  const filePath = findExistingFile([relativePath]);
+  if (!isAllowedBrandingAssetPath(relativePath)) return null;
+  const filePath = findExistingFile([relativePath.startsWith("/") ? relativePath : `/${relativePath}`]);
   if (!filePath) return null;
+
+  const allowed = findPublicRoots().some((root) =>
+    assertPublicBrandingFileWithinRoot(root, filePath)
+  );
+  if (!allowed) return null;
 
   try {
     const buf = fs.readFileSync(filePath);
@@ -120,11 +133,13 @@ export function getAcademyLogoDataUriSync(): string {
 export function normalizeBrandingPath(url: string | null | undefined): string {
   if (!url?.trim()) return "";
   const trimmed = url.trim();
-  if (trimmed.startsWith("/") || trimmed.startsWith("data:")) return trimmed;
+  if (trimmed.startsWith("data:image/")) return trimmed;
+  if (trimmed.startsWith("/")) return isAllowedBrandingAssetPath(trimmed) ? trimmed : "";
   try {
-    return new URL(trimmed).pathname;
+    const pathname = new URL(trimmed).pathname;
+    return isAllowedBrandingAssetPath(pathname) ? pathname : "";
   } catch {
-    return trimmed;
+    return "";
   }
 }
 
@@ -142,13 +157,16 @@ export async function resolvePdfImageSrc(
     return readPublicAsset(trimmed);
   }
 
-  if (fs.existsSync(trimmed)) {
-    const source = bufferSourceFromFile(trimmed);
-    return typeof source === "string" ? source : null;
-  }
-
   try {
     const parsed = new URL(trimmed);
+
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+
+    if (isBlockedFetchHostname(parsed.hostname)) {
+      return null;
+    }
 
     if (requestOrigin) {
       try {
@@ -164,12 +182,14 @@ export async function resolvePdfImageSrc(
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const res = await fetch(trimmed, { signal: controller.signal });
+    const res = await fetch(trimmed, { signal: controller.signal, redirect: "error" });
     clearTimeout(timer);
     if (!res.ok) return null;
 
+    const contentType = res.headers.get("content-type")?.split(";")[0] ?? "";
+    if (!contentType.startsWith("image/")) return null;
+
     const buf = Buffer.from(await res.arrayBuffer());
-    const contentType = res.headers.get("content-type")?.split(";")[0] ?? "image/png";
     return `data:${contentType};base64,${buf.toString("base64")}`;
   } catch {
     return null;

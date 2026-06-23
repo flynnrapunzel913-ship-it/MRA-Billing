@@ -1,4 +1,6 @@
+import { randomBytes } from "node:crypto";
 import { Prisma, Role } from "@prisma/client";
+import { hashPasswordSync } from "@/lib/security/password-policy";
 import { prisma } from "@/lib/prisma";
 import {
   BACKUP_SCHEMA_VERSION,
@@ -361,11 +363,16 @@ export function validateBackupForRestore(backup: DatabaseBackup): void {
 }
 
 function mapUser(row: Record<string, unknown>): Prisma.UserCreateManyInput {
+  const password =
+    typeof row.password === "string" && row.password.length > 0
+      ? row.password
+      : hashPasswordSync(randomBytes(32).toString("hex"));
+
   return {
     id: requireString(row, "id"),
     username: requireString(row, "username"),
     email: optionalString(row.email),
-    password: requireString(row, "password"),
+    password,
     name: requireString(row, "name"),
     role: requireString(row, "role") as Role,
     status: requireString(row, "status") as Prisma.UserCreateManyInput["status"],

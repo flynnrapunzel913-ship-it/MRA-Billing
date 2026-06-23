@@ -7,7 +7,8 @@ import type { Role } from "@prisma/client";
  */
 export const authConfig = {
   secret: process.env.AUTH_SECRET,
-  trustHost: true,
+  // Require AUTH_URL in production; only trust Host header in local development.
+  trustHost: process.env.NODE_ENV !== "production",
   session: { strategy: "jwt" as const },
   pages: {
     signIn: "/login",

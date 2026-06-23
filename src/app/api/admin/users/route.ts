@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
+import { hashPassword } from "@/lib/security/password-policy";
 import { createUserSchema } from "@/lib/validations";
 import { recordUserActivity } from "@/lib/user-activity";
 import { createUserRecord, listUsers } from "@/lib/user-queries";
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Username already in use" }, { status: 409 });
     }
 
-    const hashed = await bcrypt.hash(data.password, 10);
+    const hashed = await hashPassword(data.password);
 
     const created = await prisma.$transaction(async (tx) => {
       const user = await createUserRecord(

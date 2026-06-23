@@ -1,12 +1,7 @@
 import type { NextRequest } from "next/server";
 import { AUDIT_ACTIONS, logAuditEvent } from "@/lib/audit-log";
+import { getClientIp } from "@/lib/security/client-ip";
 import { consumeRateLimit, rateLimitResponse, type RateLimitPolicy } from "@/lib/security/rate-limit";
-
-export function getClientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) return forwarded.split(",")[0]?.trim() || "unknown";
-  return request.headers.get("x-real-ip") || "unknown";
-}
 
 function applyPolicy(
   request: NextRequest,

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/admin-api";
 import { apiErrorResponse } from "@/lib/api-error";
+import { hashPassword } from "@/lib/security/password-policy";
 import { updateUserSchema, resetPasswordSchema } from "@/lib/validations";
 import { recordUserActivity } from "@/lib/user-activity";
 import {
@@ -76,7 +76,7 @@ export async function PUT(
 
     const passwordHash =
       data.password && data.password.length >= 6
-        ? await bcrypt.hash(data.password, 10)
+        ? await hashPassword(data.password)
         : undefined;
 
     const previousStatus =
@@ -215,7 +215,7 @@ export async function PATCH(
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const hashed = await bcrypt.hash(parsed.data.password, 10);
+    const hashed = await hashPassword(parsed.data.password);
 
     await prisma.$transaction(async (tx) => {
       await tx.user.update({

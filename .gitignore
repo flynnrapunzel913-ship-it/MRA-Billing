@@ -27,3 +27,8 @@ public/uploads/
 Thumbs.db
 .idea/
 .vscode/
+
+# local session/debug artifacts (never commit)
+cookies*.txt
+headers.txt
+*.session-token

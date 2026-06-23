@@ -4,6 +4,7 @@ import { sanitizeDisplayFileName, sanitizeStorageToken } from "@/lib/storage/pat
 import { normalizeCuid } from "@/lib/storage/ids";
 import {
   assertPendingBillKey,
+  assertPendingBillOwnedBy,
   assertStockBillStorageKey,
 } from "@/lib/storage/stock-bills";
 import {
@@ -39,7 +40,8 @@ export const r2StorageProvider: StorageProvider = {
   async finalizeBill(
     pendingRelative: string | null | undefined,
     entryId: string,
-    originalFileName?: string | null
+    originalFileName?: string | null,
+    uploadedByUserId?: string | null
   ) {
     if (!pendingRelative?.trim()) {
       return { billPdfUrl: null, billFileName: null };
@@ -50,7 +52,9 @@ export const r2StorageProvider: StorageProvider = {
       throw new Error("Invalid stock entry id");
     }
 
-    const pendingKey = assertPendingBillKey(pendingRelative);
+    const pendingKey = uploadedByUserId
+      ? assertPendingBillOwnedBy(pendingRelative, uploadedByUserId)
+      : assertPendingBillKey(pendingRelative);
     if (!(await objectExists(pendingKey))) {
       throw new Error("Uploaded bill file not found. Please upload again.");
     }

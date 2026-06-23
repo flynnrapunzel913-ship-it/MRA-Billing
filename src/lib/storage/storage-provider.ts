@@ -16,7 +16,8 @@ export type StorageProvider = {
   finalizeBill(
     pendingRelative: string | null | undefined,
     entryId: string,
-    originalFileName?: string | null
+    originalFileName?: string | null,
+    uploadedByUserId?: string | null
   ): Promise<BillFinalizeResult>;
   readBill(relativeUrl: string): Promise<Buffer>;
   deleteBill(relativeKey: string): Promise<void>;

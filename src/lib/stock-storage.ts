@@ -19,9 +19,15 @@ export async function savePendingStockBill(userId: string, file: File) {
 export async function finalizeStockBill(
   pendingRelative: string | null | undefined,
   entryId: string,
-  originalFileName?: string | null
+  originalFileName?: string | null,
+  uploadedByUserId?: string | null
 ) {
-  return getStorageProvider().finalizeBill(pendingRelative, entryId, originalFileName);
+  return getStorageProvider().finalizeBill(
+    pendingRelative,
+    entryId,
+    originalFileName,
+    uploadedByUserId
+  );
 }
 
 export async function readStockBill(relativeUrl: string) {

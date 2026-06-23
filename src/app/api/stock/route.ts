@@ -129,7 +129,12 @@ export async function POST(request: NextRequest) {
     if (pendingBillUrl) {
       let finalizedBillPdfUrl: string | null = null;
       try {
-        const bill = await finalizeStockBill(pendingBillUrl, created.id, data.billFileName);
+        const bill = await finalizeStockBill(
+          pendingBillUrl,
+          created.id,
+          data.billFileName,
+          user!.id
+        );
         finalizedBillPdfUrl = bill.billPdfUrl;
         await prisma.stockEntry.update({
           where: { id: created.id },
