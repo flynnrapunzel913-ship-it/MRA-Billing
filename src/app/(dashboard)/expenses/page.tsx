@@ -62,7 +62,7 @@ export default function ExpensesPage() {
 
   const { data, isInitialLoading, isRefreshing, refetch } = useCachedFetch<ExpenseListResponse>(
     listUrl,
-    { pollIntervalMs: 10_000, refetchOnFocus: true, ttlMs: 10_000 }
+    { ttlMs: 60_000 }
   );
 
   const items = data?.items ?? [];

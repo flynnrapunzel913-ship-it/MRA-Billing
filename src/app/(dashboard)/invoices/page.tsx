@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useSession } from "next-auth/react";
+import { useIsAdmin } from "@/lib/hooks/use-is-admin";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
 import { useInvoiceDelete } from "@/lib/hooks/use-invoice-delete";
 import { canDeleteInvoice } from "@/lib/invoice-permissions";
@@ -30,6 +31,7 @@ type InvoiceDirectoryView = "active" | "deleted";
 
 export default function InvoicesPage() {
   const { data: session } = useSession();
+  const { isAdmin } = useIsAdmin();
   const [directoryView, setDirectoryView] = useState<InvoiceDirectoryView>("active");
   const [query, setQuery] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<InvoiceListRow | null>(null);
@@ -37,10 +39,6 @@ export default function InvoicesPage() {
   const debouncedQuery = useDebouncedValue(query, 150);
   const { deleteTarget, setDeleteTarget, deleting, handleDelete } = useInvoiceDelete();
 
-  const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
-    "/api/dashboard"
-  );
-  const isAdmin = dashboardMeta?.role === "ADMIN" || session?.user?.role === "ADMIN";
   const isDeletedView = directoryView === "deleted" && isAdmin;
 
   const listUrl =

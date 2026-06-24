@@ -209,9 +209,9 @@ input[type="number"]::-webkit-outer-spin-button {
   background: linear-gradient(135deg, var(--btn-gradient-start), var(--btn-gradient-end));
   color: #fff;
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    filter 0.2s ease;
+    transform 0.1s ease,
+    box-shadow 0.1s ease,
+    filter 0.1s ease;
 }
 
 .btn-aqua {
@@ -249,9 +249,9 @@ input[type="number"]::-webkit-outer-spin-button {
     0 6px 28px rgba(0, 194, 255, 0.38),
     0 0 20px rgba(0, 229, 212, 0.2);
   transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    filter 0.2s ease;
+    transform 0.1s ease,
+    box-shadow 0.1s ease,
+    filter 0.1s ease;
 }
 
 .btn-aqua-cta:hover:not(:disabled) {

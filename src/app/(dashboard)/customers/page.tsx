@@ -10,6 +10,7 @@ import { ListPageSkeleton } from "@/components/ui/skeletons";
 import { cn } from "@/lib/utils";
 import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { useIsAdmin } from "@/lib/hooks/use-is-admin";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { CustomerFormDialog } from "@/components/customers/customer-form-dialog";
 import { CustomerDrawer } from "@/components/customers/customer-drawer";
@@ -62,9 +63,11 @@ export default function CustomersPage() {
       ? "/api/customers?q=&view=deleted"
       : "/api/customers?q=&view=active";
 
+  const { isAdmin } = useIsAdmin();
+
   const { data: customers, isInitialLoading, isRefreshing, refetch } = useCachedFetch<CustomerListRow[]>(
     customersListUrl,
-    { pollIntervalMs: 10_000, refetchOnFocus: true, ttlMs: 10_000 }
+    { ttlMs: 60_000 }
   );
   const { data: invoices } = useCachedFetch<Array<{ customerId?: string | null; paymentStatus: string; items?: Array<{ itemType: string; description?: string; packageEndDate?: string | null }> }>>(
     "/api/invoices"
@@ -72,10 +75,6 @@ export default function CustomersPage() {
   const { data: subscriptionPlans } = useCachedFetch<
     Array<{ id: string; planName: string; name: string; isActive?: boolean }>
   >("/api/catalog/subscriptions");
-  const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
-    "/api/dashboard"
-  );
-  const isAdmin = dashboardMeta?.role === "ADMIN";
 
   const subscriptionOptions = useMemo(() => {
     const rows = subscriptionPlans ?? [];

@@ -21,24 +21,17 @@ function isApiPath(pathname: string) {
   return pathname.startsWith("/api/");
 }
 
-function isPublicApiPath(pathname: string) {
-  return pathname.startsWith("/api/auth");
-}
-
 export default edgeAuth(async (req) => {
   const { pathname } = req.nextUrl;
   const isLoggedIn = !!req.auth?.user?.id;
   const role = req.auth?.user?.role;
   const userId = req.auth?.user?.id;
-  // --- Rate limiting (login, search, PDF, revenue export, backup restore) ---
+
+  // Rate limiting on hot paths only (login, search, PDF, exports, backup restore).
   const rateLimitRequest = req as unknown as NextRequest;
   if (isApiPath(pathname)) {
     const rateLimited = applyApiRateLimitsEdge(rateLimitRequest, { userId });
     if (rateLimited) return rateLimited;
-
-    if (!isPublicApiPath(pathname) && !isLoggedIn) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
   }
 
   // --- Page routes (not API) ---
@@ -78,7 +71,12 @@ export default edgeAuth(async (req) => {
 
 export const config = {
   matcher: [
-    "/api/:path*",
+    "/api/auth/:path*",
+    "/api/admin/revenue/export",
+    "/api/admin/backup/restore",
+    "/api/customers",
+    "/api/invoices",
+    "/api/invoices/:path*",
     "/((?!_next/static|_next/image|favicon.ico|backgrounds|.*\\..*).*)",
   ],
 };

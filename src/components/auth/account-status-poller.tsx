@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { signOut, useSession } from "next-auth/react";
 
-const POLL_MS = 5000;
+const POLL_MS = 60_000;
 const DISABLED_MESSAGE = "Your account has been disabled by an administrator.";
 
 async function forceLogout(message: string) {
@@ -19,7 +19,7 @@ async function forceLogout(message: string) {
 }
 
 /**
- * Polls account status so disabled users are logged out within ~5s on every open tab.
+ * Polls account status so disabled users are logged out within ~60s on every open tab.
  */
 export function AccountStatusPoller() {
   const { data: session, status } = useSession();
@@ -33,6 +33,8 @@ export function AccountStatusPoller() {
     let cancelled = false;
 
     const check = async () => {
+      if (document.visibilityState !== "visible") return;
+
       try {
         const res = await fetch("/api/auth/account-status", {
           credentials: "include",

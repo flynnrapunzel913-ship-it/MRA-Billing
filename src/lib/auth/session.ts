@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "@/lib/prisma";
 import {
   isUserDisabled,
@@ -19,7 +20,7 @@ export type ActiveAccount = {
  * Loads the user row and determines if the account may use the application.
  * Node runtime only — used by requireAuth/requireAdmin and dashboard layout (not middleware/JWT).
  */
-export async function loadActiveAccount(userId: string): Promise<ActiveAccount | null> {
+export const loadActiveAccount = cache(async (userId: string): Promise<ActiveAccount | null> => {
   if (!userId) return null;
 
   const withStatus = await supportsUserStatus();
@@ -54,7 +55,7 @@ export async function loadActiveAccount(userId: string): Promise<ActiveAccount |
       ? (row as { sessionVersion: number }).sessionVersion
       : 0,
   };
-}
+});
 
 /** Lightweight poll target for client session watchdog (Node only). */
 export async function getAccountStatus(userId: string) {

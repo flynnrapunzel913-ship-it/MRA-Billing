@@ -10,6 +10,7 @@ import { invalidateCache, invalidateCachePrefix } from "@/lib/client-cache";
 import { StockPageSkeleton } from "@/components/ui/skeletons";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { useCachedFetch } from "@/lib/hooks/use-cached-fetch";
+import { useIsAdmin } from "@/lib/hooks/use-is-admin";
 import { StockSummaryCards, type StockSummary } from "@/components/stock/stock-summary-cards";
 import {
   StockFilters,
@@ -61,10 +62,7 @@ export default function StockInventoryPage() {
   const debouncedQ = useDebouncedValue(filters.q, 150);
   const filtersActive = hasActiveFilters(filters);
 
-  const { data: dashboardMeta, isInitialLoading: roleLoading } = useCachedFetch<{
-    role?: "ADMIN" | "RECEPTIONIST";
-  }>("/api/dashboard");
-  const isAdmin = dashboardMeta?.role === "ADMIN";
+  const { isAdmin } = useIsAdmin();
 
   const listUrl = useMemo(
     () => buildStockQuery({ ...filters, q: debouncedQ }, directoryView),
@@ -92,10 +90,6 @@ export default function StockInventoryPage() {
   useEffect(() => {
     setSelectedIds(new Set());
   }, [directoryView]);
-
-  if (roleLoading && !dashboardMeta) {
-    return <StockPageSkeleton kpiCount={2} showFinancial={false} />;
-  }
 
   const rows = entries ?? [];
   const isDeletedView = directoryView === "deleted" && isAdmin;

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useIsAdmin } from "@/lib/hooks/use-is-admin";
 import { ArrowLeft, History, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ type InvoiceDirectoryView = "active" | "deleted";
 
 export default function InvoiceHistoryPage() {
   const { data: session } = useSession();
+  const { isAdmin } = useIsAdmin();
   const [directoryView, setDirectoryView] = useState<InvoiceDirectoryView>("active");
   const [query, setQuery] = useState("");
   const [restoreTarget, setRestoreTarget] = useState<InvoiceListRow | null>(null);
@@ -36,10 +38,6 @@ export default function InvoiceHistoryPage() {
   const debouncedQuery = useDebouncedValue(query, 300);
   const { deleteTarget, setDeleteTarget, deleting, handleDelete } = useInvoiceDelete();
 
-  const { data: dashboardMeta } = useCachedFetch<{ role?: "ADMIN" | "RECEPTIONIST" }>(
-    "/api/dashboard"
-  );
-  const isAdmin = dashboardMeta?.role === "ADMIN" || session?.user?.role === "ADMIN";
   const isDeletedView = directoryView === "deleted" && isAdmin;
 
   const listUrl =
