@@ -27,15 +27,12 @@ export default edgeAuth(async (req) => {
   const role = req.auth?.user?.role;
   const userId = req.auth?.user?.id;
 
-  // Rate limiting on hot paths only (login, search, PDF, exports, backup restore).
   const rateLimitRequest = req as unknown as NextRequest;
   if (isApiPath(pathname)) {
     const rateLimited = applyApiRateLimitsEdge(rateLimitRequest, { userId });
     if (rateLimited) return rateLimited;
   }
 
-  // --- Page routes (not API) ---
-  // Session invalidation for disabled/deleted users: Node only (requireAuth, dashboard layout).
   if (!isApiPath(pathname)) {
     const isProtected = protectedPrefixes.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -56,7 +53,6 @@ export default edgeAuth(async (req) => {
     }
 
     if (pathname === "/login" && isLoggedIn) {
-      // Dashboard layout redirects disabled users here; do not bounce back to /dashboard (S1-07).
       if (req.nextUrl.searchParams.get("error") === "session_invalid") {
         return NextResponse.next();
       }
@@ -71,7 +67,8 @@ export default edgeAuth(async (req) => {
 
 export const config = {
   matcher: [
-    "/api/auth/:path*",
+    // Do NOT match /api/auth/* — edgeAuth would run assertConfig on those routes
+    // before the [...nextauth] handlers, causing UntrustedHost failures.
     "/api/admin/revenue/export",
     "/api/admin/backup/restore",
     "/api/customers",
